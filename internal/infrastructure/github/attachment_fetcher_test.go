@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -84,6 +85,42 @@ func TestFetch_ReturnsAnErrorForANonSuccessStatusCode(t *testing.T) {
 	_, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/missing")
 	if err == nil {
 		t.Fatal("Fetch() error = nil, want an error for a 404 response")
+	}
+}
+
+func TestFetch_ReturnsAnErrorWhenTheResponseBodyExceedsTheSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("0123456789"))
+	}))
+	defer server.Close()
+
+	fetcher := newTestAttachmentFetcher(t, server).(*attachmentFetcher)
+	fetcher.maxBytes = 5
+
+	_, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
+	if err == nil {
+		t.Fatal("Fetch() error = nil, want an error for a response body exceeding the size limit")
+	}
+	if !strings.Contains(err.Error(), "exceeds the 5-byte size limit") {
+		t.Fatalf("Fetch() error = %v, want it to mention the size-limit violation", err)
+	}
+}
+
+func TestFetch_AcceptsAResponseBodyExactlyAtTheSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("01234"))
+	}))
+	defer server.Close()
+
+	fetcher := newTestAttachmentFetcher(t, server).(*attachmentFetcher)
+	fetcher.maxBytes = 5
+
+	data, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
+	if err != nil {
+		t.Fatalf("Fetch() error = %v, want nil for a response body exactly at the size limit", err)
+	}
+	if string(data) != "01234" {
+		t.Fatalf("Fetch() data = %q, want %q", data, "01234")
 	}
 }
 
