@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-19
+
+### Fixed
+
+- Release workflow: the build-provenance attestation step now finds its
+  subject binaries, instead of failing every release with "Could not
+  find subject at path ...". Release automation only; no effect on the
+  `gh-exhibit` binary itself.
+
 ## [0.1.0] - 2026-07-19
 
 ### Added
@@ -53,5 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.0...HEAD>
+[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.1...HEAD>
+[0.1.1]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.0...v0.1.1>
 [0.1.0]: <https://github.com/connect0459/gh-exhibit/releases/tag/v0.1.0>
