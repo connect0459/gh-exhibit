@@ -1942,3 +1942,54 @@ todo.md checklist item):
 - No test file for any of this — same as `release.yml`'s own precedent;
   verified via `pre-commit run --files .github/workflows/ci.yml`
   (`check-yaml` and the rest all pass).
+
+### Community Standards and CHANGELOG (2026-07-19)
+
+Ahead of the first tagged release, GitHub's Community Standards checklist
+(`community_profile` API, `health_percentage` 28% beforehand) flagged four
+missing files; a fifth (`CHANGELOG.md`) is not on that checklist itself but
+is this author's own standing convention (present in both
+`connect0459/starlark-mbt` and `connect0459/rustgression`). All five added
+on `docs/community-health-files` (a tooling/docs change, not a `todo.md`
+checklist item, same precedent as the CI workflow entry above):
+
+- `LICENSE` — MIT, matching `connect0459/rustgression`'s choice (confirmed
+  with the user over `connect0459/starlark-mbt`'s Apache-2.0).
+- `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1, reused verbatim from
+  `connect0459/starlark-mbt`/`connect0459/rustgression` (identical between
+  both), so contributor-facing policy is consistent across this author's
+  public projects. Enforcement contact confirmed with the user as
+  `connect0459@gmail.com`, matching those same two projects.
+- `CONTRIBUTING.md` — written specific to this project's actual toolchain
+  (`just`, `pre-commit`, `golangci-lint`) rather than adapted from either
+  reference repo's language-specific instructions (MoonBit/`moon`,
+  Rust/`cargo`+Python/`uv`). Documents the dev-workflow command sequence
+  already fixed by `ci/add-go-workflow`'s CI job, the Red/Green TDD and
+  per-layer coverage conventions already recorded throughout this file and
+  `AGENTS.md`, and the commit/branch/PR conventions from `AGENTS.md`
+  verbatim so a first-time external contributor doesn't need to
+  reverse-engineer them from commit history.
+- `SECURITY.md` — scoped to this project's actual attack surface rather
+  than either reference repo's boilerplate scope: credential exposure via
+  attachment-URL host spoofing (the risk `fix/attachment-host-detection`
+  already closed), output-path traversal (`fix/issue-ref-owner-repo-
+  validation`'s risk), and resource exhaustion (`fix/attachment-fetch-
+  size-limit`'s risk) — naming the actual fixed issue classes instead of a
+  generic scope list. Reporting channel: GitHub private vulnerability
+  reporting or `connect0459@gmail.com`, both confirmed with the user.
+- `CHANGELOG.md` — follows the `Keep a Changelog` format and Semantic
+  Versioning, reusing both reference repos' maintenance-instructions
+  header comment verbatim (repo name substituted). **Pre-populated for the
+  `v0.1.0` first release, not left under `[Unreleased]`**, matching
+  `connect0459/starlark-mbt`'s own release convention (e.g. its PR #390):
+  the version section is written and merged to `main` before the
+  corresponding tag exists, so `gh release create`
+  has a matching entry the moment the tag is cut, rather than the
+  CHANGELOG trailing the release via a separate follow-up PR. Every
+  capability built across Slices 1-5 is recorded under
+  `## [0.1.0] - 2026-07-19`, with `[Unreleased]` left empty above it; the
+  footer links `[Unreleased]` as `compare/v0.1.0...HEAD` and `[0.1.0]` as
+  `releases/tag/v0.1.0`.
+- No test file for any of this — none of it is Go logic; verified via
+  `pre-commit run --files LICENSE CODE_OF_CONDUCT.md CONTRIBUTING.md
+  SECURITY.md CHANGELOG.md` (`markdownlint-cli2` and the rest all pass).
