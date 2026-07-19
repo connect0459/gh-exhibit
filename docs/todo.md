@@ -2110,7 +2110,7 @@ final step, `actions/attest-build-provenance`, failed:
   --snapshot --clean`'s asset naming and a built binary's `--version`
   output, but not this attestation step, which no snapshot run exercises
   (it only runs in `release.yml`, gated on a real tag push). Fixed on
-  `fix/attest-build-provenance-subject-path`: `subject-path` now reads
+  `ci/attest-build-provenance-subject-path`: `subject-path` now reads
   `dist/gh-exhibit_*/gh-exhibit*`, matching the real build-id-directory
   layout confirmed directly from this run's own artifact listing (not
   assumed).
