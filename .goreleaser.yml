@@ -1,0 +1,55 @@
+version: 2
+
+builds:
+  - id: gh-exhibit
+    main: ./cmd/gh-exhibit
+    binary: gh-exhibit
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
+    goos:
+      - darwin
+      - freebsd
+      - linux
+      - windows
+    goarch:
+      - "386"
+      - amd64
+      - arm
+      - arm64
+    goarm:
+      - "6"
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      - goos: freebsd
+        goarch: arm
+      - goos: windows
+        goarch: arm
+
+# format: binary uploads the raw executable (no archive), matching the
+# release-asset naming gh's own extension manager requires: a suffix of
+# exactly "{os}-{arch}[.exe]" (see cli/cli's pkg/cmd/extension/manager.go).
+archives:
+  - id: gh-exhibit
+    formats: [binary]
+    name_template: "gh-exhibit-{{ .Os }}-{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+# keep-existing (the default) leaves an already-existing release's title
+# and notes untouched and only attaches the built binaries as assets — the
+# expected flow is `gh release create vX.Y.Z --notes-file ... --target main`
+# run first (creating the tag and the curated release), which is what
+# triggers this workflow via the tag push.
+release:
+  mode: keep-existing
+
+changelog:
+  disable: true
