@@ -18,10 +18,11 @@ func TestFilename_DerivesTheExtensionFromContentType(t *testing.T) {
 		{"application/pdf", "9492692e-41a2-484f-8d3b-e149d5f2c20f.pdf"},
 	}
 
+	attachment := services.NewAttachment(url)
 	for _, c := range cases {
-		got := services.Filename(url, c.contentType)
+		got := attachment.Filename(c.contentType)
 		if got != c.want {
-			t.Fatalf("Filename(url, %q) = %q, want %q", c.contentType, got, c.want)
+			t.Fatalf("Filename(%q) = %q, want %q", c.contentType, got, c.want)
 		}
 	}
 }
@@ -29,7 +30,7 @@ func TestFilename_DerivesTheExtensionFromContentType(t *testing.T) {
 func TestFilename_IgnoresContentTypeParameters(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 
-	got := services.Filename(url, "image/png; charset=binary")
+	got := services.NewAttachment(url).Filename("image/png; charset=binary")
 
 	want := "9492692e-41a2-484f-8d3b-e149d5f2c20f.png"
 	if got != want {
@@ -40,7 +41,7 @@ func TestFilename_IgnoresContentTypeParameters(t *testing.T) {
 func TestFilename_OmitsTheExtensionForAnUnrecognizedContentType(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 
-	got := services.Filename(url, "application/octet-stream")
+	got := services.NewAttachment(url).Filename("application/octet-stream")
 
 	want := "9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	if got != want {
