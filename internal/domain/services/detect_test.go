@@ -86,6 +86,18 @@ func TestDetect_MatchesAttachmentsOnAGitHubEnterpriseServerHost(t *testing.T) {
 	}
 }
 
+func TestDetect_MatchesAttachmentsOnAGitHubEnterpriseServerHostOverPlainHTTP(t *testing.T) {
+	url := "http://github.example.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
+	markdown := []byte("before\n![alt](" + url + ")\nafter")
+
+	got := services.Detect(markdown, "github.example.com")
+
+	want := []string{url}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Detect() = %v, want %v", got, want)
+	}
+}
+
 func TestDetect_IgnoresAnAttachmentOnADifferentHostThanTheOneRequested(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte("before\n![alt](" + url + ")\nafter")
