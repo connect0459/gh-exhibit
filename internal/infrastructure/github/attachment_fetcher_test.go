@@ -93,21 +93,10 @@ func TestFetch_ReturnsAnErrorWhenTheResponseBodyExceedsTheSizeLimit(t *testing.T
 	}))
 	defer server.Close()
 
-	u, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatalf("url.Parse(%q) error = %v", server.URL, err)
-	}
-	client, err := api.NewHTTPClient(api.ClientOptions{
-		Host:      "github.localhost",
-		AuthToken: "test-token",
-		Transport: &rewriteTransport{target: u.Host},
-	})
-	if err != nil {
-		t.Fatalf("api.NewHTTPClient() error = %v", err)
-	}
-	fetcher := &attachmentFetcher{client: client, maxBytes: 5}
+	fetcher := newTestAttachmentFetcher(t, server).(*attachmentFetcher)
+	fetcher.maxBytes = 5
 
-	_, _, err = fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
+	_, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
 	if err == nil {
 		t.Fatal("Fetch() error = nil, want an error for a response body exceeding the size limit")
 	}
