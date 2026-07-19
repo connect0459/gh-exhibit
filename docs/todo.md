@@ -1648,13 +1648,15 @@ per lens below) found real issues, all fixed on `test/review-followup-fixes`:
   `internal/domain/valueobjects` (`attribution.go`, `document.go`,
   `inline_context.go`, `review_state.go`, `render.go` — 10 sites carrying
   `"entry:"`; `issue_ref.go` — 8 sites carrying `"repositories:"`, stale
-  since before `IssueRef` moved here from `domain/repositories`) and
-  `internal/domain/services` (`classify.go`, `body.go`, `join.go` — 15
-  sites carrying `"timeline:"`) all now use their actual current package
-  name, matching every sibling layer's own convention (`github:`,
-  `persistence:`, `cli:`, `services:` for the application layer). No test
-  asserted on any of the old prefix strings, so this was a safe mechanical
-  change; confirmed via `grep` before editing.
+  since before `IssueRef` moved here from `domain/repositories`) now use
+  `"valueobjects:"`, matching every infrastructure-layer package's own
+  convention (`github:`, `persistence:`, `cli:`). No test asserted on any
+  of the old prefix strings, so this was a safe mechanical change;
+  confirmed via `grep` before editing. `internal/domain/services`
+  (`classify.go`, `body.go`, `join.go` — 15 sites carrying `"timeline:"`)
+  is a separate case: see the follow-up review below, which found the
+  first-pass `"timeline:"` → `"services:"` rename here introduced a new
+  problem rather than fixing the old one.
 - **Two test-coverage gaps**, both closed with Red/Green TDD: (1)
   `internal/infrastructure/persistence`'s `WritePullRequest`/
   `WriteReviewComments` had no test for the `ctx.Err()` cancellation guard,
@@ -1670,3 +1672,56 @@ per lens below) found real issues, all fixed on `test/review-followup-fixes`:
 C0 after this round: `internal/infrastructure/persistence` 100% (up from
 96.2%), `internal/domain/services` 99.3% (up from 97.2%). `go build ./...`,
 `go vet ./...`, `go test ./... -race -cover`, and `gofmt -l .` all pass.
+
+### Human review of the "services:" prefix rename (2026-07-19)
+
+A human review (not the workflow above) of the branch this file's
+previous entry describes found that the `"timeline:"` → `"services:"`
+rename in `internal/domain/services` had itself introduced a new defect,
+still on `test/review-followup-fixes`:
+
+- **`"services:"` collides with `internal/application/services`, which
+  already used that exact tag.** `internal/` has exactly one duplicated
+  directory basename, `services` (`internal/domain/services` and
+  `internal/application/services`); every other prefix (`valueobjects:`,
+  `github:`, `persistence:`, `cli:`) names a directory unique across the
+  repo. `export_service.go`'s `BuildBody`
+  call site re-wraps the domain-layer error with its own `"services: ...`
+  message, so an attribution failure produced a doubled
+  `"services: could not derive a title and body from the issue/PR
+  resource: services: issue resource attribution: ..."` string — the
+  exact non-uniqueness the rename was meant to fix, now reintroduced
+  between these two packages specifically.
+- **Reconsidered the prefix scheme's actual audience, not just its
+  collision.** `internal/presentation/cli/run.go`'s `RunExports` prints
+  an `Export` failure straight to `stderr` via `%v` — this prefix is not
+  an internal debugging aid a maintainer sees only with the source open;
+  it is literally what `gh-exhibit`'s end user reads on a failed export.
+  A Go package or onion-architecture-layer name means nothing to that
+  reader (they have no notion of "domain" vs "application"), so a
+  layer-qualifying fix (`"domain/services:"` / `"application/services:"`)
+  was considered and rejected: it resolves the string collision but adds
+  more meaningless jargon to a user-facing message rather than less.
+- **Resolved by dropping `internal/domain/services`'s package tag
+  entirely, not by qualifying it.** Every domain-layer error in this
+  package is always re-wrapped by `internal/application/services` before
+  it reaches the CLI's output, so the inner tag was pure redundancy on
+  top of the operation-describing text it prefixed (which already reads
+  as a complete, specific explanation without it — e.g. `"issue resource
+  attribution: attribution author must not be empty"`). `SkipNote.Reason`
+  values (the other half of the 15 sites) currently reach no output at
+  all (`RunExports` only reports a skip *count*, not each reason), so the
+  same argument applies there even more directly. `internal/application/
+  services` keeps its own existing `"services:"` tag unchanged — it was
+  never part of this collision and sits at the one place (closest to the
+  CLI boundary) where a package tag might still carry marginal value.
+- This does not reopen the doc-accuracy lens's earlier verdict (no
+  findings): that lens checked specific behavioral claims (concurrency,
+  retry, coverage figures), not this file's own just-written description
+  of the rename, which this entry corrects.
+
+No test asserted on the `"services:"` tag itself (only on operation words
+like `"unmarshal"`/`"attribution"`, which are unchanged), so removing it
+required no test changes. C0 unchanged: `internal/domain/services` 99.3%.
+`go build ./...`, `go vet ./...`, `go test ./... -race -cover`, and
+`gofmt -l .` all pass.
