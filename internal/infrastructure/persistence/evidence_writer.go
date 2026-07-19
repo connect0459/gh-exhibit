@@ -28,6 +28,7 @@ func NewEvidenceWriter(baseDir string) repositories.EvidenceWriter {
 	return &evidenceWriter{baseDir: baseDir}
 }
 
+// WriteIssue implements repositories.EvidenceWriter.
 func (w *evidenceWriter) WriteIssue(ctx context.Context, ref valueobjects.IssueRef, raw json.RawMessage) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -35,6 +36,7 @@ func (w *evidenceWriter) WriteIssue(ctx context.Context, ref valueobjects.IssueR
 	return writeFile(issuePath(w.baseDir, ref, "json"), raw)
 }
 
+// WriteTimeline implements repositories.EvidenceWriter.
 func (w *evidenceWriter) WriteTimeline(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -46,6 +48,7 @@ func (w *evidenceWriter) WriteTimeline(ctx context.Context, ref valueobjects.Iss
 	return writeFile(issuePath(w.baseDir, ref, "timeline.json"), joined)
 }
 
+// WritePullRequest implements repositories.EvidenceWriter.
 func (w *evidenceWriter) WritePullRequest(ctx context.Context, ref valueobjects.IssueRef, raw json.RawMessage) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -53,6 +56,7 @@ func (w *evidenceWriter) WritePullRequest(ctx context.Context, ref valueobjects.
 	return writeFile(issuePath(w.baseDir, ref, "pull.json"), raw)
 }
 
+// WriteReviewComments implements repositories.EvidenceWriter.
 func (w *evidenceWriter) WriteReviewComments(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error {
 	if err := ctx.Err(); err != nil {
 		return err
