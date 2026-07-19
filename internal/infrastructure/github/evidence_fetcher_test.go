@@ -304,6 +304,48 @@ func TestFetchIssue_WaitsTheDurationSpecifiedByRetryAfterBeforeRetrying(t *testi
 	}
 }
 
+func TestFetchIssue_UsesFixedBackoffWhenNeitherRateLimitHeaderIsPresent(t *testing.T) {
+	req := &fakeRequester{calls: []fakeCall{
+		{err: &api.HTTPError{StatusCode: http.StatusTooManyRequests, Headers: http.Header{}}},
+		{resp: okResponse()},
+	}}
+	spy := &sleepSpy{}
+	fetcher := &evidenceFetcher{client: req, sleep: spy.sleep}
+
+	_, err := fetcher.FetchIssue(context.Background(), testIssueRef(t))
+
+	if err != nil {
+		t.Fatalf("FetchIssue() error = %v, want nil", err)
+	}
+	if req.n != 2 {
+		t.Fatalf("requester called %d times, want 2", req.n)
+	}
+	if len(spy.waits) != 1 || spy.waits[0] != fixedBackoffBase {
+		t.Fatalf("waits = %v, want [%v] (the fixed-backoff fallback for attempt 0)", spy.waits, fixedBackoffBase)
+	}
+}
+
+func TestFetchIssue_UsesFixedBackoffWhenRateLimitHeadersAreMalformed(t *testing.T) {
+	req := &fakeRequester{calls: []fakeCall{
+		{err: &api.HTTPError{StatusCode: http.StatusTooManyRequests, Headers: http.Header{
+			"Retry-After":       []string{"not-a-number"},
+			"X-RateLimit-Reset": []string{"also-not-a-number"},
+		}}},
+		{resp: okResponse()},
+	}}
+	spy := &sleepSpy{}
+	fetcher := &evidenceFetcher{client: req, sleep: spy.sleep}
+
+	_, err := fetcher.FetchIssue(context.Background(), testIssueRef(t))
+
+	if err != nil {
+		t.Fatalf("FetchIssue() error = %v, want nil", err)
+	}
+	if len(spy.waits) != 1 || spy.waits[0] != fixedBackoffBase {
+		t.Fatalf("waits = %v, want [%v] (malformed headers must fall through to the fixed-backoff fallback)", spy.waits, fixedBackoffBase)
+	}
+}
+
 func TestFetchIssue_DoesNotRetryANetworkLevelError(t *testing.T) {
 	wantErr := errors.New("connection refused")
 	req := &fakeRequester{calls: []fakeCall{{err: wantErr}}}

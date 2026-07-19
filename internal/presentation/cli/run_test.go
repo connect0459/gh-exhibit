@@ -82,6 +82,23 @@ func TestRunExports_ContinuesToTheRemainingRefsAfterAFailure(t *testing.T) {
 	}
 }
 
+func TestRunExports_ReportsAnInvalidOwnerWithoutCallingExport(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{1: {}}}
+	var stdout, stderr bytes.Buffer
+
+	got := RunExports(context.Background(), exporter, "connect_0459", "hello-world", ".", []int{1}, &stdout, &stderr)
+
+	if got != 1 {
+		t.Errorf("RunExports() = %d, want 1", got)
+	}
+	if len(exporter.calledNumbers) != 0 {
+		t.Errorf("Export was called %v times, want 0 (an invalid owner must be rejected before exporting)", exporter.calledNumbers)
+	}
+	if !strings.Contains(stderr.String(), "1") {
+		t.Errorf("stderr = %q, want it to mention the failing ref number", stderr.String())
+	}
+}
+
 func TestRunExports_PrintsAFailureLineToStderr(t *testing.T) {
 	exporter := &fakeExporter{results: map[int]fakeExportResult{
 		1: {err: errors.New("boom")},
