@@ -23,10 +23,14 @@ gh exhibit <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
   repository's context when omitted.
 - `-o`, `--output`: output directory the evidence is written under;
   defaults to `.`.
+- `--version`: print the version, commit, and build date, then exit.
 
 ### Examples
 
 ```sh
+# Print the installed version
+gh exhibit --version
+
 # Export a single PR from the current repository
 gh exhibit 10
 
