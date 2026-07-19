@@ -1,0 +1,564 @@
+package services_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/connect0459/gh-exhibit/internal/domain/services"
+	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
+)
+
+func loadTestdata(t *testing.T, name string) json.RawMessage {
+	t.Helper()
+	raw, err := os.ReadFile("testdata/" + name)
+	if err != nil {
+		t.Fatalf("unexpected error reading testdata/%s: %v", name, err)
+	}
+	return raw
+}
+
+func reviewedEventRaw(id int64, login, body string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{
+		"id": %d,
+		"event": "reviewed",
+		"user": {"login": %q},
+		"body": %q,
+		"state": "commented",
+		"submitted_at": "2026-07-02T14:19:40Z",
+		"html_url": "https://github.com/example/repo/pull/1#pullrequestreview-%d"
+	}`, id, login, body, id))
+}
+
+func commentedEventRaw(login, body, url string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{
+		"event": "commented",
+		"user": {"login": %q},
+		"body": %q,
+		"created_at": "2026-07-01T10:00:00Z",
+		"html_url": %q
+	}`, login, body, url))
+}
+
+func reviewCommentRaw(reviewID int64, login, body, path string, line int) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{
+		"pull_request_review_id": %d,
+		"user": {"login": %q},
+		"body": %q,
+		"path": %q,
+		"line": %d,
+		"diff_hunk": "@@ -1,3 +1,3 @@",
+		"created_at": "2026-07-02T14:19:39Z",
+		"html_url": "https://github.com/example/repo/pull/1#discussion_r%d"
+	}`, reviewID, login, body, path, line, line))
+}
+
+func TestBuildEntries_InsertsAnInlineCommentImmediatelyAfterItsParentReview(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{reviewCommentRaw(1001, "octocat", "Nit here.", "main.go", 10)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(entries))
+	}
+
+	if _, ok := entries[0].(valueobjects.PullRequestReview); !ok {
+		t.Fatalf("entries[0] = %#v, want PullRequestReview", entries[0])
+	}
+	if _, ok := entries[1].(valueobjects.InlineReviewComment); !ok {
+		t.Fatalf("entries[1] = %#v, want InlineReviewComment", entries[1])
+	}
+}
+
+func TestBuildEntries_PreservesOrderOfMultipleCommentsOnTheSameReview(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{
+		reviewCommentRaw(1001, "octocat", "First nit.", "main.go", 10),
+		reviewCommentRaw(1001, "octocat", "Second nit.", "main.go", 20),
+	}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("got %d entries, want 3", len(entries))
+	}
+
+	first, ok := entries[1].(valueobjects.InlineReviewComment)
+	if !ok || first.Body() != "First nit." {
+		t.Fatalf("entries[1] = %#v, want the first inline comment", entries[1])
+	}
+	second, ok := entries[2].(valueobjects.InlineReviewComment)
+	if !ok || second.Body() != "Second nit." {
+		t.Fatalf("entries[2] = %#v, want the second inline comment", entries[2])
+	}
+}
+
+func TestBuildEntries_StillRendersAReviewWithNoMatchingInlineComments(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Approved, nothing to add.")}
+
+	entries, skipped := services.BuildEntries(rawTimeline, nil)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+	if _, ok := entries[0].(valueobjects.PullRequestReview); !ok {
+		t.Fatalf("entries[0] = %#v, want PullRequestReview", entries[0])
+	}
+}
+
+func TestBuildEntries_StillRendersAnOrphanedInlineCommentAtTheEnd(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Approved.")}
+	rawComments := []json.RawMessage{
+		reviewCommentRaw(9999, "octocat", "Comment on a review we never fetched.", "main.go", 5),
+	}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(entries))
+	}
+
+	if _, ok := entries[0].(valueobjects.PullRequestReview); !ok {
+		t.Fatalf("entries[0] = %#v, want PullRequestReview", entries[0])
+	}
+	orphan, ok := entries[1].(valueobjects.InlineReviewComment)
+	if !ok || orphan.Body() != "Comment on a review we never fetched." {
+		t.Fatalf("entries[1] = %#v, want the orphaned inline comment", entries[1])
+	}
+}
+
+func TestBuildEntries_RendersAReviewAndItsCommentsOnlyOnceWhenTheReviewedEventIsDuplicated(t *testing.T) {
+	rawTimeline := []json.RawMessage{
+		reviewedEventRaw(1001, "octocat", "Overall looks fine."),
+		reviewedEventRaw(1001, "octocat", "Overall looks fine."),
+	}
+	rawComments := []json.RawMessage{reviewCommentRaw(1001, "octocat", "Nit here.", "main.go", 10)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1 (the duplicate reviewed event)", len(skipped))
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2 (one review, one comment, no duplication)", len(entries))
+	}
+
+	if _, ok := entries[0].(valueobjects.PullRequestReview); !ok {
+		t.Fatalf("entries[0] = %#v, want PullRequestReview", entries[0])
+	}
+	if _, ok := entries[1].(valueobjects.InlineReviewComment); !ok {
+		t.Fatalf("entries[1] = %#v, want InlineReviewComment", entries[1])
+	}
+}
+
+func TestBuildEntries_RendersAReviewCommentOnlyOnceWhenItsOwnIDIsDuplicated(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	comment := json.RawMessage(`{
+		"id": 9001,
+		"pull_request_review_id": 1001,
+		"user": {"login": "octocat"},
+		"body": "Nit here.",
+		"path": "main.go",
+		"line": 10,
+		"diff_hunk": "@@ -1,3 +1,3 @@",
+		"created_at": "2026-07-02T14:19:39Z",
+		"html_url": "https://github.com/example/repo/pull/1#discussion_r9001"
+	}`)
+	rawComments := []json.RawMessage{comment, comment}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1 (the duplicate review comment)", len(skipped))
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2 (one review, one comment, no duplication)", len(entries))
+	}
+
+	if _, ok := entries[0].(valueobjects.PullRequestReview); !ok {
+		t.Fatalf("entries[0] = %#v, want PullRequestReview", entries[0])
+	}
+	if _, ok := entries[1].(valueobjects.InlineReviewComment); !ok {
+		t.Fatalf("entries[1] = %#v, want InlineReviewComment", entries[1])
+	}
+}
+
+func TestBuildEntries_DoesNotJoinACommentToAMalformedReviewWithIDZero(t *testing.T) {
+	rawTimeline := []json.RawMessage{
+		reviewedEventRaw(0, "octocat", "A review missing its own id."),
+		reviewedEventRaw(2002, "octocat", "A second, well-formed review."),
+	}
+	rawComments := []json.RawMessage{
+		reviewCommentRaw(0, "octocat", "Unrelated comment whose review id also defaulted to zero.", "main.go", 5),
+	}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("got %d entries, want 3", len(entries))
+	}
+
+	// If id=0 wrongly matched pull_request_review_id=0, the comment would
+	// land at entries[1], immediately after the id-zero review, instead of
+	// at the end as an orphan.
+	if _, ok := entries[1].(valueobjects.PullRequestReview); !ok {
+		t.Fatalf("entries[1] = %#v, want the second PullRequestReview, not the comment", entries[1])
+	}
+	orphan, ok := entries[2].(valueobjects.InlineReviewComment)
+	if !ok || orphan.Body() != "Unrelated comment whose review id also defaulted to zero." {
+		t.Fatalf("entries[2] = %#v, want the orphaned inline comment", entries[2])
+	}
+}
+
+func TestBuildEntries_RendersAFileLevelReviewCommentWithoutALine(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{json.RawMessage(`{
+		"pull_request_review_id": 1001,
+		"user": {"login": "octocat"},
+		"body": "This file as a whole needs a rewrite.",
+		"path": "main.go",
+		"subject_type": "file",
+		"line": null,
+		"original_line": null,
+		"diff_hunk": "",
+		"created_at": "2026-07-02T14:19:39Z",
+		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
+	}`)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(entries))
+	}
+
+	comment, ok := entries[1].(valueobjects.InlineReviewComment)
+	if !ok {
+		t.Fatalf("entries[1] = %#v, want InlineReviewComment", entries[1])
+	}
+	if comment.Context().Line() != nil {
+		t.Fatalf("Context().Line() = %v, want nil for a file-level comment", comment.Context().Line())
+	}
+	if comment.Context().Outdated() {
+		t.Fatal("expected a file-level comment to not be marked outdated")
+	}
+}
+
+func TestBuildEntries_FallsBackToOriginalLineForAnOutdatedReviewComment(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{json.RawMessage(`{
+		"pull_request_review_id": 1001,
+		"user": {"login": "octocat"},
+		"body": "This diff has since changed underneath the comment.",
+		"path": "main.go",
+		"line": null,
+		"original_line": 346,
+		"diff_hunk": "",
+		"created_at": "2026-07-02T14:19:39Z",
+		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
+	}`)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(entries))
+	}
+
+	comment, ok := entries[1].(valueobjects.InlineReviewComment)
+	if !ok {
+		t.Fatalf("entries[1] = %#v, want InlineReviewComment", entries[1])
+	}
+	if comment.Context().Line() == nil || *comment.Context().Line() != 346 {
+		t.Fatalf("Context().Line() = %v, want 346 (original_line)", comment.Context().Line())
+	}
+	if !comment.Context().Outdated() {
+		t.Fatal("expected the comment's context to be marked outdated")
+	}
+}
+
+func TestBuildEntries_AttributesAReviewCommentFromADeletedAccountToGhost(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{json.RawMessage(`{
+		"pull_request_review_id": 1001,
+		"user": null,
+		"body": "This comment survives its author's account being deleted.",
+		"path": "main.go",
+		"line": 10,
+		"created_at": "2026-07-02T14:19:39Z",
+		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
+	}`)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(entries))
+	}
+
+	comment, ok := entries[1].(valueobjects.InlineReviewComment)
+	if !ok {
+		t.Fatalf("entries[1] = %#v, want InlineReviewComment", entries[1])
+	}
+	if comment.Attribution().Author() != "ghost" {
+		t.Fatalf("Attribution().Author() = %q, want %q", comment.Attribution().Author(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsAReviewCommentThatFailsToUnmarshal(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{json.RawMessage(`{"pull_request_review_id": "not-a-number"}`)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the review, without the unmarshalable comment)", len(entries))
+	}
+}
+
+func TestBuildEntries_SkipsAReviewCommentWithNoPath(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{reviewCommentRaw(1001, "octocat", "Nit here.", "", 10)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the review, without the pathless comment)", len(entries))
+	}
+}
+
+func TestBuildEntries_PreservesOverallOrderWhenCommentsAndReviewsInterleave(t *testing.T) {
+	rawTimeline := []json.RawMessage{
+		commentedEventRaw("alice", "First comment.", "https://github.com/example/repo/issues/1#issuecomment-1"),
+		reviewedEventRaw(1001, "octocat", "Overall looks fine."),
+		commentedEventRaw("bob", "Second comment.", "https://github.com/example/repo/issues/1#issuecomment-2"),
+	}
+	rawComments := []json.RawMessage{reviewCommentRaw(1001, "octocat", "Nit here.", "main.go", 10)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 4 {
+		t.Fatalf("got %d entries, want 4", len(entries))
+	}
+
+	first, ok := entries[0].(valueobjects.IssueComment)
+	if !ok || first.Body() != "First comment." {
+		t.Fatalf("entries[0] = %#v, want the first issue comment", entries[0])
+	}
+	if _, ok := entries[1].(valueobjects.PullRequestReview); !ok {
+		t.Fatalf("entries[1] = %#v, want PullRequestReview", entries[1])
+	}
+	if _, ok := entries[2].(valueobjects.InlineReviewComment); !ok {
+		t.Fatalf("entries[2] = %#v, want InlineReviewComment", entries[2])
+	}
+	last, ok := entries[3].(valueobjects.IssueComment)
+	if !ok || last.Body() != "Second comment." {
+		t.Fatalf("entries[3] = %#v, want the second issue comment", entries[3])
+	}
+}
+
+func TestBuildEntries_ClassifiesACommentedEventIntoAnIssueComment(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "commented_event.json")}, nil)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.IssueComment)
+	if !ok {
+		t.Fatalf("entries[0] is not an IssueComment: %#v", entries[0])
+	}
+
+	attribution, err := valueobjects.NewAttribution(
+		"cli-triage[bot]",
+		time.Date(2026, 7, 14, 16, 9, 46, 0, time.UTC),
+		"https://github.com/cli/cli/issues/13880#issuecomment-4971365859",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error building expected attribution: %v", err)
+	}
+	want := valueobjects.NewIssueComment(attribution, "This is a duplicate of #8514, which tracked the same behavior.")
+
+	if !got.Equals(want) {
+		t.Fatalf("entries[0] = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildEntries_ClassifiesAReviewedEventIntoAPullRequestReview(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "reviewed_event.json")}, nil)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.PullRequestReview)
+	if !ok {
+		t.Fatalf("entries[0] is not a PullRequestReview: %#v", entries[0])
+	}
+
+	attribution, err := valueobjects.NewAttribution(
+		"Copilot",
+		time.Date(2026, 7, 2, 14, 19, 40, 0, time.UTC),
+		"https://github.com/cli/cli/pull/13780#pullrequestreview-4618365681",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error building expected attribution: %v", err)
+	}
+	want := valueobjects.NewPullRequestReview(
+		attribution,
+		valueobjects.ReviewStateCommented,
+		"Pull request overview: hardens the GitHub CLI deployment workflow.",
+	)
+
+	if !got.Equals(want) {
+		t.Fatalf("entries[0] = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildEntries_AttributesACommentedEventFromADeletedAccountToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"event": "commented",
+		"user": null,
+		"body": "This comment survives its author's account being deleted.",
+		"created_at": "2026-07-01T00:00:00Z",
+		"html_url": "https://github.com/example/repo/issues/1#issuecomment-1"
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	comment, ok := entries[0].(valueobjects.IssueComment)
+	if !ok {
+		t.Fatalf("entries[0] is not an IssueComment: %#v", entries[0])
+	}
+	if comment.Attribution().Author() != "ghost" {
+		t.Fatalf("Attribution().Author() = %q, want %q", comment.Attribution().Author(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsAnUnparsableTimelineItemAndContinuesWithTheRest(t *testing.T) {
+	rawTimeline := []json.RawMessage{
+		json.RawMessage(`{not valid json`),
+		loadTestdata(t, "commented_event.json"),
+	}
+
+	entries, skipped := services.BuildEntries(rawTimeline, nil)
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the still-valid one)", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if string(skipped[0].Raw) != `{not valid json` {
+		t.Fatalf("skipped[0].Raw = %q, want the offending raw JSON", skipped[0].Raw)
+	}
+}
+
+func TestBuildEntries_SkipsACommentedEventThatFailsToUnmarshal(t *testing.T) {
+	raw := json.RawMessage(`{"event": "commented", "created_at": 12345}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "unmarshal") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the unmarshal failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsAReviewedEventWithAnUnrecognizedState(t *testing.T) {
+	raw := json.RawMessage(`{
+		"event": "reviewed",
+		"user": {"login": "octocat"},
+		"body": "x",
+		"state": "dismissed",
+		"submitted_at": "2026-07-01T00:00:00Z",
+		"html_url": "https://github.com/example/repo/pull/1#pullrequestreview-1"
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func TestBuildEntries_SkipsAReviewedEventThatFailsToUnmarshal(t *testing.T) {
+	raw := json.RawMessage(`{"event": "reviewed", "submitted_at": 12345}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "unmarshal") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the unmarshal failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsADuplicateCommentedEventSharingAnAlreadySeenID(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 5001,
+		"event": "commented",
+		"user": {"login": "octocat"},
+		"body": "Looks good.",
+		"created_at": "2026-07-01T00:00:00Z",
+		"html_url": "https://github.com/example/repo/issues/1#issuecomment-5001"
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil)
+
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the duplicate should be skipped)", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func TestBuildEntries_LeavesAnUnrecognizedEventKindUnclassifiedWithoutFailing(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "review_requested_event.json")}, nil)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries for an unrecognized event, want 0", len(entries))
+	}
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items for an unrecognized-but-benign event, want 0: %#v", len(skipped), skipped)
+	}
+}

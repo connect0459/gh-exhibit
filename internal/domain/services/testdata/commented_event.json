@@ -1,0 +1,10 @@
+{
+  "id": 4971365859,
+  "event": "commented",
+  "user": {
+    "login": "cli-triage[bot]"
+  },
+  "body": "This is a duplicate of #8514, which tracked the same behavior.",
+  "created_at": "2026-07-14T16:09:46Z",
+  "html_url": "https://github.com/cli/cli/issues/13880#issuecomment-4971365859"
+}
