@@ -32,7 +32,7 @@ func BuildEntries(rawTimeline, rawReviewComments []json.RawMessage) ([]valueobje
 		// render the same InlineReviewComment twice.
 		if markSeen(seenCommentIDs, id) {
 			skipped = append(skipped, SkipNote{
-				Reason: fmt.Sprintf("services: duplicate review comment id %d", id),
+				Reason: fmt.Sprintf("duplicate review comment id %d", id),
 				Raw:    raw,
 			})
 			continue
@@ -63,17 +63,17 @@ func BuildEntries(rawTimeline, rawReviewComments []json.RawMessage) ([]valueobje
 func buildReviewComment(raw json.RawMessage) (valueobjects.InlineReviewComment, int64, int64, error) {
 	var w reviewCommentWire
 	if err := json.Unmarshal(raw, &w); err != nil {
-		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("services: unmarshal review comment: %w", err)
+		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("unmarshal review comment: %w", err)
 	}
 
 	attribution, err := valueobjects.NewAttribution(w.User.resolvedLogin(), w.CreatedAt, w.HTMLURL)
 	if err != nil {
-		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("services: review comment attribution: %w", err)
+		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("review comment attribution: %w", err)
 	}
 	line, outdated := w.resolvedLine()
 	ctx, err := valueobjects.NewInlineContext(w.Path, line, w.DiffHunk, outdated)
 	if err != nil {
-		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("services: review comment context: %w", err)
+		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("review comment context: %w", err)
 	}
 
 	return valueobjects.NewInlineReviewComment(attribution, ctx, w.Body), w.ID, w.PullRequestReviewID, nil

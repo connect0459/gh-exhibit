@@ -35,7 +35,7 @@ type IssueResource struct {
 func ParseIssueResource(rawIssue json.RawMessage) (IssueResource, error) {
 	var w issueResourceWire
 	if err := json.Unmarshal(rawIssue, &w); err != nil {
-		return IssueResource{}, fmt.Errorf("services: unmarshal issue resource: %w", err)
+		return IssueResource{}, fmt.Errorf("unmarshal issue resource: %w", err)
 	}
 	return IssueResource{wire: w}, nil
 }
@@ -59,14 +59,14 @@ func BuildBody(issue IssueResource, rawPullRequest json.RawMessage) (body valueo
 
 	attribution, err := valueobjects.NewAttribution(w.User.resolvedLogin(), w.CreatedAt, w.HTMLURL)
 	if err != nil {
-		return valueobjects.Body{}, "", fmt.Errorf("services: issue resource attribution: %w", err)
+		return valueobjects.Body{}, "", fmt.Errorf("issue resource attribution: %w", err)
 	}
 
 	var mergedAt *time.Time
 	if len(rawPullRequest) > 0 {
 		var pw pullRequestResourceWire
 		if err := json.Unmarshal(rawPullRequest, &pw); err != nil {
-			return valueobjects.Body{}, "", fmt.Errorf("services: unmarshal pull request resource: %w", err)
+			return valueobjects.Body{}, "", fmt.Errorf("unmarshal pull request resource: %w", err)
 		}
 		mergedAt = pw.MergedAt
 	}
