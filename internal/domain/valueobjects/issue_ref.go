@@ -33,36 +33,36 @@ func NewIssueRef(owner, repo string, number int) (IssueRef, error) {
 		return IssueRef{}, err
 	}
 	if number <= 0 {
-		return IssueRef{}, errors.New("valueobjects: issue ref number must be positive")
+		return IssueRef{}, errors.New("issue ref number must be positive")
 	}
 	return IssueRef{owner: owner, repo: repo, number: number}, nil
 }
 
 func validateOwner(owner string) error {
 	if owner == "" {
-		return errors.New("valueobjects: issue ref owner must not be empty")
+		return errors.New("issue ref owner must not be empty")
 	}
 	if len(owner) > maxOwnerLength {
-		return fmt.Errorf("valueobjects: issue ref owner must be at most %d characters, got %d", maxOwnerLength, len(owner))
+		return fmt.Errorf("issue ref owner must be at most %d characters, got %d", maxOwnerLength, len(owner))
 	}
 	if !ownerPattern.MatchString(owner) {
-		return fmt.Errorf("valueobjects: issue ref owner %q is not a valid GitHub username", owner)
+		return fmt.Errorf("issue ref owner %q is not a valid GitHub username", owner)
 	}
 	return nil
 }
 
 func validateRepoName(repo string) error {
 	if repo == "" {
-		return errors.New("valueobjects: issue ref repo must not be empty")
+		return errors.New("issue ref repo must not be empty")
 	}
 	if repo == "." || repo == ".." {
-		return fmt.Errorf("valueobjects: issue ref repo must not be %q", repo)
+		return fmt.Errorf("issue ref repo must not be %q", repo)
 	}
 	if len(repo) > maxRepoLength {
-		return fmt.Errorf("valueobjects: issue ref repo must be at most %d characters, got %d", maxRepoLength, len(repo))
+		return fmt.Errorf("issue ref repo must be at most %d characters, got %d", maxRepoLength, len(repo))
 	}
 	if !repoPattern.MatchString(repo) {
-		return fmt.Errorf("valueobjects: issue ref repo %q is not a valid GitHub repository name", repo)
+		return fmt.Errorf("issue ref repo %q is not a valid GitHub repository name", repo)
 	}
 	return nil
 }

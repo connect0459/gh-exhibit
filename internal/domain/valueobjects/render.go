@@ -31,7 +31,7 @@ func newAttributionMeta(a Attribution) attributionMeta {
 func writeMetaLine(w io.Writer, meta any, body string) error {
 	line, err := json.Marshal(meta)
 	if err != nil {
-		return fmt.Errorf("valueobjects: marshal meta: %w", err)
+		return fmt.Errorf("marshal meta: %w", err)
 	}
 
 	body = normalizeBody(body)

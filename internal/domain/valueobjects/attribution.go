@@ -18,13 +18,13 @@ type Attribution struct {
 
 func NewAttribution(author string, created time.Time, url string) (Attribution, error) {
 	if author == "" {
-		return Attribution{}, errors.New("valueobjects: attribution author must not be empty")
+		return Attribution{}, errors.New("attribution author must not be empty")
 	}
 	if !isASCII(author) {
-		return Attribution{}, fmt.Errorf("valueobjects: attribution author %q must contain only ASCII characters", author)
+		return Attribution{}, fmt.Errorf("attribution author %q must contain only ASCII characters", author)
 	}
 	if url == "" {
-		return Attribution{}, errors.New("valueobjects: attribution url must not be empty")
+		return Attribution{}, errors.New("attribution url must not be empty")
 	}
 	return Attribution{author: author, created: created, url: url}, nil
 }
