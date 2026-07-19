@@ -28,8 +28,8 @@ gh exhibit <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
 
 ```sh
 # Export a single PR from the current repository
-gh exhibit 123
+gh exhibit 10
 
 # Export multiple issues/PRs from an explicit repository
-gh exhibit 123,124,125 --repo cli/cli -o ./evidence
+gh exhibit 10,11,12 --repo connect0459/gh-exhibit -o ./evidence
 ```
