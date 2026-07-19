@@ -282,7 +282,7 @@ func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects
 
 		filename := r.attachment.Filename(r.contentType)
 		downloads = append(downloads, downloadedAsset{filename: filename, data: r.data})
-		resolutions[r.attachment.URL()] = services.Downloaded(fmt.Sprintf("%d/assets/%s", ref.Number(), filename))
+		resolutions[r.attachment.URL()] = services.Downloaded(ref.AssetPath(filename))
 	}
 
 	return services.Rewrite(rendered, resolutions), downloads, failureLog.Bytes(), nil
