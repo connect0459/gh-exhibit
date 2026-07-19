@@ -24,13 +24,16 @@ type ExportService struct {
 	docs        repositories.DocumentWriter
 	attachments repositories.AttachmentFetcher
 	assets      repositories.AttachmentWriter
+	host        string
 }
 
 // NewExportService builds an ExportService from its five collaborating
 // ports (dependency inversion — this constructor takes abstract types,
-// not infrastructure-layer concrete implementations).
-func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.EvidenceWriter, docs repositories.DocumentWriter, attachments repositories.AttachmentFetcher, assets repositories.AttachmentWriter) *ExportService {
-	return &ExportService{fetcher: fetcher, writer: writer, docs: docs, attachments: attachments, assets: assets}
+// not infrastructure-layer concrete implementations) plus host, the target
+// repository's own host (e.g. "github.com" or a GitHub Enterprise Server
+// hostname), used to recognize that host's own attachment URLs.
+func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.EvidenceWriter, docs repositories.DocumentWriter, attachments repositories.AttachmentFetcher, assets repositories.AttachmentWriter, host string) *ExportService {
+	return &ExportService{fetcher: fetcher, writer: writer, docs: docs, attachments: attachments, assets: assets, host: host}
 }
 
 // Export fetches, classifies, and renders the evidence for ref, returning
@@ -239,7 +242,7 @@ type attachmentFetchResult struct {
 // matching how FetchIssue/FetchTimeline and the other fetch steps treat
 // the same error.
 func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects.IssueRef, rendered []byte) ([]byte, []downloadedAsset, []byte, error) {
-	urls := services.Detect(rendered)
+	urls := services.Detect(rendered, s.host)
 	if len(urls) == 0 {
 		return rendered, nil, nil, nil
 	}
