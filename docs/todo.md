@@ -1970,14 +1970,21 @@ checklist item, same precedent as the CI workflow entry above):
   verbatim so a first-time external contributor doesn't need to
   reverse-engineer them from commit history.
 - `SECURITY.md` — scoped to this project's actual attack surface rather
-  than either reference repo's boilerplate scope: credential exposure via
-  attachment-URL host spoofing (the risk `fix/attachment-host-detection`
-  already closed), resource exhaustion (`fix/attachment-fetch-size-limit`'s
-  risk), and output-path traversal (mitigated by `IssueRef`'s
-  `validateOwner`/`validateRepoName`, introduced in the initial
-  domain-layer implementation commit `5466a48`, not a dedicated fix PR) —
-  naming the actual mitigated issue classes instead of a generic scope
-  list. Reporting channel: GitHub
+  than either reference repo's boilerplate scope: resource exhaustion
+  (`fix/attachment-fetch-size-limit`'s risk), output-path traversal
+  (mitigated by `IssueRef`'s `validateOwner`/`validateRepoName`, introduced
+  in the initial domain-layer implementation commit `5466a48`, not a
+  dedicated fix PR), and credential exposure via attachment-URL host
+  spoofing. **Corrected**: an earlier draft of this entry attributed the
+  credential-exposure mitigation to `fix/attachment-host-detection` — that
+  PR's actual purpose, confirmed against its own commit `4d22181`, was
+  GitHub Enterprise Server host support (`services.Detect` hardcoded
+  `github.com`, silently skipping every attachment on a GHES repository);
+  the host-scoped attachment-URL regex it's built on (`urlPattern`) has
+  matched only the configured host, with the literal `.` already escaped,
+  since the initial domain-layer implementation commit `5466a48` — no PR
+  closed a credential-exposure hole, because the host-scoping was never
+  open to begin with. Reporting channel: GitHub
   private vulnerability reporting or `connect0459@gmail.com`, both
   confirmed with the user.
 - `CHANGELOG.md` — follows the `Keep a Changelog` format and Semantic
