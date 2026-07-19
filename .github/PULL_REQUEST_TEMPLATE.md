@@ -63,8 +63,8 @@ without this information.
 
 **Please check all items before merging.**
 
-- [ ] **Pre-commit checks**: `golangci-lint`, `gofmt`, and `go test ./...`
-      passed on every commit via the repo's pre-commit hook.
+- [ ] **CI Workflow Execution**: All checks passed on the [CI workflow](../actions/workflows/ci.yml)
+      for this PR.
 - [ ] **Code Comments**: Limited to Godoc and non-obvious WHY/WHY-NOT
       explanations, per this project's comment policy.
 - [ ] **Reference Docs**: `docs/todo.md` updated to check off completed
