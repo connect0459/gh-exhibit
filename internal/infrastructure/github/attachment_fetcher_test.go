@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -99,6 +100,9 @@ func TestFetch_ReturnsAnErrorWhenTheResponseBodyExceedsTheSizeLimit(t *testing.T
 	_, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
 	if err == nil {
 		t.Fatal("Fetch() error = nil, want an error for a response body exceeding the size limit")
+	}
+	if !strings.Contains(err.Error(), "exceeds the 5-byte size limit") {
+		t.Fatalf("Fetch() error = %v, want it to mention the size-limit violation", err)
 	}
 }
 
