@@ -43,6 +43,18 @@ func TestParseArgs_TrimsSpacesAroundCommas(t *testing.T) {
 	}
 }
 
+func TestParseArgs_DeduplicatesARepeatedNumberInFirstSeenOrder(t *testing.T) {
+	got, err := ParseArgs([]string{"123,123,124"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	want := []int{123, 124}
+	if !equalInts(got.Numbers, want) {
+		t.Errorf("Numbers = %v, want %v", got.Numbers, want)
+	}
+}
+
 func TestParseArgs_RejectsANonNumericEntry(t *testing.T) {
 	if _, err := ParseArgs([]string{"123,abc"}); err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for a non-numeric entry")

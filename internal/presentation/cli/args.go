@@ -118,10 +118,11 @@ func looksLikeANegativeNumberList(s string) bool {
 }
 
 // parseNumbers splits raw on "," and parses each trimmed part as a positive
-// issue/PR number.
+// issue/PR number, deduplicating repeats in first-seen order.
 func parseNumbers(raw string) ([]int, error) {
 	parts := strings.Split(raw, ",")
 	numbers := make([]int, 0, len(parts))
+	seen := make(map[int]bool, len(parts))
 	for _, part := range parts {
 		trimmed := strings.TrimSpace(part)
 		if trimmed == "" {
@@ -135,6 +136,10 @@ func parseNumbers(raw string) ([]int, error) {
 		if n <= 0 {
 			return nil, fmt.Errorf("issue/PR number %d must be positive", n)
 		}
+		if seen[n] {
+			continue
+		}
+		seen[n] = true
 
 		numbers = append(numbers, n)
 	}
