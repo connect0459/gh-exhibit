@@ -44,8 +44,11 @@ All items below are formally recorded in
       domain-layer target — coverage breakdown is presented per package after
       implementation, decided case by case.
 - [x] Decide a case-normalization policy for GitHub identifiers held by
-      value objects (`entry.Attribution.author`, `repositories.IssueRef`'s
-      `owner`/`repo`) — **flagged by local review (2026-07-18), resolved
+      value objects (`valueobjects.Attribution.author`,
+      `valueobjects.IssueRef`'s `owner`/`repo` — named `entry.Attribution`/
+      `repositories.IssueRef` at the time this item was flagged, before the
+      domain layer package reorganization below moved both into
+      `valueobjects`) — **flagged by local review (2026-07-18), resolved
       (2026-07-19)**. See "Case-insensitive identifier equality
       (2026-07-19)" below for what was built.
 - [x] Reconcile `CLAUDE.md`'s Evergreen Tests wording ("test names must
@@ -1611,7 +1614,10 @@ designed.
   stricter pattern here instead.
 
 C0 after this round: `internal/domain/valueobjects` 95.1% (up from
-94.9%). `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
+94.9%; a later `go test ./... -cover` run reports 95.4% for this
+package, since subsequent unrelated test additions incidentally
+exercised a few more branches — no entry below this one updates the
+figure). `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
 and `gofmt -l .` all pass.
 
 ### Repository migration and commit history reconstruction
