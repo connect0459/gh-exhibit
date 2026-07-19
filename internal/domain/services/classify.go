@@ -47,7 +47,7 @@ func classify(rawTimeline []json.RawMessage) ([]classifiedItem, map[int64]bool, 
 		var d discriminator
 		if err := json.Unmarshal(raw, &d); err != nil {
 			skipped = append(skipped, SkipNote{
-				Reason: fmt.Sprintf("timeline: peek discriminator: %v", err),
+				Reason: fmt.Sprintf("services: peek discriminator: %v", err),
 				Raw:    raw,
 			})
 			continue
@@ -65,7 +65,7 @@ func classify(rawTimeline []json.RawMessage) ([]classifiedItem, map[int64]bool, 
 			// would otherwise render the same IssueComment twice.
 			if markSeen(seenCommentedIDs, id) {
 				skipped = append(skipped, SkipNote{
-					Reason: fmt.Sprintf("timeline: duplicate commented event id %d", id),
+					Reason: fmt.Sprintf("services: duplicate commented event id %d", id),
 					Raw:    raw,
 				})
 				continue
@@ -84,7 +84,7 @@ func classify(rawTimeline []json.RawMessage) ([]classifiedItem, map[int64]bool, 
 			// comment bucketed under its id in the final render.
 			if id := item.review.id; markSeen(seenReviewIDs, id) {
 				skipped = append(skipped, SkipNote{
-					Reason: fmt.Sprintf("timeline: duplicate reviewed event id %d", id),
+					Reason: fmt.Sprintf("services: duplicate reviewed event id %d", id),
 					Raw:    raw,
 				})
 				continue
@@ -101,12 +101,12 @@ func classify(rawTimeline []json.RawMessage) ([]classifiedItem, map[int64]bool, 
 func classifyCommentedEvent(raw json.RawMessage) (classifiedItem, int64, error) {
 	var w commentedEventWire
 	if err := json.Unmarshal(raw, &w); err != nil {
-		return classifiedItem{}, 0, fmt.Errorf("timeline: unmarshal commented event: %w", err)
+		return classifiedItem{}, 0, fmt.Errorf("services: unmarshal commented event: %w", err)
 	}
 
 	attribution, err := valueobjects.NewAttribution(w.User.resolvedLogin(), w.CreatedAt, w.HTMLURL)
 	if err != nil {
-		return classifiedItem{}, 0, fmt.Errorf("timeline: commented event attribution: %w", err)
+		return classifiedItem{}, 0, fmt.Errorf("services: commented event attribution: %w", err)
 	}
 
 	return classifiedItem{direct: valueobjects.NewIssueComment(attribution, w.Body)}, w.ID, nil
@@ -115,17 +115,17 @@ func classifyCommentedEvent(raw json.RawMessage) (classifiedItem, int64, error) 
 func classifyReviewedEvent(raw json.RawMessage) (classifiedItem, error) {
 	var w reviewedEventWire
 	if err := json.Unmarshal(raw, &w); err != nil {
-		return classifiedItem{}, fmt.Errorf("timeline: unmarshal reviewed event: %w", err)
+		return classifiedItem{}, fmt.Errorf("services: unmarshal reviewed event: %w", err)
 	}
 
 	attribution, err := valueobjects.NewAttribution(w.User.resolvedLogin(), w.SubmittedAt, w.HTMLURL)
 	if err != nil {
-		return classifiedItem{}, fmt.Errorf("timeline: reviewed event attribution: %w", err)
+		return classifiedItem{}, fmt.Errorf("services: reviewed event attribution: %w", err)
 	}
 
 	state, err := valueobjects.ParseReviewState(w.State)
 	if err != nil {
-		return classifiedItem{}, fmt.Errorf("timeline: reviewed event state: %w", err)
+		return classifiedItem{}, fmt.Errorf("services: reviewed event state: %w", err)
 	}
 
 	review := valueobjects.NewPullRequestReview(attribution, state, w.Body)
