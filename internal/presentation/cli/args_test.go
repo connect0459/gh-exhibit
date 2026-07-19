@@ -183,6 +183,22 @@ func TestParseArgs_ReadsTheOutputShorthandFlag(t *testing.T) {
 	}
 }
 
+func TestParseArgs_TreatsTokensAfterADoubleDashAsLiteralPositionalText(t *testing.T) {
+	_, err := ParseArgs([]string{"--", "--repo"})
+	if err == nil {
+		t.Fatal(`ParseArgs() error = nil, want an error since "--repo" after -- is not a valid issue/PR number`)
+	}
+	if strings.Contains(err.Error(), "flag provided but not defined") {
+		t.Errorf("ParseArgs() error = %v, want a number-parsing error, not a flag-parsing error (-- must force literal positional text)", err)
+	}
+}
+
+func TestParseArgs_ReturnsAnErrorWhenAValueFlagIsTheLastToken(t *testing.T) {
+	if _, err := ParseArgs([]string{"123", "--repo"}); err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since --repo has no following value")
+	}
+}
+
 func TestParseArgs_WrapsFlagErrHelpForTheHelpFlag(t *testing.T) {
 	_, err := ParseArgs([]string{"--help"})
 	if !errors.Is(err, flag.ErrHelp) {
