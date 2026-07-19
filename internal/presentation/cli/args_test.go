@@ -199,6 +199,26 @@ func TestParseArgs_ReturnsAnErrorWhenAValueFlagIsTheLastToken(t *testing.T) {
 	}
 }
 
+func TestParseArgs_AcceptsTheVersionFlagWithoutAPositionalArgument(t *testing.T) {
+	got, err := ParseArgs([]string{"--version"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+	if !got.Version {
+		t.Errorf("Version = false, want true")
+	}
+}
+
+func TestParseArgs_TheVersionFlagTakesPriorityOverAMissingPositionalArgument(t *testing.T) {
+	got, err := ParseArgs([]string{"--repo", "octocat/hello-world", "--version"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+	if !got.Version {
+		t.Errorf("Version = false, want true")
+	}
+}
+
 func TestParseArgs_WrapsFlagErrHelpForTheHelpFlag(t *testing.T) {
 	_, err := ParseArgs([]string{"--help"})
 	if !errors.Is(err, flag.ErrHelp) {

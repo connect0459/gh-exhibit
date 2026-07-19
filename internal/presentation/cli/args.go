@@ -25,6 +25,11 @@ type Args struct {
 	// OutputDir is the -o/--output base directory the exported evidence is
 	// written under; defaults to "." (the current directory) when omitted.
 	OutputDir string
+
+	// Version is true when --version was given; the caller should print
+	// the running binary's version and exit without requiring a
+	// positional issue/PR number.
+	Version bool
 }
 
 // ParseArgs parses and validates args (typically os.Args[1:]) into an Args
@@ -36,11 +41,16 @@ func ParseArgs(args []string) (Args, error) {
 	repo := fs.String("repo", "", "target repository as owner/repo (defaults to the current repository)")
 	output := fs.String("output", ".", "output directory the evidence is written under")
 	fs.StringVar(output, "o", ".", "shorthand for --output")
+	version := fs.Bool("version", false, "print the version and exit")
 
 	flagArgs, positional := splitFlagsAndPositional(args)
 
 	if err := fs.Parse(flagArgs); err != nil {
 		return Args{}, fmt.Errorf("parse flags: %w", err)
+	}
+
+	if *version {
+		return Args{Version: true}, nil
 	}
 
 	if len(positional) != 1 {

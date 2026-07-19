@@ -16,6 +16,15 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/registry"
 )
 
+// version, commit, and date are set via -ldflags at release build time
+// (see .goreleaser.yml); a locally run `go build` leaves them at these
+// defaults.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	os.Exit(run())
 }
@@ -28,6 +37,11 @@ func run() int {
 		}
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		return 2
+	}
+
+	if args.Version {
+		_, _ = fmt.Fprintf(os.Stdout, "gh-exhibit %s (commit %s, built %s)\n", version, commit, date)
+		return 0
 	}
 
 	repo, err := cli.ResolveRepo(args.Repo, repository.Current)
