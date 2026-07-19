@@ -49,5 +49,5 @@ func NewExportService(cfg Config) (*services.ExportService, error) {
 	docs := persistence.NewDocumentWriter(cfg.OutputDir)
 	assets := persistence.NewAttachmentWriter(cfg.OutputDir)
 
-	return services.NewExportService(fetcher, writer, docs, attachments, assets), nil
+	return services.NewExportService(fetcher, writer, docs, attachments, assets, cfg.Host), nil
 }
