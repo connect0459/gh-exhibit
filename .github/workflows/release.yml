@@ -35,4 +35,9 @@ jobs:
 
       - uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
-          subject-path: "${{ github.workspace }}/dist/gh-exhibit-*"
+          # A "binary" format archive (see .goreleaser.yml) uploads its
+          # release asset under archives.name_template, but leaves the
+          # actual file on disk at its build-id directory, e.g.
+          # dist/gh-exhibit_linux_amd64_v1/gh-exhibit — never at a
+          # dist/gh-exhibit-* top-level path.
+          subject-path: "${{ github.workspace }}/dist/gh-exhibit_*/gh-exhibit*"
