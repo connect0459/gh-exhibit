@@ -25,6 +25,10 @@ type IssueRef struct {
 	number int
 }
 
+// NewIssueRef constructs an IssueRef from owner, repo, and number. It
+// returns an error if owner or repo fails GitHub's own username/
+// repository-name rules (length, character set) or if number is not
+// positive.
 func NewIssueRef(owner, repo string, number int) (IssueRef, error) {
 	if err := validateOwner(owner); err != nil {
 		return IssueRef{}, err
@@ -67,18 +71,25 @@ func validateRepoName(repo string) error {
 	return nil
 }
 
+// Owner returns the repository's owner (user or organization login).
 func (r IssueRef) Owner() string {
 	return r.owner
 }
 
+// Repo returns the repository name.
 func (r IssueRef) Repo() string {
 	return r.repo
 }
 
+// Number returns the issue or pull request number.
 func (r IssueRef) Number() int {
 	return r.number
 }
 
+// Equals reports whether r and other identify the same owner, repo, and
+// number. Owner and repo are compared case-insensitively
+// (strings.EqualFold), matching GitHub's own case-insensitive uniqueness
+// rule for both.
 func (r IssueRef) Equals(other IssueRef) bool {
 	return strings.EqualFold(r.owner, other.owner) &&
 		strings.EqualFold(r.repo, other.repo) &&

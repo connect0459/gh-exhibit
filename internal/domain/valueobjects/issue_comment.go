@@ -9,22 +9,28 @@ type IssueComment struct {
 	body        string
 }
 
+// NewIssueComment constructs an IssueComment from its attribution and body
+// text.
 func NewIssueComment(attribution Attribution, body string) IssueComment {
 	return IssueComment{attribution: attribution, body: body}
 }
 
+// Attribution returns who authored the comment and when, and its source URL.
 func (c IssueComment) Attribution() Attribution {
 	return c.attribution
 }
 
+// Body returns the comment's raw Markdown content.
 func (c IssueComment) Body() string {
 	return c.body
 }
 
+// Equals reports whether c and other have the same attribution and body.
 func (c IssueComment) Equals(other IssueComment) bool {
 	return c.attribution.Equals(other.attribution) && c.body == other.body
 }
 
+// Render writes c's meta:{...} line followed by its body, satisfying Entry.
 func (c IssueComment) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta

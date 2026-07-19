@@ -12,6 +12,9 @@ const (
 	ReviewStateCommented
 )
 
+// ParseReviewState parses GitHub's REST "reviewed" event's state field
+// ("approved", "changes_requested", "commented") into a ReviewState. It
+// returns an error for any other value.
 func ParseReviewState(raw string) (ReviewState, error) {
 	switch raw {
 	case "approved":
@@ -25,6 +28,7 @@ func ParseReviewState(raw string) (ReviewState, error) {
 	}
 }
 
+// String returns s's GitHub API spelling (e.g. "changes_requested").
 func (s ReviewState) String() string {
 	switch s {
 	case ReviewStateApproved:
