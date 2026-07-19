@@ -1624,3 +1624,49 @@ replaced with a new one. The affected parts were removed and the history
 was recommitted from scratch, so the decisions recorded above are no
 longer traceable at the commit-log level, but the final artifacts they
 produced were carried over essentially unchanged.
+
+### Cross-cutting local review after the migration (2026-07-19)
+
+With every todo.md checklist item already marked done, a fresh review was
+run across the whole repository (not scoped to one branch's diff, unlike
+every prior review round above) — six independent lenses (correctness,
+onion-architecture boundaries, test quality, comment/error-message
+conventions, security, and doc-accuracy against this file's own claims),
+each verified adversarially before being accepted. Correctness,
+architecture, security, and doc-accuracy raised nothing; two rounds (one
+per lens below) found real issues, all fixed on `test/review-followup-fixes`:
+
+- **Stale package-name error-message prefixes, left behind by the
+  2026-07-19 domain-layer reorg** (see "Domain layer package
+  reorganization" above): the reorg's own follow-up review had already
+  caught one instance of this class (the `"timeline."` → `"services."`
+  substitution corrupting the `"timeline.json"` filename literal), but
+  that check only covered the dotted-qualifier pattern, not the
+  colon-prefixed error/skip-reason pattern (`"entry: ..."`,
+  `"repositories: ..."`, `"timeline: ..."`), so 33 call sites across both
+  reorganized packages kept naming a package that no longer exists.
+  `internal/domain/valueobjects` (`attribution.go`, `document.go`,
+  `inline_context.go`, `review_state.go`, `render.go` — 10 sites carrying
+  `"entry:"`; `issue_ref.go` — 8 sites carrying `"repositories:"`, stale
+  since before `IssueRef` moved here from `domain/repositories`) and
+  `internal/domain/services` (`classify.go`, `body.go`, `join.go` — 15
+  sites carrying `"timeline:"`) all now use their actual current package
+  name, matching every sibling layer's own convention (`github:`,
+  `persistence:`, `cli:`, `services:` for the application layer). No test
+  asserted on any of the old prefix strings, so this was a safe mechanical
+  change; confirmed via `grep` before editing.
+- **Two test-coverage gaps**, both closed with Red/Green TDD: (1)
+  `internal/infrastructure/persistence`'s `WritePullRequest`/
+  `WriteReviewComments` had no test for the `ctx.Err()` cancellation guard,
+  unlike their sibling `WriteIssue`/`WriteTimeline` (2026-07-18's "ctx was
+  discarded by all four EvidenceWriter methods" fix, only tested for half
+  of the four methods it was added to); (2) `internal/domain/services`'s
+  `classifyCommentedEvent`, `classifyReviewedEvent`, and
+  `buildReviewComment` each had no test for the branch where
+  `valueobjects.NewAttribution` fails (e.g. an empty `html_url`), even
+  though every sibling failure branch in the same three functions (bad
+  state, missing path, malformed JSON) was already tested.
+
+C0 after this round: `internal/infrastructure/persistence` 100% (up from
+96.2%), `internal/domain/services` 99.3% (up from 97.2%). `go build ./...`,
+`go vet ./...`, `go test ./... -race -cover`, and `gofmt -l .` all pass.
