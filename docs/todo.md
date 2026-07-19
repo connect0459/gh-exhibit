@@ -1972,11 +1972,14 @@ checklist item, same precedent as the CI workflow entry above):
 - `SECURITY.md` — scoped to this project's actual attack surface rather
   than either reference repo's boilerplate scope: credential exposure via
   attachment-URL host spoofing (the risk `fix/attachment-host-detection`
-  already closed), output-path traversal (`fix/issue-ref-owner-repo-
-  validation`'s risk), and resource exhaustion (`fix/attachment-fetch-
-  size-limit`'s risk) — naming the actual fixed issue classes instead of a
-  generic scope list. Reporting channel: GitHub private vulnerability
-  reporting or `connect0459@gmail.com`, both confirmed with the user.
+  already closed), resource exhaustion (`fix/attachment-fetch-size-limit`'s
+  risk), and output-path traversal (mitigated by `IssueRef`'s
+  `validateOwner`/`validateRepoName`, introduced in the initial
+  domain-layer implementation commit `5466a48`, not a dedicated fix PR) —
+  naming the actual mitigated issue classes instead of a generic scope
+  list. Reporting channel: GitHub
+  private vulnerability reporting or `connect0459@gmail.com`, both
+  confirmed with the user.
 - `CHANGELOG.md` — follows the `Keep a Changelog` format and Semantic
   Versioning, reusing both reference repos' maintenance-instructions
   header comment verbatim (repo name substituted). **Pre-populated for the
