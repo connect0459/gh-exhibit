@@ -16,6 +16,9 @@ type Attribution struct {
 	url     string
 }
 
+// NewAttribution constructs an Attribution from author, created, and url.
+// It returns an error if author or url is empty, or if author contains a
+// non-ASCII character (see isASCII).
 func NewAttribution(author string, created time.Time, url string) (Attribution, error) {
 	if author == "" {
 		return Attribution{}, errors.New("attribution author must not be empty")
@@ -42,18 +45,26 @@ func isASCII(s string) bool {
 	return true
 }
 
+// Author returns the GitHub login (or "ghost" for a deleted account) that
+// this Attribution credits.
 func (a Attribution) Author() string {
 	return a.author
 }
 
+// CreatedAt returns when the attributed content was created.
 func (a Attribution) CreatedAt() time.Time {
 	return a.created
 }
 
+// URL returns the GitHub HTML URL of the attributed content.
 func (a Attribution) URL() string {
 	return a.url
 }
 
+// Equals reports whether a and other identify the same author, url, and
+// created time. Author is compared case-insensitively (strings.EqualFold),
+// matching GitHub's own case-insensitive login uniqueness rule; url and
+// created are compared exactly.
 func (a Attribution) Equals(other Attribution) bool {
 	return strings.EqualFold(a.author, other.author) &&
 		a.url == other.url &&

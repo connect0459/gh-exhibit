@@ -1,3 +1,8 @@
+// Package repositories defines the abstract ports the domain layer exposes
+// for fetching and persisting raw GitHub evidence, rendered documents, and
+// downloaded attachments — infrastructure implements each interface
+// (dependency inversion), so the application layer depends only on these
+// abstractions, never on a concrete GitHub or filesystem implementation.
 package repositories
 
 import "context"
@@ -10,5 +15,6 @@ import "context"
 // only reliable source of the attachment's file extension — the
 // user-attachments URL path does not encode one.
 type AttachmentFetcher interface {
+	// Fetch downloads url and returns its body and Content-Type.
 	Fetch(ctx context.Context, url string) (data []byte, contentType string, err error)
 }

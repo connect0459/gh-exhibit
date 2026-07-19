@@ -22,6 +22,7 @@ func NewDocumentWriter(baseDir string) repositories.DocumentWriter {
 	return &documentWriter{baseDir: baseDir}
 }
 
+// WriteDocument implements repositories.DocumentWriter.
 func (w *documentWriter) WriteDocument(ctx context.Context, ref valueobjects.IssueRef, rendered []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err

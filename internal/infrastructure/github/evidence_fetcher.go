@@ -48,18 +48,22 @@ func realSleep(ctx context.Context, d time.Duration) error {
 	}
 }
 
+// FetchIssue implements repositories.EvidenceFetcher.
 func (r *evidenceFetcher) FetchIssue(ctx context.Context, ref valueobjects.IssueRef) (json.RawMessage, error) {
 	return r.fetchSingle(ctx, issuePath(ref))
 }
 
+// FetchPullRequest implements repositories.EvidenceFetcher.
 func (r *evidenceFetcher) FetchPullRequest(ctx context.Context, ref valueobjects.IssueRef) (json.RawMessage, error) {
 	return r.fetchSingle(ctx, pullPath(ref))
 }
 
+// FetchTimeline implements repositories.EvidenceFetcher.
 func (r *evidenceFetcher) FetchTimeline(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error) {
 	return r.fetchPaginated(ctx, issuePath(ref)+"/timeline")
 }
 
+// FetchReviewComments implements repositories.EvidenceFetcher.
 func (r *evidenceFetcher) FetchReviewComments(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error) {
 	return r.fetchPaginated(ctx, pullPath(ref)+"/comments")
 }

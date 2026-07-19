@@ -1789,3 +1789,93 @@ No test asserted on any of the removed tags; only on operation words
 (`"unmarshal"`, `"attribution"`, etc.), all unchanged, so no test needed
 updating. C0 unchanged across every touched package. `go build ./...`,
 `go vet ./...`, `go test ./... -race -cover`, and `gofmt -l .` all pass.
+
+### Comment cleanup: Godoc coverage and thin-comment enhancements (2026-07-19)
+
+The user raised two concerns about the codebase's current comment state:
+few Godoc comments document parameters/return values, and a handful of
+comments look like they might just restate obvious WHAT. Addressed on
+`docs/comment-cleanup`, one package per commit (confirmed with the user
+before starting):
+
+- **A full survey preceded any edit** (workflow effort=high Explore
+  agent, not a fresh local-review round): every non-test `.go` file under
+  `internal/` and `cmd/` was inventoried for exported members lacking
+  Godoc, existing Godoc quality, and any comment resembling pure
+  WHAT-restatement. **Finding: this codebase's existing comment culture
+  already skews WHY** — no egregious pure-WHAT violation was found
+  anywhere; every WHY/WHY-NOT comment cited in prior review rounds
+  (`isASCII`'s Unicode case-folding rationale, `joinRawArray`'s
+  verbatim-bytes rationale, the concurrent-fetch cancellation-priority
+  comments, etc.) was left untouched. The real gap was the first
+  concern: most exported constructors/getters/`Equals`/`Render` methods
+  in `internal/domain/valueobjects`, and the `Fetch*`/`Write*`
+  implementation methods in `internal/infrastructure/{github,
+  persistence}`, had no Godoc at all.
+- **Scope confirmed with the user**: also add a package-level doc
+  comment to the three packages that had none
+  (`internal/domain/repositories`, `internal/infrastructure/persistence`,
+  `internal/application/services`) — an extension beyond the user's
+  literal ask, since consistency with every sibling package (which all
+  already had one) was judged worth the small addition.
+- `internal/domain/valueobjects`: every previously-undocumented exported
+  constructor, getter, `Equals`, and `Render` across all nine files
+  gained a one-line Godoc, documenting nil-handling and case-insensitive-
+  comparison semantics where non-obvious (e.g. `Attribution.Equals`,
+  `IssueRef.Equals`).
+- `internal/domain/repositories`: added the package doc comment plus a
+  Godoc on every interface method that had none (`Fetch`, `WriteAsset`,
+  `WriteDocument`, all four `EvidenceFetcher`/`EvidenceWriter` methods).
+  `WriteAsset`'s existing comment was enhanced to name its `data`
+  parameter explicitly.
+- `internal/infrastructure/github` /
+  `internal/infrastructure/persistence`: each `Fetch*`/`Write*`
+  implementation method gained a one-line Godoc pointing back to the
+  `repositories` interface it implements, whose own doc comment already
+  covers behavior in full — matching this codebase's existing pattern of
+  not duplicating the same explanation at both the interface and its
+  implementation.
+- `internal/application/services`: added the package doc comment,
+  including a note distinguishing it from the identically-named
+  `internal/domain/services` package (two Go packages sharing a base
+  name, at different import paths — already a source of confusion once
+  before, during the error-message-prefix rounds above).
+- `internal/registry`: `Config.Host`/`Config.OutputDir`'s field comments
+  previously just restated the field name; both now name which of
+  `NewExportService`'s constructed collaborators actually consumes them.
+- **Considered and left as-is**: `internal/presentation/cli/args.go`'s
+  `Args` type comment and `internal/domain/valueobjects/attribution.go`/
+  `issue_comment.go`'s type comments were flagged by the survey as
+  borderline-thin, but each already adds concrete, non-obvious context
+  (the `meta:{...}` line format, the source timeline event, or — for
+  `Args` — that the shape is validated, with the real substance carried
+  by its own field-level comments) rather than merely restating the
+  identifier, so rewriting them would have been enhancement for its own
+  sake, not a fix for a real violation.
+- No behavior change anywhere — comment-only across all seven commits.
+  C0 unchanged in every package touched:
+  `internal/domain/valueobjects` 95.4%, `internal/infrastructure/github`
+  91.7%, `internal/infrastructure/persistence` 100%,
+  `internal/application/services` 97.2%, `internal/presentation/cli`
+  98.8%. `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
+  and `gofmt -l .` all pass after every commit.
+
+### Local review of the comment cleanup (2026-07-19)
+
+A local review of the above found one confirmed correctness issue,
+addressed on the same `docs/comment-cleanup` branch; every other Godoc
+checked (`Attribution.Equals`'s case-insensitive comparison, `IssueRef`'s
+validation rules, `registry.Config`'s field descriptions) was verified
+accurate against its actual implementation.
+
+- **`DocumentWriter.WriteDocument`'s Godoc was not a grammatical
+  sentence.** It read "WriteDocument persists rendered, ref's fully
+  rendered Markdown document." — a leftover mid-edit artifact (the
+  `rendered` parameter name spliced in without finishing the sentence
+  around it), unlike every other Godoc added in this pass. Reworded to
+  "WriteDocument persists ref's fully rendered Markdown document.",
+  matching the sibling `EvidenceWriter` methods' own "persists ref's ...
+  resource" phrasing rather than naming the parameter explicitly.
+
+No behavior change; `go build ./...`, `go vet ./...`,
+`go test ./... -race -cover`, and `gofmt -l .` all pass.

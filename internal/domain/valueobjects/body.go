@@ -15,26 +15,35 @@ type Body struct {
 	mergedAt    *time.Time
 }
 
+// NewBody constructs a Body from its attribution, content, and optional
+// closed/merged timestamps (nil when not applicable).
 func NewBody(attribution Attribution, content string, closedAt, mergedAt *time.Time) Body {
 	return Body{attribution: attribution, content: content, closedAt: closedAt, mergedAt: mergedAt}
 }
 
+// Attribution returns who authored the body and when, and its source URL.
 func (b Body) Attribution() Attribution {
 	return b.attribution
 }
 
+// Content returns the body's raw Markdown content.
 func (b Body) Content() string {
 	return b.content
 }
 
+// ClosedAt returns when the issue/PR was closed, or nil if it is still open.
 func (b Body) ClosedAt() *time.Time {
 	return b.closedAt
 }
 
+// MergedAt returns when the pull request was merged, or nil if it was never
+// merged (including for a plain issue, which has no merge concept).
 func (b Body) MergedAt() *time.Time {
 	return b.mergedAt
 }
 
+// Equals reports whether b and other have the same attribution, content,
+// and closed/merged timestamps.
 func (b Body) Equals(other Body) bool {
 	return b.attribution.Equals(other.attribution) &&
 		b.content == other.content &&
@@ -46,6 +55,8 @@ func equalTimePointers(a, b *time.Time) bool {
 	return equalPointers(a, b, func(x, y time.Time) bool { return x.Equal(y) })
 }
 
+// Render writes b's meta:{...} line followed by its content, satisfying
+// Entry.
 func (b Body) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta

@@ -15,8 +15,15 @@ import (
 // EvidenceFetcher's fetch shape; concatenating them into ADR-002's
 // single persisted array per file is this port's implementation's job.
 type EvidenceWriter interface {
+	// WriteIssue persists ref's raw issue or pull request resource
+	// verbatim.
 	WriteIssue(ctx context.Context, ref valueobjects.IssueRef, raw json.RawMessage) error
+	// WriteTimeline persists ref's timeline items, concatenated into a
+	// single JSON array.
 	WriteTimeline(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error
+	// WritePullRequest persists ref's raw pull request resource verbatim.
 	WritePullRequest(ctx context.Context, ref valueobjects.IssueRef, raw json.RawMessage) error
+	// WriteReviewComments persists ref's review comment items,
+	// concatenated into a single JSON array.
 	WriteReviewComments(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error
 }

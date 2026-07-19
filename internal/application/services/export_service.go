@@ -1,3 +1,8 @@
+// Package services implements gh-exhibit's application layer: orchestrating
+// the domain and infrastructure layers into a single Export operation for
+// one issue or pull request. Despite the shared package name, this is
+// distinct from internal/domain/services, which holds domain-layer
+// transformation logic.
 package services
 
 import (

@@ -50,6 +50,7 @@ func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetche
 	return &attachmentFetcher{client: client, maxBytes: maxAttachmentBytes}, nil
 }
 
+// Fetch implements repositories.AttachmentFetcher.
 func (f *attachmentFetcher) Fetch(ctx context.Context, url string) ([]byte, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

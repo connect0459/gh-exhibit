@@ -14,8 +14,15 @@ import (
 // services.BuildEntries already consumes, rather than a single
 // concatenated blob.
 type EvidenceFetcher interface {
+	// FetchIssue fetches ref's issue or pull request resource.
 	FetchIssue(ctx context.Context, ref valueobjects.IssueRef) (json.RawMessage, error)
+	// FetchTimeline fetches ref's timeline, one raw JSON element per item
+	// across all pages.
 	FetchTimeline(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error)
+	// FetchPullRequest fetches ref's pull request resource. Callers should
+	// only call this once ref is known to be a pull request.
 	FetchPullRequest(ctx context.Context, ref valueobjects.IssueRef) (json.RawMessage, error)
+	// FetchReviewComments fetches ref's inline review comments, one raw
+	// JSON element per item across all pages.
 	FetchReviewComments(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error)
 }

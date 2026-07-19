@@ -23,11 +23,14 @@ import (
 // "succeed" — reaching the wrong host or the wrong directory only shows up
 // at runtime).
 type Config struct {
-	// Host is the target repository's host (e.g. "github.com").
+	// Host is the target repository's host (e.g. "github.com"), scoping
+	// both the GitHub REST and attachment-download clients this
+	// constructor builds.
 	Host string
 
-	// OutputDir is the local filesystem directory evidence is written
-	// under.
+	// OutputDir is the local filesystem directory this constructor's
+	// writers persist raw evidence, rendered Markdown, and downloaded
+	// attachments under.
 	OutputDir string
 }
 

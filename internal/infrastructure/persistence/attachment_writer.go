@@ -1,3 +1,6 @@
+// Package persistence implements gh-exhibit's domain-layer repository
+// ports (EvidenceWriter, DocumentWriter, AttachmentWriter) against the
+// local filesystem, per ADR-002's on-disk layout.
 package persistence
 
 import (
@@ -27,6 +30,7 @@ func NewAttachmentWriter(baseDir string) repositories.AttachmentWriter {
 	return &attachmentWriter{baseDir: baseDir}
 }
 
+// WriteAsset implements repositories.AttachmentWriter.
 func (w *attachmentWriter) WriteAsset(ctx context.Context, ref valueobjects.IssueRef, filename string, data []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err

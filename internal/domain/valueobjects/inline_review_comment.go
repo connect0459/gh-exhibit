@@ -16,28 +16,37 @@ type InlineReviewComment struct {
 	body        string
 }
 
+// NewInlineReviewComment constructs an InlineReviewComment from its
+// attribution, file/line context, and body text.
 func NewInlineReviewComment(attribution Attribution, context InlineContext, body string) InlineReviewComment {
 	return InlineReviewComment{attribution: attribution, context: context, body: body}
 }
 
+// Attribution returns who authored the comment and when, and its source URL.
 func (c InlineReviewComment) Attribution() Attribution {
 	return c.attribution
 }
 
+// Context returns the file/line the comment is anchored to.
 func (c InlineReviewComment) Context() InlineContext {
 	return c.context
 }
 
+// Body returns the comment's raw Markdown content.
 func (c InlineReviewComment) Body() string {
 	return c.body
 }
 
+// Equals reports whether c and other have the same attribution, context,
+// and body.
 func (c InlineReviewComment) Equals(other InlineReviewComment) bool {
 	return c.attribution.Equals(other.attribution) &&
 		c.context.Equals(other.context) &&
 		c.body == other.body
 }
 
+// Render writes c's meta:{...} line, its body, and — when present — its
+// diff hunk under a "**Diff:**" label, satisfying Entry.
 func (c InlineReviewComment) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta
