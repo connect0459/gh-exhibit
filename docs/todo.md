@@ -1859,3 +1859,23 @@ before starting):
   `internal/application/services` 97.2%, `internal/presentation/cli`
   98.8%. `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
   and `gofmt -l .` all pass after every commit.
+
+### Local review of the comment cleanup (2026-07-19)
+
+A local review of the above found one confirmed correctness issue,
+addressed on the same `docs/comment-cleanup` branch; every other Godoc
+checked (`Attribution.Equals`'s case-insensitive comparison, `IssueRef`'s
+validation rules, `registry.Config`'s field descriptions) was verified
+accurate against its actual implementation.
+
+- **`DocumentWriter.WriteDocument`'s Godoc was not a grammatical
+  sentence.** It read "WriteDocument persists rendered, ref's fully
+  rendered Markdown document." — a leftover mid-edit artifact (the
+  `rendered` parameter name spliced in without finishing the sentence
+  around it), unlike every other Godoc added in this pass. Reworded to
+  "WriteDocument persists ref's fully rendered Markdown document.",
+  matching the sibling `EvidenceWriter` methods' own "persists ref's ...
+  resource" phrasing rather than naming the parameter explicitly.
+
+No behavior change; `go build ./...`, `go vet ./...`,
+`go test ./... -race -cover`, and `gofmt -l .` all pass.
