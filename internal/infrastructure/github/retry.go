@@ -24,7 +24,7 @@ type requester interface {
 
 // sleeper waits d, honoring ctx cancellation, so a caller can interrupt an
 // in-progress rate-limit wait (X-RateLimit-Reset can be up to an hour out)
-// instead of blocking uninterruptibly. realSleep (evidence_repository.go) is
+// instead of blocking uninterruptibly. realSleep (evidence_fetcher.go) is
 // the production implementation; tests substitute a spy that returns
 // immediately.
 type sleeper func(ctx context.Context, d time.Duration) error
