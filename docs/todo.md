@@ -2087,3 +2087,41 @@ tooling change has no test file, same precedent as `release.yml` itself):
 `gofmt -l .` all pass. No release tag has been pushed yet to exercise the
 new workflow for real — deferred to whenever the user is ready to publish,
 same as the original distribution-scaffolding entry's own deferral.
+
+### `v0.1.0` release and a real-run-only `release.yml` bug (2026-07-19)
+
+`v0.1.0` was tagged via `gh release create v0.1.0 --title "v0.1.0"
+--notes-file .connect0459/gh-release-draft.md --target main` (#15 merged
+first, closing #10), the first time `release.yml` ran against a real tag
+push rather than a local `goreleaser --snapshot` dry run. GoReleaser
+itself succeeded — all 12 platform binaries and `checksums.txt` were
+built and attached to the GitHub Release correctly — but the workflow's
+final step, `actions/attest-build-provenance`, failed:
+
+- **`subject-path: dist/gh-exhibit-*` matched nothing on disk.** A
+  `formats: [binary]` archive (per `.goreleaser.yml`) uploads its release
+  asset under `archives.name_template` (`gh-exhibit-{os}-{arch}`), but
+  that renaming happens only at upload time — the actual built file stays
+  at its build-id directory the whole run, e.g.
+  `dist/gh-exhibit_linux_amd64_v1/gh-exhibit` or
+  `dist/gh-exhibit_windows_386_sse2/gh-exhibit.exe`, never at a
+  `dist/gh-exhibit-*` top-level path. The `--version` flag entry's own
+  "verified end-to-end" claim above covered `goreleaser release
+  --snapshot --clean`'s asset naming and a built binary's `--version`
+  output, but not this attestation step, which no snapshot run exercises
+  (it only runs in `release.yml`, gated on a real tag push). Fixed on
+  `ci/attest-build-provenance-subject-path`: `subject-path` now reads
+  `dist/gh-exhibit_*/gh-exhibit*`, matching the real build-id-directory
+  layout confirmed directly from this run's own artifact listing (not
+  assumed).
+- The GitHub Release itself needed no fix or re-run — its assets were
+  already correct and complete before the failing step ran; only the
+  build-provenance attestation was missing. This gap is deferred to the
+  next tag push (no in-place way to re-run just the attestation step
+  against `v0.1.0`'s existing assets without re-running the whole
+  release).
+- No test file for a workflow YAML change, same precedent as
+  `release.yml`/`ci.yml`'s own prior entries; verified via `pre-commit
+  run --files .github/workflows/release.yml` (`check-yaml` passes) and by
+  reproducing the exact on-disk paths from the failed run's own artifact
+  JSON, not by re-running GoReleaser locally.
