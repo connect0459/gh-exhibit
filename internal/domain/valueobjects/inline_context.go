@@ -18,13 +18,13 @@ type InlineContext struct {
 
 func NewInlineContext(path string, line *int, diffHunk string, outdated bool) (InlineContext, error) {
 	if path == "" {
-		return InlineContext{}, errors.New("entry: inline context path must not be empty")
+		return InlineContext{}, errors.New("inline context path must not be empty")
 	}
 	if line != nil && *line <= 0 {
-		return InlineContext{}, errors.New("entry: inline context line must be positive when present")
+		return InlineContext{}, errors.New("inline context line must be positive when present")
 	}
 	if line == nil && outdated {
-		return InlineContext{}, errors.New("entry: inline context cannot be outdated without a line")
+		return InlineContext{}, errors.New("inline context cannot be outdated without a line")
 	}
 	return InlineContext{path: path, line: line, diffHunk: diffHunk, outdated: outdated}, nil
 }

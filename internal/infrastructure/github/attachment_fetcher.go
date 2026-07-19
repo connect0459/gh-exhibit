@@ -37,7 +37,7 @@ type attachmentFetcher struct {
 func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetcher, error) {
 	client, err := api.NewHTTPClient(opts)
 	if err != nil {
-		return nil, fmt.Errorf("github: new HTTP client: %w", err)
+		return nil, fmt.Errorf("create the GitHub-authenticated HTTP client: %w", err)
 	}
 
 	return &attachmentFetcher{client: client}, nil
@@ -46,22 +46,22 @@ func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetche
 func (f *attachmentFetcher) Fetch(ctx context.Context, url string) ([]byte, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, "", fmt.Errorf("github: build request for %s: %w", url, err)
+		return nil, "", fmt.Errorf("build request for %s: %w", url, err)
 	}
 
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("github: fetch %s: %w", url, err)
+		return nil, "", fmt.Errorf("fetch %s: %w", url, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, "", fmt.Errorf("github: fetch %s: unexpected status %d", url, resp.StatusCode)
+		return nil, "", fmt.Errorf("fetch %s: unexpected status %d", url, resp.StatusCode)
 	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, "", fmt.Errorf("github: read response body for %s: %w", url, err)
+		return nil, "", fmt.Errorf("read response body for %s: %w", url, err)
 	}
 
 	return data, resp.Header.Get("Content-Type"), nil

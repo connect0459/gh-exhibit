@@ -333,6 +333,69 @@ func TestBuildEntries_SkipsAReviewCommentThatFailsToUnmarshal(t *testing.T) {
 	}
 }
 
+func TestBuildEntries_SkipsACommentedEventWithNoHTMLURL(t *testing.T) {
+	raw := commentedEventRaw("octocat", "Looks good.", "")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "attribution") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the attribution failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsAReviewedEventWithNoHTMLURL(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1001,
+		"event": "reviewed",
+		"user": {"login": "octocat"},
+		"body": "Overall looks fine.",
+		"state": "commented",
+		"submitted_at": "2026-07-02T14:19:40Z",
+		"html_url": ""
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "attribution") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the attribution failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsAReviewCommentWithNoHTMLURL(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{json.RawMessage(`{
+		"pull_request_review_id": 1001,
+		"user": {"login": "octocat"},
+		"body": "Nit here.",
+		"path": "main.go",
+		"line": 10,
+		"diff_hunk": "@@ -1,3 +1,3 @@",
+		"created_at": "2026-07-02T14:19:39Z",
+		"html_url": ""
+	}`)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the review, without the URL-less comment)", len(entries))
+	}
+	if !strings.Contains(skipped[0].Reason, "attribution") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the attribution failure", skipped[0].Reason)
+	}
+}
+
 func TestBuildEntries_SkipsAReviewCommentWithNoPath(t *testing.T) {
 	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
 	rawComments := []json.RawMessage{reviewCommentRaw(1001, "octocat", "Nit here.", "", 10)}

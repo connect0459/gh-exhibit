@@ -40,11 +40,11 @@ func ParseArgs(args []string) (Args, error) {
 	flagArgs, positional := splitFlagsAndPositional(args)
 
 	if err := fs.Parse(flagArgs); err != nil {
-		return Args{}, fmt.Errorf("cli: parse flags: %w", err)
+		return Args{}, fmt.Errorf("parse flags: %w", err)
 	}
 
 	if len(positional) != 1 {
-		return Args{}, fmt.Errorf("cli: expected exactly one issue/PR number argument (a single number or a comma-separated list), got %d", len(positional))
+		return Args{}, fmt.Errorf("expected exactly one issue/PR number argument (a single number or a comma-separated list), got %d", len(positional))
 	}
 
 	numbers, err := parseNumbers(positional[0])
@@ -125,15 +125,15 @@ func parseNumbers(raw string) ([]int, error) {
 	for _, part := range parts {
 		trimmed := strings.TrimSpace(part)
 		if trimmed == "" {
-			return nil, fmt.Errorf("cli: empty issue/PR number in list %q", raw)
+			return nil, fmt.Errorf("empty issue/PR number in list %q", raw)
 		}
 
 		n, err := strconv.Atoi(trimmed)
 		if err != nil {
-			return nil, fmt.Errorf("cli: %q is not a valid issue/PR number: %w", trimmed, err)
+			return nil, fmt.Errorf("%q is not a valid issue/PR number: %w", trimmed, err)
 		}
 		if n <= 0 {
-			return nil, fmt.Errorf("cli: issue/PR number %d must be positive", n)
+			return nil, fmt.Errorf("issue/PR number %d must be positive", n)
 		}
 
 		numbers = append(numbers, n)

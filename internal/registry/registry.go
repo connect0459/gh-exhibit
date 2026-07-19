@@ -37,12 +37,12 @@ type Config struct {
 func NewExportService(cfg Config) (*services.ExportService, error) {
 	fetcher, err := github.NewEvidenceFetcher(api.ClientOptions{Host: cfg.Host})
 	if err != nil {
-		return nil, fmt.Errorf("registry: could not create the GitHub evidence client: %w", err)
+		return nil, fmt.Errorf("could not create the GitHub evidence client: %w", err)
 	}
 
 	attachments, err := github.NewAttachmentFetcher(api.ClientOptions{Host: cfg.Host})
 	if err != nil {
-		return nil, fmt.Errorf("registry: could not create the GitHub attachment client: %w", err)
+		return nil, fmt.Errorf("could not create the GitHub attachment client: %w", err)
 	}
 
 	writer := persistence.NewEvidenceWriter(cfg.OutputDir)

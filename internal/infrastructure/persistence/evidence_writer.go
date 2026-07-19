@@ -41,7 +41,7 @@ func (w *evidenceWriter) WriteTimeline(ctx context.Context, ref valueobjects.Iss
 	}
 	joined, err := joinRawArray(items)
 	if err != nil {
-		return fmt.Errorf("persistence: could not combine the timeline pages into one array for %s/%d: %w", ref.Repo(), ref.Number(), err)
+		return fmt.Errorf("could not combine the timeline pages into one array for %s/%d: %w", ref.Repo(), ref.Number(), err)
 	}
 	return writeFile(issuePath(w.baseDir, ref, "timeline.json"), joined)
 }
@@ -59,7 +59,7 @@ func (w *evidenceWriter) WriteReviewComments(ctx context.Context, ref valueobjec
 	}
 	joined, err := joinRawArray(items)
 	if err != nil {
-		return fmt.Errorf("persistence: could not combine the review comment pages into one array for %s/%d: %w", ref.Repo(), ref.Number(), err)
+		return fmt.Errorf("could not combine the review comment pages into one array for %s/%d: %w", ref.Repo(), ref.Number(), err)
 	}
 	return writeFile(issuePath(w.baseDir, ref, "review-comments.json"), joined)
 }
@@ -81,7 +81,7 @@ func joinRawArray(items []json.RawMessage) ([]byte, error) {
 	buf.WriteByte('[')
 	for i, item := range items {
 		if len(item) == 0 {
-			return nil, fmt.Errorf("persistence: item %d is empty", i)
+			return nil, fmt.Errorf("item %d is empty", i)
 		}
 		if i > 0 {
 			buf.WriteByte(',')
@@ -94,10 +94,10 @@ func joinRawArray(items []json.RawMessage) ([]byte, error) {
 
 func writeFile(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("persistence: create directory for %s: %w", path, err)
+		return fmt.Errorf("create directory for %s: %w", path, err)
 	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
-		return fmt.Errorf("persistence: could not save data to %s: %w", path, err)
+		return fmt.Errorf("could not save data to %s: %w", path, err)
 	}
 	return nil
 }

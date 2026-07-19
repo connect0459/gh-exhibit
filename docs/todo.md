@@ -1624,3 +1624,162 @@ replaced with a new one. The affected parts were removed and the history
 was recommitted from scratch, so the decisions recorded above are no
 longer traceable at the commit-log level, but the final artifacts they
 produced were carried over essentially unchanged.
+
+### Cross-cutting local review after the migration (2026-07-19)
+
+With every todo.md checklist item already marked done, a fresh review was
+run across the whole repository (not scoped to one branch's diff, unlike
+every prior review round above) — six independent lenses (correctness,
+onion-architecture boundaries, test quality, comment/error-message
+conventions, security, and doc-accuracy against this file's own claims),
+each verified adversarially before being accepted. Correctness,
+architecture, security, and doc-accuracy raised nothing; two rounds (one
+per lens below) found real issues, all fixed on `test/review-followup-fixes`:
+
+- **Stale package-name error-message prefixes, left behind by the
+  2026-07-19 domain-layer reorg** (see "Domain layer package
+  reorganization" above): the reorg's own follow-up review had already
+  caught one instance of this class (the `"timeline."` → `"services."`
+  substitution corrupting the `"timeline.json"` filename literal), but
+  that check only covered the dotted-qualifier pattern, not the
+  colon-prefixed error/skip-reason pattern (`"entry: ..."`,
+  `"repositories: ..."`, `"timeline: ..."`), so 33 call sites across both
+  reorganized packages kept naming a package that no longer exists.
+  `internal/domain/valueobjects` (`attribution.go`, `document.go`,
+  `inline_context.go`, `review_state.go`, `render.go` — 10 sites carrying
+  `"entry:"`; `issue_ref.go` — 8 sites carrying `"repositories:"`, stale
+  since before `IssueRef` moved here from `domain/repositories`) now use
+  `"valueobjects:"`, matching every infrastructure-layer package's own
+  convention (`github:`, `persistence:`, `cli:`). No test asserted on any
+  of the old prefix strings, so this was a safe mechanical change;
+  confirmed via `grep` before editing. `internal/domain/services`
+  (`classify.go`, `body.go`, `join.go` — 15 sites carrying `"timeline:"`)
+  is a separate case: see the follow-up review below, which found the
+  first-pass `"timeline:"` → `"services:"` rename here introduced a new
+  problem rather than fixing the old one.
+- **Two test-coverage gaps**, both closed with Red/Green TDD: (1)
+  `internal/infrastructure/persistence`'s `WritePullRequest`/
+  `WriteReviewComments` had no test for the `ctx.Err()` cancellation guard,
+  unlike their sibling `WriteIssue`/`WriteTimeline` (2026-07-18's "ctx was
+  discarded by all four EvidenceWriter methods" fix, only tested for half
+  of the four methods it was added to); (2) `internal/domain/services`'s
+  `classifyCommentedEvent`, `classifyReviewedEvent`, and
+  `buildReviewComment` each had no test for the branch where
+  `valueobjects.NewAttribution` fails (e.g. an empty `html_url`), even
+  though every sibling failure branch in the same three functions (bad
+  state, missing path, malformed JSON) was already tested.
+
+C0 after this round: `internal/infrastructure/persistence` 100% (up from
+96.2%), `internal/domain/services` 99.3% (up from 97.2%). `go build ./...`,
+`go vet ./...`, `go test ./... -race -cover`, and `gofmt -l .` all pass.
+
+### Human review of the "services:" prefix rename (2026-07-19)
+
+A human review (not the workflow above) of the branch this file's
+previous entry describes found that the `"timeline:"` → `"services:"`
+rename in `internal/domain/services` had itself introduced a new defect,
+still on `test/review-followup-fixes`:
+
+- **`"services:"` collides with `internal/application/services`, which
+  already used that exact tag.** `internal/` has exactly one duplicated
+  directory basename, `services` (`internal/domain/services` and
+  `internal/application/services`); every other prefix (`valueobjects:`,
+  `github:`, `persistence:`, `cli:`) names a directory unique across the
+  repo. `export_service.go`'s `BuildBody`
+  call site re-wraps the domain-layer error with its own `"services: ...`
+  message, so an attribution failure produced a doubled
+  `"services: could not derive a title and body from the issue/PR
+  resource: services: issue resource attribution: ..."` string — the
+  exact non-uniqueness the rename was meant to fix, now reintroduced
+  between these two packages specifically.
+- **Reconsidered the prefix scheme's actual audience, not just its
+  collision.** `internal/presentation/cli/run.go`'s `RunExports` prints
+  an `Export` failure straight to `stderr` via `%v` — this prefix is not
+  an internal debugging aid a maintainer sees only with the source open;
+  it is literally what `gh-exhibit`'s end user reads on a failed export.
+  A Go package or onion-architecture-layer name means nothing to that
+  reader (they have no notion of "domain" vs "application"), so a
+  layer-qualifying fix (`"domain/services:"` / `"application/services:"`)
+  was considered and rejected: it resolves the string collision but adds
+  more meaningless jargon to a user-facing message rather than less.
+- **Resolved by dropping `internal/domain/services`'s package tag
+  entirely, not by qualifying it.** Every domain-layer error in this
+  package is always re-wrapped by `internal/application/services` before
+  it reaches the CLI's output, so the inner tag was pure redundancy on
+  top of the operation-describing text it prefixed (which already reads
+  as a complete, specific explanation without it — e.g. `"issue resource
+  attribution: attribution author must not be empty"`). `SkipNote.Reason`
+  values (the other half of the 15 sites) currently reach no output at
+  all (`RunExports` only reports a skip *count*, not each reason), so the
+  same argument applies there even more directly. `internal/application/
+  services` keeps its own existing `"services:"` tag unchanged — it was
+  never part of this collision and sits at the one place (closest to the
+  CLI boundary) where a package tag might still carry marginal value.
+- This does not reopen the doc-accuracy lens's earlier verdict (no
+  findings): that lens checked specific behavioral claims (concurrency,
+  retry, coverage figures), not this file's own just-written description
+  of the rename, which this entry corrects.
+
+No test asserted on the `"services:"` tag itself (only on operation words
+like `"unmarshal"`/`"attribution"`, which are unchanged), so removing it
+required no test changes. C0 unchanged: `internal/domain/services` 99.3%.
+`go build ./...`, `go vet ./...`, `go test ./... -race -cover`, and
+`gofmt -l .` all pass.
+
+### Removal of every remaining package-name error-message tag (2026-07-19)
+
+A follow-up question from the user ("doesn't `valueobjects:` have the
+same problem?") after the entry above led to auditing every remaining
+package-name prefix in the repo, not just the one this file already
+fixed, still on `test/review-followup-fixes`:
+
+- **`valueobjects:` has the identical defect** the prior entry just
+  reasoned through for `internal/domain/services`: its errors are always
+  either re-wrapped by a caller before reaching the CLI's output, or (for
+  `NewIssueRef`, called directly from `internal/presentation/cli`)
+  printed completely unwrapped — in neither case does a Go package name
+  mean anything to the reader.
+- **Traced every remaining prefix to its actual endpoint** rather than
+  assuming: `cmd/gh-exhibit/main.go` prints `cli:`- and `registry:`-
+  prefixed errors directly via `fmt.Fprintln(os.Stderr, err)`, and
+  `internal/presentation/cli/run.go`'s `RunExports` prints everything
+  `ExportService.Export` returns (including `application/services`'s own
+  `"services:"` tag and anything it wraps — `github:`, `persistence:`)
+  via `%v`. Every single package-name prefix in the repository is
+  user-facing; none is an internal-only debugging aid.
+- **Reconsidered and reversed this file's own prior claim** that
+  `application/services`'s tag "sits at the one place where a package
+  tag might still carry marginal value": that tag is applied uniformly
+  to every `Export` failure regardless of which subsystem actually broke
+  (GitHub fetch, local write, or domain validation alike), so it carries
+  no discriminating information even for a maintainer — the claim did
+  not hold up under the same scrutiny already applied to
+  `domain/services`.
+- **`github:` and `persistence:` were considered as possible exceptions**
+  (they name real, external I/O boundaries — network vs. local disk —
+  which are at least a distinction a user could plausibly act on,
+  unlike an internal Go package name), but the user preferred full
+  consistency: if a message can be made self-descriptive without the
+  tag, drop the tag there too rather than carve out exceptions. Checked
+  each of the 17 sites individually rather than blanket-stripping:
+  `internal/infrastructure/persistence`'s 6 messages already interpolate
+  a local filesystem path (unambiguous without a tag) and 2 of them
+  (`joinRawArray`'s) were not I/O failures to begin with, so the tag was
+  actively mischaracterizing them; `internal/infrastructure/github`'s
+  `attachment_fetcher.go` messages interpolate a full attachment URL
+  (already shows a `github.com` host), so those needed only the prefix
+  dropped, but `evidence_fetcher.go`'s messages interpolate a bare REST
+  API path with no host/scheme (e.g. `repos/owner/repo/issues/42`) and
+  its two client-construction messages interpolate no identifier at all
+  — both reworded to name "GitHub" directly in their own operation text
+  instead of via a tag, so no information was lost by dropping the
+  prefix.
+- End state: zero package- or layer-name error-message prefixes remain
+  anywhere in the repository. Every message is self-descriptive English
+  text, verified by an exhaustive repo-wide grep for the `"word: "`
+  pattern turning up nothing outside `_test.go` files.
+
+No test asserted on any of the removed tags; only on operation words
+(`"unmarshal"`, `"attribution"`, etc.), all unchanged, so no test needed
+updating. C0 unchanged across every touched package. `go build ./...`,
+`go vet ./...`, `go test ./... -race -cover`, and `gofmt -l .` all pass.

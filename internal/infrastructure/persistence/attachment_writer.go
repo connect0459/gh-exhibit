@@ -46,7 +46,7 @@ func (w *attachmentWriter) WriteFetchErrorLog(ctx context.Context, ref valueobje
 	path := filepath.Join(issueDir(w.baseDir, ref), "fetch-errors.log")
 	if len(log) == 0 {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("persistence: remove %s: %w", path, err)
+			return fmt.Errorf("remove %s: %w", path, err)
 		}
 		return nil
 	}

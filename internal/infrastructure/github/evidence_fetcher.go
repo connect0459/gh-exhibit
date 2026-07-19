@@ -30,7 +30,7 @@ type evidenceFetcher struct {
 func NewEvidenceFetcher(opts api.ClientOptions) (repositories.EvidenceFetcher, error) {
 	client, err := api.NewRESTClient(opts)
 	if err != nil {
-		return nil, fmt.Errorf("github: new REST client: %w", err)
+		return nil, fmt.Errorf("create the GitHub REST client: %w", err)
 	}
 
 	return &evidenceFetcher{client: client, sleep: realSleep}, nil
@@ -75,13 +75,13 @@ func pullPath(ref valueobjects.IssueRef) string {
 func (r *evidenceFetcher) fetchSingle(ctx context.Context, path string) (json.RawMessage, error) {
 	resp, err := doWithRetry(ctx, r.client, r.sleep, http.MethodGet, path)
 	if err != nil {
-		return nil, fmt.Errorf("github: fetch %s: %w", path, err)
+		return nil, fmt.Errorf("fetch GitHub resource %s: %w", path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("github: read response body for %s: %w", path, err)
+		return nil, fmt.Errorf("read GitHub response body for %s: %w", path, err)
 	}
 
 	return json.RawMessage(body), nil
@@ -102,19 +102,19 @@ func (r *evidenceFetcher) fetchPaginated(ctx context.Context, path string) ([]js
 
 	for pages := 0; path != ""; pages++ {
 		if pages == maxPaginationPages {
-			return nil, fmt.Errorf("github: aborting pagination for %s after %d pages, Link header may be looping", path, maxPaginationPages)
+			return nil, fmt.Errorf("aborting GitHub pagination for %s after %d pages, Link header may be looping", path, maxPaginationPages)
 		}
 
 		resp, err := doWithRetry(ctx, r.client, r.sleep, http.MethodGet, path)
 		if err != nil {
-			return nil, fmt.Errorf("github: fetch %s: %w", path, err)
+			return nil, fmt.Errorf("fetch GitHub resource %s: %w", path, err)
 		}
 
 		var page []json.RawMessage
 		decodeErr := json.NewDecoder(resp.Body).Decode(&page)
 		_ = resp.Body.Close()
 		if decodeErr != nil {
-			return nil, fmt.Errorf("github: decode page for %s: %w", path, decodeErr)
+			return nil, fmt.Errorf("decode GitHub API page for %s: %w", path, decodeErr)
 		}
 		all = append(all, page...)
 

@@ -47,12 +47,12 @@ func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.
 func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) ([]services.SkipNote, error) {
 	rawIssue, err := s.fetcher.FetchIssue(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("services: could not retrieve the issue/PR resource: %w", err)
+		return nil, fmt.Errorf("could not retrieve the issue/PR resource: %w", err)
 	}
 
 	issue, err := services.ParseIssueResource(rawIssue)
 	if err != nil {
-		return nil, fmt.Errorf("services: the issue/PR resource could not be parsed: %w", err)
+		return nil, fmt.Errorf("the issue/PR resource could not be parsed: %w", err)
 	}
 
 	fetched, err := s.fetchPullRequestChainAndTimeline(ctx, ref, issue)
@@ -62,7 +62,7 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 
 	body, title, err := services.BuildBody(issue, fetched.pullRequest)
 	if err != nil {
-		return nil, fmt.Errorf("services: could not derive a title and body from the issue/PR resource: %w", err)
+		return nil, fmt.Errorf("could not derive a title and body from the issue/PR resource: %w", err)
 	}
 
 	classified, skipped := services.BuildEntries(fetched.timeline, fetched.reviewComments)
@@ -70,36 +70,36 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 
 	doc, err := valueobjects.NewDocument(title, entries)
 	if err != nil {
-		return nil, fmt.Errorf("services: assemble document: %w", err)
+		return nil, fmt.Errorf("assemble document: %w", err)
 	}
 
 	var buf bytes.Buffer
 	if err := doc.Render(&buf); err != nil {
-		return nil, fmt.Errorf("services: could not render the document to Markdown: %w", err)
+		return nil, fmt.Errorf("could not render the document to Markdown: %w", err)
 	}
 
 	rendered, downloads, failureLog, err := s.resolveAttachments(ctx, ref, buf.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("services: could not resolve one or more attachments: %w", err)
+		return nil, fmt.Errorf("could not resolve one or more attachments: %w", err)
 	}
 
 	if err := s.writer.WriteIssue(ctx, ref, rawIssue); err != nil {
-		return nil, fmt.Errorf("services: could not persist the raw issue/PR resource: %w", err)
+		return nil, fmt.Errorf("could not persist the raw issue/PR resource: %w", err)
 	}
 	if issue.IsPullRequest() {
 		if err := s.writer.WritePullRequest(ctx, ref, fetched.pullRequest); err != nil {
-			return nil, fmt.Errorf("services: could not persist the raw pull request resource: %w", err)
+			return nil, fmt.Errorf("could not persist the raw pull request resource: %w", err)
 		}
 		if err := s.writer.WriteReviewComments(ctx, ref, fetched.reviewComments); err != nil {
-			return nil, fmt.Errorf("services: could not persist the raw review comments: %w", err)
+			return nil, fmt.Errorf("could not persist the raw review comments: %w", err)
 		}
 	}
 	if err := s.writer.WriteTimeline(ctx, ref, fetched.timeline); err != nil {
-		return nil, fmt.Errorf("services: could not persist the raw timeline: %w", err)
+		return nil, fmt.Errorf("could not persist the raw timeline: %w", err)
 	}
 	for _, d := range downloads {
 		if err := s.assets.WriteAsset(ctx, ref, d.filename, d.data); err != nil {
-			return nil, fmt.Errorf("services: could not persist the downloaded attachment %s: %w", d.filename, err)
+			return nil, fmt.Errorf("could not persist the downloaded attachment %s: %w", d.filename, err)
 		}
 	}
 	// Always called, even when failureLog is empty: WriteFetchErrorLog
@@ -107,10 +107,10 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 	// from a prior run with failures doesn't survive a rerun where every
 	// attachment (or none at all) now resolves successfully.
 	if err := s.assets.WriteFetchErrorLog(ctx, ref, failureLog); err != nil {
-		return nil, fmt.Errorf("services: could not persist the attachment fetch error log: %w", err)
+		return nil, fmt.Errorf("could not persist the attachment fetch error log: %w", err)
 	}
 	if err := s.docs.WriteDocument(ctx, ref, rendered); err != nil {
-		return nil, fmt.Errorf("services: could not persist the rendered document: %w", err)
+		return nil, fmt.Errorf("could not persist the rendered document: %w", err)
 	}
 
 	return skipped, nil
@@ -167,7 +167,7 @@ func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, re
 		defer wg.Done()
 		timeline, err := s.fetcher.FetchTimeline(fetchCtx, ref)
 		if err != nil {
-			fail(fmt.Errorf("services: could not retrieve the timeline: %w", err))
+			fail(fmt.Errorf("could not retrieve the timeline: %w", err))
 			return
 		}
 		result.timeline = timeline
@@ -179,14 +179,14 @@ func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, re
 			defer wg.Done()
 			pullRequest, err := s.fetcher.FetchPullRequest(fetchCtx, ref)
 			if err != nil {
-				fail(fmt.Errorf("services: could not retrieve the pull request resource: %w", err))
+				fail(fmt.Errorf("could not retrieve the pull request resource: %w", err))
 				return
 			}
 			result.pullRequest = pullRequest
 
 			reviewComments, err := s.fetcher.FetchReviewComments(fetchCtx, ref)
 			if err != nil {
-				fail(fmt.Errorf("services: could not retrieve the review comments: %w", err))
+				fail(fmt.Errorf("could not retrieve the review comments: %w", err))
 				return
 			}
 			result.reviewComments = reviewComments

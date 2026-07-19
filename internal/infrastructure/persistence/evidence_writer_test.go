@@ -196,6 +196,36 @@ func TestWriteTimeline_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCance
 	}
 }
 
+func TestWritePullRequest_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCancelled(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := writer.WritePullRequest(ctx, testIssueRef(t), json.RawMessage(`{}`))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("WritePullRequest() error = %v, want context.Canceled", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42.pull.json")); !os.IsNotExist(statErr) {
+		t.Fatalf("WritePullRequest() wrote a file despite the cancelled context, stat error = %v", statErr)
+	}
+}
+
+func TestWriteReviewComments_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCancelled(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := writer.WriteReviewComments(ctx, testIssueRef(t), []json.RawMessage{json.RawMessage(`{"id":1}`)})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("WriteReviewComments() error = %v, want context.Canceled", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42.review-comments.json")); !os.IsNotExist(statErr) {
+		t.Fatalf("WriteReviewComments() wrote a file despite the cancelled context, stat error = %v", statErr)
+	}
+}
+
 func TestWriteIssue_ReturnsWrappedErrorWhenDirectoryCannotBeCreated(t *testing.T) {
 	baseDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(baseDir, "issues"), []byte("not a directory"), 0o644); err != nil {
