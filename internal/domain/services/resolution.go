@@ -1,5 +1,7 @@
 package services
 
+import "fmt"
+
 // Resolution is the outcome of attempting to fetch a single attachment URL:
 // either the local path it was downloaded to, or a failure reason. Success
 // is tracked by its own field rather than inferred from reason being
@@ -29,6 +31,15 @@ func FetchFailed(reason string) Resolution {
 	return Resolution{reason: reason}
 }
 
-func (r Resolution) ok() bool {
-	return r.succeeded
+// Substitute returns the Markdown replacement text for url given r: on a
+// successful fetch, its local path; on a failed fetch, an inline
+// placeholder noting url and the failure reason, so the evidence that an
+// attachment existed is not silently lost (ADR-002). The decision of what
+// to substitute is r's own — a caller only ever supplies url, the one piece
+// r itself does not carry.
+func (r Resolution) Substitute(url string) string {
+	if r.succeeded {
+		return r.localPath
+	}
+	return fmt.Sprintf("%s (attachment unavailable: %s)", url, r.reason)
 }
