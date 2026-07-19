@@ -31,7 +31,7 @@ func (f *fakeExporter) Export(_ context.Context, ref valueobjects.IssueRef) ([]s
 
 	result, ok := f.results[ref.Number()]
 	if !ok {
-		return nil, fmt.Errorf("fakeExporter: no result configured for #%d", ref.Number())
+		return nil, fmt.Errorf("no fake result configured for #%d", ref.Number())
 	}
 	return result.skips, result.err
 }
