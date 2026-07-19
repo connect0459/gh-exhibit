@@ -21,7 +21,7 @@ func ParseReviewState(raw string) (ReviewState, error) {
 	case "commented":
 		return ReviewStateCommented, nil
 	default:
-		return 0, fmt.Errorf("entry: unrecognized review state %q", raw)
+		return 0, fmt.Errorf("valueobjects: unrecognized review state %q", raw)
 	}
 }
 

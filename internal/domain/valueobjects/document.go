@@ -17,11 +17,11 @@ type Document struct {
 
 func NewDocument(title string, entries []Entry) (Document, error) {
 	if title == "" {
-		return Document{}, errors.New("entry: document title must not be empty")
+		return Document{}, errors.New("valueobjects: document title must not be empty")
 	}
 	for i, e := range entries {
 		if e == nil {
-			return Document{}, fmt.Errorf("entry: document entry %d must not be nil", i)
+			return Document{}, fmt.Errorf("valueobjects: document entry %d must not be nil", i)
 		}
 	}
 	// Cloned so a later mutation of the caller's slice (or of a slice this
