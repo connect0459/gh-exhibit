@@ -12,7 +12,7 @@ import (
 // EvidenceWriter/DocumentWriter but for a different artifact shape (binary
 // assets, not JSON or Markdown).
 type AttachmentWriter interface {
-	// WriteAsset writes a single downloaded attachment under
+	// WriteAsset writes a single downloaded attachment's data under
 	// issues/{repo}/{number}/assets/{filename}.
 	WriteAsset(ctx context.Context, ref valueobjects.IssueRef, filename string, data []byte) error
 
