@@ -1879,3 +1879,66 @@ accurate against its actual implementation.
 
 No behavior change; `go build ./...`, `go vet ./...`,
 `go test ./... -race -cover`, and `gofmt -l .` all pass.
+
+### CI workflow (2026-07-19)
+
+`.github/workflows/ci.yml` existed on disk but was untracked — a verbatim
+copy of `starlark-mbt`'s MoonBit workflow (`moon fmt`/`moon check`/`moon
+test`), never wired to this project's own Go toolchain. Replaced with a
+Go-native workflow, on `ci/add-go-workflow` (a tooling-only change, not a
+todo.md checklist item):
+
+- One sequential job (`gofmt -l .` → `go vet ./...` → `golangci-lint` →
+  `go build ./...` → `go test ./... -race -cover`), matching this
+  project's own verification convention already recorded throughout this
+  file. `golangci-lint-action` is pinned to `v2.12.2`, the same version
+  `.pre-commit-config.yaml` already pins locally, so CI and the local
+  pre-commit hook enforce identical lint behavior.
+- `actions/checkout`/`actions/setup-go`/`golangci-lint-action` are pinned
+  to a full commit SHA with a trailing version comment, matching
+  `release.yml`'s existing pinning convention;
+  `actions/checkout`'s SHA is the same one `release.yml` already uses.
+- **Considered and rejected**: an initial draft split `lint`/`test` into
+  two parallel jobs (mirroring `starlark-mbt`'s own two-job split,
+  itself driven by MoonBit's four build targets — a condition Go's
+  single-target build doesn't share). **Confirmed with the user**: two
+  jobs duplicate the checkout/setup-go steps for a parallelism gain this
+  project's small package count (7) doesn't meaningfully benefit from;
+  consolidated into one job instead, matching this user's own
+  `edit-pr-duration` Go project's existing CI structure.
+- **Also considered**: GitHub Actions' newly-introduced step-level
+  `background`/`wait`/`wait-all`/`parallel` keywords (announced
+  2026-06-25), which could parallelize steps within a single job without
+  duplicating checkout/setup-go. Rejected for now: the feature's exact
+  syntax is not yet reflected in GitHub's own workflow-syntax reference
+  documentation as of this writing, so adopting it here would mean
+  committing to unconfirmed syntax for a three-week-old feature, not a
+  verified one.
+- `dorny/paths-filter`, pinned the same way, gates every check-running
+  step behind whether the push/PR actually touched `**/*.go`, `go.mod`,
+  `go.sum`, `.golangci.yml`, or the workflow file itself — matching
+  `edit-pr-duration`'s own precedent for the same reason (a docs-only or
+  `todo.md`-only change shouldn't pay for a Go build/test run).
+  `actions/checkout` sets `fetch-depth: 0`, also matching that precedent,
+  since `paths-filter` diffing a `push` event against its previous ref
+  needs history a shallow (default) clone doesn't have.
+- Every `run:` step sets `shell: bash` explicitly, rather than relying on
+  the Linux runner's default shell.
+- **Flagged by the user, fixed before opening the PR**: an initial draft
+  gave every step an explicit `name:`, including `uses:` steps whose own
+  `action.yml` already declares a self-descriptive default name
+  (`actions/checkout`, `actions/setup-go`, `golangci-lint-action`, and
+  `dorny/paths-filter` each surface their own — "Checkout", "Setup Go
+  environment", and "Golangci-lint" confirmed directly from the first
+  three actions' own `action.yml`) — restating that default at the call
+  site is the workflow-YAML equivalent of a code comment restating
+  obvious WHAT. Decided policy: a step-level `name:` is omitted wherever
+  the action's own default name already covers it (every `uses:` step in
+  this workflow), and given explicitly wherever this workflow supplies
+  its own command (every `run:` step: "Check formatting", "Run go vet",
+  "Build", "Test", "Skip CI checks (no relevant changes)") — a
+  self-authored command has no built-in title to fall back on, unlike an
+  action invocation.
+- No test file for any of this — same as `release.yml`'s own precedent;
+  verified via `pre-commit run --files .github/workflows/ci.yml`
+  (`check-yaml` and the rest all pass).
