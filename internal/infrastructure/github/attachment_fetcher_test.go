@@ -87,6 +87,61 @@ func TestFetch_ReturnsAnErrorForANonSuccessStatusCode(t *testing.T) {
 	}
 }
 
+func TestFetch_ReturnsAnErrorWhenTheResponseBodyExceedsTheSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("0123456789"))
+	}))
+	defer server.Close()
+
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("url.Parse(%q) error = %v", server.URL, err)
+	}
+	client, err := api.NewHTTPClient(api.ClientOptions{
+		Host:      "github.localhost",
+		AuthToken: "test-token",
+		Transport: &rewriteTransport{target: u.Host},
+	})
+	if err != nil {
+		t.Fatalf("api.NewHTTPClient() error = %v", err)
+	}
+	fetcher := &attachmentFetcher{client: client, maxBytes: 5}
+
+	_, _, err = fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
+	if err == nil {
+		t.Fatal("Fetch() error = nil, want an error for a response body exceeding the size limit")
+	}
+}
+
+func TestFetch_AcceptsAResponseBodyExactlyAtTheSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("01234"))
+	}))
+	defer server.Close()
+
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("url.Parse(%q) error = %v", server.URL, err)
+	}
+	client, err := api.NewHTTPClient(api.ClientOptions{
+		Host:      "github.localhost",
+		AuthToken: "test-token",
+		Transport: &rewriteTransport{target: u.Host},
+	})
+	if err != nil {
+		t.Fatalf("api.NewHTTPClient() error = %v", err)
+	}
+	fetcher := &attachmentFetcher{client: client, maxBytes: 5}
+
+	data, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
+	if err != nil {
+		t.Fatalf("Fetch() error = %v, want nil for a response body exactly at the size limit", err)
+	}
+	if string(data) != "01234" {
+		t.Fatalf("Fetch() data = %q, want %q", data, "01234")
+	}
+}
+
 func TestFetch_ReturnsContextErrorWhenContextIsAlreadyCancelled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("data"))
