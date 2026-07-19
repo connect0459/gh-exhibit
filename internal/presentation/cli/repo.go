@@ -14,14 +14,14 @@ func ResolveRepo(flagRepo string, current func() (repository.Repository, error))
 	if flagRepo != "" {
 		repo, err := repository.Parse(flagRepo)
 		if err != nil {
-			return repository.Repository{}, fmt.Errorf("cli: parse --repo %q: %w", flagRepo, err)
+			return repository.Repository{}, fmt.Errorf("parse --repo %q: %w", flagRepo, err)
 		}
 		return repo, nil
 	}
 
 	repo, err := current()
 	if err != nil {
-		return repository.Repository{}, fmt.Errorf("cli: could not determine the repository from the current directory: %w", err)
+		return repository.Repository{}, fmt.Errorf("could not determine the repository from the current directory: %w", err)
 	}
 	return repo, nil
 }
