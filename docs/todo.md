@@ -2003,3 +2003,87 @@ checklist item, same precedent as the CI workflow entry above):
 - No test file for any of this — none of it is Go logic; verified via
   `pre-commit run --files LICENSE CODE_OF_CONDUCT.md CONTRIBUTING.md
   SECURITY.md CHANGELOG.md` (`markdownlint-cli2` and the rest all pass).
+
+### --version flag and GoReleaser migration (2026-07-19)
+
+The user asked whether a version-embedding step was missing, comparing
+against `connect0459/starlark-mbt`'s own `moon.mod` version bump. `go.mod`
+has no equivalent field — Go module versions are resolved from VCS tags,
+not a manifest field, so there is no direct analog. But the underlying
+question surfaced a real, separate gap: `gh-exhibit` had no `--version` at
+all, even though `SECURITY.md` and `BUG_REPORT.md` already ask a reporter
+for "the version of `gh-exhibit`" with no way to determine it. Addressed on
+`chore/migrate-to-goreleaser` (Red/Green TDD for the CLI change; the
+tooling change has no test file, same precedent as `release.yml` itself):
+
+- `internal/presentation/cli.Args` gains a `Version bool` field;
+  `ParseArgs` returns `Args{Version: true}` immediately after a successful
+  `--version` parse, before the "exactly one positional argument" check —
+  the same short-circuit precedent `--help`/`flag.ErrHelp` already
+  established, confirmed by a new test asserting `--version` needs no
+  positional number even combined with other flags.
+- `cmd/gh-exhibit/main.go` gains package-level `version`/`commit`/`date`
+  vars (default `"dev"`/`"none"`/`"unknown"`), printed and exited 0 when
+  `args.Version` is set, before `ResolveRepo` runs.
+- **Investigated before committing to an injection mechanism**: real-world
+  precedent was surveyed rather than assumed. `vilmibm/gh-screensaver`
+  (plain `cli/gh-extension-precompile`, no version string at all) and
+  `dlvhdr/gh-dash`/`k1LoW/gh-grep` (both migrated to GoReleaser
+  specifically for `ldflags`-injected version strings) were checked
+  directly. The middle option (keep `cli/gh-extension-precompile`, inject
+  `-ldflags` via its `go_build_options` input) was verified **not to
+  work**: that action's `build_and_release.sh` passes `go_build_options`
+  as a single quoted shell argument and already hardcodes its own
+  `-ldflags="-s -w"`, so a second `-ldflags` value has no way in. Confirmed
+  with the user: migrate to GoReleaser fully rather than hand-roll a
+  `build_script_override`.
+- **Migration verified end-to-end, not just configured**: `.goreleaser.yml`
+  was validated with `goreleaser check` (caught and fixed one deprecated
+  key, `archives.format` → `archives.formats: [binary]`) and exercised with
+  `goreleaser release --snapshot --clean`, inspecting the actual output
+  rather than assuming the config was correct:
+  - **Release-asset naming was checked against `gh`'s own source**
+    (`cli/cli`'s `pkg/cmd/extension/manager.go`: `strings.HasSuffix(a.Name,
+    platform+ext)` where `platform` is `"{os}-{arch}"`) — confirmed
+    `k1LoW/gh-grep`'s actual published assets use underscores
+    (`gh-grep_v1.2.5_darwin_amd64`), which would **not** satisfy this
+    match; `archives.name_template: "gh-exhibit-{{ .Os }}-{{ .Arch }}"`
+    (hyphenated, `format: binary` so no archive extension is appended) was
+    chosen specifically to avoid the same mistake. A snapshot release's
+    `checksums.txt` was inspected directly and lists exactly
+    `gh-exhibit-darwin-amd64`, `gh-exhibit-windows-amd64.exe`, etc.
+  - `ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}}
+    -X main.date={{.Date}}` — a snapshot-built binary's `--version` output
+    was run directly and printed the injected values, not assumed from the
+    config alone.
+  - `release.mode: keep-existing` (GoReleaser's own default, kept explicit
+    with a comment) reproduces `build_and_release.sh`'s own existing
+    behavior (upload to an already-existing release without touching its
+    notes) — confirmed with the user: preserves the
+    `gh release create vX.Y.Z --notes-file ... --target main` flow
+    `CHANGELOG.md`'s header comment already documents, unchanged.
+  - **A `before.hooks: [go mod tidy]` step was tried, based on
+    `k1LoW/gh-grep`'s own `.goreleaser.yml`, and dropped**: running it
+    locally mutated `go.sum`, pulling in `github.com/MakeNowJust/heredoc`
+    — a transitive dependency unrelated to any import this project
+    actually added. `ci.yml`'s own checks never call `go mod tidy`, so
+    this project has no existing dependency on that step; reverted before
+    committing (`git checkout -- go.sum`) rather than carrying an
+    unexplained dependency-lock change.
+  - 12 target platforms (`darwin`/`freebsd`/`linux`/`windows` ×
+    `386`/`amd64`/`arm`/`arm64`, minus the same 4 combinations
+    `cli/gh-extension-precompile` never supported) all built successfully
+    in the snapshot run.
+- `.gitignore` gains `/dist/` (GoReleaser's local build output directory;
+  the project previously only ignored the single top-level binary
+  `cli/gh-extension-precompile` produced).
+- **Does not reopen ADR-002's Go-for-distribution-ease reasoning**
+  (`gh extension create`'s scaffolding targets Go, which remains true) —
+  only the specific precompile mechanism changed, so no ADR amendment was
+  needed, matching how the CI workflow swap (MoonBit-copy → Go-native) was
+  handled as a `docs/todo.md` entry rather than an ADR revision.
+
+`go build ./...`, `go vet ./...`, `go test ./... -race -cover`, and
+`gofmt -l .` all pass. No release tag has been pushed yet to exercise the
+new workflow for real — deferred to whenever the user is ready to publish,
+same as the original distribution-scaffolding entry's own deferral.
