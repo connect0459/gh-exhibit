@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--repo <owner>/<repo>` — target an explicit repository; defaults to the
   current repository's context when omitted.
 - `-o`, `--output <dir>` — output directory the evidence is written under.
+- `--version` — print the running binary's version, commit, and build date.
 - Attachments referenced in a body/comment/review are downloaded locally
   (not hotlinked) and rewritten to a relative local path; a per-URL fetch
   failure is skipped with a placeholder and recorded in a
