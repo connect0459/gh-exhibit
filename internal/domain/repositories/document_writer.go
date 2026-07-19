@@ -13,7 +13,6 @@ import (
 // raw JSON as the evidentiary source of truth and the rendered Markdown as
 // a regenerable view of it — deliberately different concerns.
 type DocumentWriter interface {
-	// WriteDocument persists rendered, ref's fully rendered Markdown
-	// document.
+	// WriteDocument persists ref's fully rendered Markdown document.
 	WriteDocument(ctx context.Context, ref valueobjects.IssueRef, rendered []byte) error
 }
