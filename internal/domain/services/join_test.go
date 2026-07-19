@@ -456,14 +456,14 @@ func TestBuildEntries_ClassifiesACommentedEventIntoAnIssueComment(t *testing.T) 
 	}
 
 	attribution, err := valueobjects.NewAttribution(
-		"cli-triage[bot]",
-		time.Date(2026, 7, 14, 16, 9, 46, 0, time.UTC),
-		"https://github.com/cli/cli/issues/13880#issuecomment-4971365859",
+		"connect0459",
+		time.Date(2026, 6, 17, 9, 47, 30, 0, time.UTC),
+		"https://github.com/connect0459/starlark-mbt/issues/218#issuecomment-4728347671",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error building expected attribution: %v", err)
 	}
-	want := valueobjects.NewIssueComment(attribution, "This is a duplicate of #8514, which tracked the same behavior.")
+	want := valueobjects.NewIssueComment(attribution, "The bug has been fixed in PR#3690 of [moonbitlang/core](https://github.com/moonbitlang/core). Accordingly, the workaround applied in this repository will be removed.\n\n**Workaround removal schedule**\n\nPR#3690 was merged on 2026-06-17, but the current moon toolchain (`0.1.20260608`, built on 2026-06-08) does not yet include the fix. The workaround in `internal/std_math/std_math.mbt` will be removed once a new moon release that bundles the corrected `@math.cosh` is available.")
 
 	if !got.Equals(want) {
 		t.Fatalf("entries[0] = %#v, want %#v", got, want)
@@ -485,9 +485,9 @@ func TestBuildEntries_ClassifiesAReviewedEventIntoAPullRequestReview(t *testing.
 	}
 
 	attribution, err := valueobjects.NewAttribution(
-		"Copilot",
-		time.Date(2026, 7, 2, 14, 19, 40, 0, time.UTC),
-		"https://github.com/cli/cli/pull/13780#pullrequestreview-4618365681",
+		"copilot-pull-request-reviewer[bot]",
+		time.Date(2026, 6, 19, 1, 53, 17, 0, time.UTC),
+		"https://github.com/connect0459/starlark-mbt/pull/277#pullrequestreview-4529659600",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error building expected attribution: %v", err)
@@ -495,7 +495,7 @@ func TestBuildEntries_ClassifiesAReviewedEventIntoAPullRequestReview(t *testing.
 	want := valueobjects.NewPullRequestReview(
 		attribution,
 		valueobjects.ReviewStateCommented,
-		"Pull request overview: hardens the GitHub CLI deployment workflow.",
+		"## Pull request overview\n\nThis PR prepares the `v0.3.1` release by bumping the module version and adding the `0.3.1` release notes + compare links to `CHANGELOG.md` (no implementation changes).\n\n**Changes:**\n- Bump `moon.mod` version from `0.3.0` to `0.3.1`.\n- Add `0.3.1` section to `CHANGELOG.md` with release notes and update bottom compare links.\n\n### Reviewed changes\n\nCopilot reviewed 2 out of 2 changed files in this pull request and generated 1 comment.\n\n| File | Description |\n| ---- | ----------- |\n| moon.mod | Version bump to `0.3.1` for the release. |\n| CHANGELOG.md | Adds `0.3.1` release notes and updates compare/reference links. |\n\n\n\n\n\n\n---\n\n💡 <a href=\"/connect0459/starlark-mbt/new/main?filename=.github/instructions/*.instructions.md\" class=\"Link--inTextBlock\" target=\"_blank\" rel=\"noopener noreferrer\">Add Copilot custom instructions</a> for smarter, more guided reviews. <a href=\"https://docs.github.com/en/copilot/customizing-copilot/adding-repository-custom-instructions-for-github-copilot\" class=\"Link--inTextBlock\" target=\"_blank\" rel=\"noopener noreferrer\">Learn how to get started</a>.",
 	)
 
 	if !got.Equals(want) {

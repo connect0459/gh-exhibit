@@ -1,10 +1,10 @@
 {
-  "id": 4971365859,
+  "id": 4728347671,
   "event": "commented",
   "user": {
-    "login": "cli-triage[bot]"
+    "login": "connect0459"
   },
-  "body": "This is a duplicate of #8514, which tracked the same behavior.",
-  "created_at": "2026-07-14T16:09:46Z",
-  "html_url": "https://github.com/cli/cli/issues/13880#issuecomment-4971365859"
+  "body": "The bug has been fixed in PR#3690 of [moonbitlang/core](https://github.com/moonbitlang/core). Accordingly, the workaround applied in this repository will be removed.\n\n**Workaround removal schedule**\n\nPR#3690 was merged on 2026-06-17, but the current moon toolchain (`0.1.20260608`, built on 2026-06-08) does not yet include the fix. The workaround in `internal/std_math/std_math.mbt` will be removed once a new moon release that bundles the corrected `@math.cosh` is available.",
+  "created_at": "2026-06-17T09:47:30Z",
+  "html_url": "https://github.com/connect0459/starlark-mbt/issues/218#issuecomment-4728347671"
 }
