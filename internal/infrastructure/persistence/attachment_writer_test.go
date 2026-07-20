@@ -6,14 +6,26 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
+
+func testAssetFilename(t *testing.T, filename string) valueobjects.AssetFilename {
+	t.Helper()
+
+	f, err := valueobjects.NewAssetFilename(filename)
+	if err != nil {
+		t.Fatalf("NewAssetFilename(%q) error = %v", filename, err)
+	}
+	return f
+}
 
 func TestWriteAsset_WritesDataVerbatimUnderRepoNumberAssets(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewAttachmentWriter(baseDir)
 	const data = "binary-ish content"
 
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), "abc-123.png", []byte(data))
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), testAssetFilename(t, "abc-123.png"), []byte(data))
 	if err != nil {
 		t.Fatalf("WriteAsset() error = %v", err)
 	}
@@ -28,7 +40,7 @@ func TestWriteAsset_OmitsOwnerFromThePath(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewAttachmentWriter(baseDir)
 
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), "abc-123.png", []byte("data"))
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), testAssetFilename(t, "abc-123.png"), []byte("data"))
 	if err != nil {
 		t.Fatalf("WriteAsset() error = %v", err)
 	}
@@ -38,86 +50,13 @@ func TestWriteAsset_OmitsOwnerFromThePath(t *testing.T) {
 	}
 }
 
-func TestWriteAsset_RejectsAFilenameContainingADotDotSegment(t *testing.T) {
-	baseDir := t.TempDir()
-	writer := NewAttachmentWriter(baseDir)
-
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), "../../../../tmp/evil", []byte("data"))
-	if err == nil {
-		t.Fatal("WriteAsset() error = nil, want an error for a filename containing a \"..\" segment")
-	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "..", "..", "..", "tmp", "evil")); !os.IsNotExist(statErr) {
-		t.Fatalf("WriteAsset() wrote outside the intended directory, stat error = %v", statErr)
-	}
-}
-
-func TestWriteAsset_RejectsAFilenameContainingAPathSeparator(t *testing.T) {
-	baseDir := t.TempDir()
-	writer := NewAttachmentWriter(baseDir)
-
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), "sub/evil.png", []byte("data"))
-	if err == nil {
-		t.Fatal("WriteAsset() error = nil, want an error for a filename containing a path separator")
-	}
-}
-
-func TestWriteAsset_RejectsAnAbsolutePathFilename(t *testing.T) {
-	baseDir := t.TempDir()
-	writer := NewAttachmentWriter(baseDir)
-
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), "/etc/cron.d/evil", []byte("data"))
-	if err == nil {
-		t.Fatal("WriteAsset() error = nil, want an error for an absolute-path filename")
-	}
-}
-
-func TestWriteAsset_RejectsAFilenameEqualToASingleSlash(t *testing.T) {
-	baseDir := t.TempDir()
-	writer := NewAttachmentWriter(baseDir)
-
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), "/", []byte("data"))
-	if err == nil {
-		t.Fatal("WriteAsset() error = nil, want an error for a filename equal to \"/\" (filepath.Base(\"/\") == \"/\", a fixed point the base-comparison check alone does not catch)")
-	}
-}
-
-func TestWriteAsset_RejectsAFilenameContainingABackslash(t *testing.T) {
-	baseDir := t.TempDir()
-	writer := NewAttachmentWriter(baseDir)
-
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), `sub\evil.png`, []byte("data"))
-	if err == nil {
-		t.Fatal("WriteAsset() error = nil, want an error for a filename containing a backslash, regardless of the host OS's own path separator")
-	}
-}
-
-func TestWriteAsset_RejectsAFilenameEqualToDot(t *testing.T) {
-	baseDir := t.TempDir()
-	writer := NewAttachmentWriter(baseDir)
-
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), ".", []byte("data"))
-	if err == nil {
-		t.Fatal("WriteAsset() error = nil, want an error for a filename equal to \".\"")
-	}
-}
-
-func TestWriteAsset_RejectsAnEmptyFilename(t *testing.T) {
-	baseDir := t.TempDir()
-	writer := NewAttachmentWriter(baseDir)
-
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), "", []byte("data"))
-	if err == nil {
-		t.Fatal("WriteAsset() error = nil, want an error for an empty filename")
-	}
-}
-
 func TestWriteAsset_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCancelled(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewAttachmentWriter(baseDir)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := writer.WriteAsset(ctx, testIssueRef(t), "abc-123.png", []byte("data"))
+	err := writer.WriteAsset(ctx, testIssueRef(t), testAssetFilename(t, "abc-123.png"), []byte("data"))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("WriteAsset() error = %v, want context.Canceled", err)
 	}

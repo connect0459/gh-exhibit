@@ -3,6 +3,8 @@ package services
 import (
 	"mime"
 	"path"
+
+	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
 // extensionsByContentType is an explicit, hermetic lookup rather than
@@ -26,18 +28,23 @@ var extensionsByContentType = map[string]string{
 // URL path (unique and stable) as the base name, plus an extension resolved
 // from the response's Content-Type header — the URL path itself does not
 // reliably encode one. An unrecognized content type yields no extension
-// rather than a guessed one.
-func (a Attachment) Filename(contentType string) string {
+// rather than a guessed one. The error return is defensive: a's own URL is
+// already validated by NewAttachment to match a GitHub user-attachments
+// asset path, whose id segment can never fail valueobjects.NewAssetFilename,
+// but the constructor is still gone through rather than a bare struct
+// literal so this stays true regardless of how that upstream validation
+// evolves.
+func (a Attachment) Filename(contentType string) (valueobjects.AssetFilename, error) {
 	id := path.Base(a.url.Path())
 
 	mediaType, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		return id
+		return valueobjects.NewAssetFilename(id)
 	}
 
 	ext, ok := extensionsByContentType[mediaType]
 	if !ok {
-		return id
+		return valueobjects.NewAssetFilename(id)
 	}
-	return id + ext
+	return valueobjects.NewAssetFilename(id + ext)
 }
