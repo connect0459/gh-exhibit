@@ -2840,3 +2840,43 @@ this change — the new `expectedHost == ""` fail-closed branch in
 not-meaningfully-testable-without-a-contrived-fake gaps). `go build ./...`,
 `go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
 `pre-commit run --all-files` all pass.
+
+### Pagination host check widened to scheme + host, on PR #37 review (2026-07-20)
+
+A local review of `fix/pagination-host-validation` (PR #37) found one
+cosmetic issue and one scope question, both addressed on the same branch:
+
+- **`nextPageURL`'s local variable `url` shadowed the `net/url` package
+  name** the same file's new `validatePaginationHost` had just started
+  importing — legal Go, but confusing to read next to a function that
+  calls `url.Parse` a few lines away. Renamed to `nextURL`.
+- **The validation only compared host, not scheme** — a `next` URL naming
+  the same host under `http` instead of `https` passed unchanged, silently
+  downgrading the connection's transport security even though the
+  confused-deputy/redirection risk this check exists for is just as real
+  for a scheme downgrade as for a different host. Confirmed with the user:
+  widen the check. `requestHost`/`validatePaginationHost` are renamed to
+  `requestOrigin`/`validatePaginationOrigin` and now compare
+  `scheme://host` as a unit.
+- **Caught while writing the scheme regression test**: an httptest-based
+  end-to-end test for the scheme case (mirroring the existing host-mismatch
+  test) passed even before `validatePaginationOrigin` existed — not because
+  any real validation caught it, but because the test harness's
+  `rewriteTransport` only rewrites a request's `Host`, not its `Scheme`, so
+  an `https`-addressed "next" URL triggered a genuine TLS-handshake failure
+  against the local plain-HTTP test server before any of gh-exhibit's own
+  code ran. That accidental failure would have made a false-Green test look
+  like it verified the scheme check when it verified nothing. Replaced with
+  direct unit tests of `requestOrigin`/`validatePaginationOrigin` in a new
+  `pagination_test.go` (this package had none before — every prior case was
+  covered only indirectly through `evidence_fetcher_test.go`'s httptest
+  harness), which exercise the origin-comparison logic itself independent
+  of any real network behavior.
+- `docs/specs/README.md`'s rate-limiting section updated to describe the
+  origin (scheme + host) check.
+
+C0 after this round: `internal/infrastructure/github` 92.8% (up from
+91.2% — the new direct unit tests cover `validatePaginationOrigin`'s
+branches more precisely than the httptest-only approach did). `go build
+./...`, `go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
+`pre-commit run --all-files` all pass.
