@@ -5,10 +5,10 @@
 All items below were originally recorded in this project's now-removed ADR
 documents (`docs/adrs/adr-001-initial-plan.md`,
 `docs/adrs/adr-002-language-and-domain-design.md`); their still-valid
-conclusions live in `docs/SPEC.md` now, and their full original reasoning
+conclusions live in `docs/specs/README.md` now, and their full original reasoning
 remains readable via `git log --follow -- docs/adrs/` or
 `git show <commit>:docs/adrs/adr-002-language-and-domain-design.md` on a
-commit before their removal. See "ADRs replaced by docs/SPEC.md" below for
+commit before their removal. See "ADRs replaced by docs/specs/README.md" below for
 why.
 
 - [x] Decide the implementation language/stack — Go, with `go-gh` as the
@@ -2346,7 +2346,7 @@ covered branches). No behavior change and no on-disk output layout
 change. `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
 and `gofmt -l .` all pass.
 
-### ADRs replaced by docs/SPEC.md (2026-07-20)
+### ADRs replaced by docs/specs/README.md (2026-07-20)
 
 With every implementation slice long closed, the user raised whether the
 two ADRs (`docs/adrs/adr-001-initial-plan.md`,
@@ -2391,9 +2391,9 @@ superseding ADR). Discussed with the user and resolved on
   a violation of this project's own "code = How, comments only for
   non-obvious WHY" policy, independent of the ADR-removal question. None
   needed migrating; each was either deleted outright or reworded to point
-  at `docs/SPEC.md` where a live pointer was still useful (on-disk layout,
+  at `docs/specs/README.md` where a live pointer was still useful (on-disk layout,
   Markdown dialect, coverage targets).
-- **`docs/SPEC.md` (new)**: a single, always-in-place-edited specification
+- **`docs/specs/README.md` (new)**: a single, always-in-place-edited specification
   of gh-exhibit's *current* behavior — distribution/stack, CLI shape,
   domain model, timeline classification, on-disk layout, Markdown dialect,
   attachment policy, rate-limit/retry policy, concurrency, package layout,
@@ -2411,7 +2411,7 @@ superseding ADR). Discussed with the user and resolved on
 - `docs/adrs/` deleted in full (all three files, including the template).
   `.github/ISSUE_TEMPLATE/BUG_REPORT.md`, `FEATURE_REQUEST.md`,
   `PULL_REQUEST_TEMPLATE.md`, and `CONTRIBUTING.md`'s ADR references
-  repointed to `docs/SPEC.md`.
+  repointed to `docs/specs/README.md`.
 - No test file for any of this — none of it is Go logic (only comments and
   Markdown changed); verified via `go build ./...`, `go vet ./...`,
   `go test ./... -race -cover`, and `gofmt -l .` (no behavior change, so no
