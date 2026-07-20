@@ -1,4 +1,4 @@
-// Package valueobjects models the Tier 1 render set (ADR-001, ADR-002): the
+// Package valueobjects models the Tier 1 render set (see docs/SPEC.md): the
 // issue/PR body, issue comments, PR reviews, and inline review comments
 // that gh-exhibit renders into Markdown.
 package valueobjects

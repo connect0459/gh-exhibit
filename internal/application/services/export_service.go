@@ -20,9 +20,8 @@ import (
 
 // ExportService orchestrates the whole export flow for a single issue or
 // pull request: fetch raw evidence, persist it verbatim, classify and
-// assemble it into a Document, download any referenced attachments
-// (ADR-002's mandatory-local-download policy), and persist the rendered
-// Markdown.
+// assemble it into a Document, download any referenced attachments, and
+// persist the rendered Markdown.
 type ExportService struct {
 	fetcher     repositories.EvidenceFetcher
 	writer      repositories.EvidenceWriter
@@ -233,9 +232,8 @@ type attachmentFetchResult struct {
 	err         error
 }
 
-// resolveAttachments downloads every attachment URL referenced in rendered
-// (ADR-002's mandatory-local-download policy), up to
-// maxConcurrentAttachmentFetches at a time, returning the rewritten
+// resolveAttachments downloads every attachment URL referenced in rendered,
+// up to maxConcurrentAttachmentFetches at a time, returning the rewritten
 // Markdown (local paths substituted for successful downloads, an inline
 // placeholder for failed ones), the downloaded assets still awaiting a
 // write, and this run's failure log (nil when nothing failed). An ordinary

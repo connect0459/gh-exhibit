@@ -7,8 +7,8 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
-// Attachment/Rewrite/Resolution below implement ADR-002's mandatory-
-// local-download policy for GitHub `user-attachments` URLs inside already-
+// Attachment/Rewrite/Resolution below implement the mandatory-local-
+// download policy for GitHub `user-attachments` URLs inside already-
 // rendered Markdown, independent of this package's timeline-classification
 // half. Detection and rewriting run as a post-render pass over a Document's
 // full output, so no Tier 1 type needs a content-mutation path of its own.

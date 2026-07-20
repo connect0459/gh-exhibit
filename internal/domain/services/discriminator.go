@@ -2,7 +2,7 @@
 // classifying GitHub's heterogeneous REST timeline array into concrete
 // valueobjects.Entry values and joining inline review comments to their
 // parent review, plus detecting and rewriting GitHub `user-attachments`
-// URLs inside already-rendered Markdown (ADR-001, ADR-002).
+// URLs inside already-rendered Markdown.
 package services
 
 type discriminator struct {

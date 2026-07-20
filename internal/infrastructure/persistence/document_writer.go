@@ -8,15 +8,15 @@ import (
 )
 
 // documentWriter implements repositories.DocumentWriter against the local
-// filesystem, per ADR-002's on-disk layout. Unexported so callers depend
-// only on the repositories.DocumentWriter interface, not this
+// filesystem, per docs/SPEC.md's on-disk layout. Unexported so callers
+// depend only on the repositories.DocumentWriter interface, not this
 // infrastructure-layer type.
 type documentWriter struct {
 	baseDir string
 }
 
 // NewDocumentWriter builds a repositories.DocumentWriter that persists
-// rendered Markdown under baseDir, following ADR-002's
+// rendered Markdown under baseDir, following docs/SPEC.md's
 // issues/{repo}/{number}.md layout.
 func NewDocumentWriter(baseDir string) repositories.DocumentWriter {
 	return &documentWriter{baseDir: baseDir}

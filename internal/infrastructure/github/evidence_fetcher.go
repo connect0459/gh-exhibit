@@ -14,10 +14,10 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
-// evidenceFetcher implements repositories.EvidenceFetcher against
-// GitHub's REST API via go-gh, per ADR-002's full-native acquisition
-// decision. Unexported so callers depend only on the repositories.
-// EvidenceFetcher interface, not this infrastructure-layer type.
+// evidenceFetcher implements repositories.EvidenceFetcher against GitHub's
+// REST API via go-gh. Unexported so callers depend only on the
+// repositories.EvidenceFetcher interface, not this infrastructure-layer
+// type.
 type evidenceFetcher struct {
 	client requester
 	sleep  sleeper
@@ -99,8 +99,8 @@ func (r *evidenceFetcher) fetchSingle(ctx context.Context, path string) (json.Ra
 const maxPaginationPages = 1000
 
 // fetchPaginated returns one json.RawMessage per array element across all
-// pages, following the Link header's "next" relation (ADR-002: the caller,
-// not this fetcher, concatenates pages into a single persisted array).
+// pages, following the Link header's "next" relation; the caller, not this
+// fetcher, concatenates pages into a single persisted array.
 func (r *evidenceFetcher) fetchPaginated(ctx context.Context, path string) ([]json.RawMessage, error) {
 	var all []json.RawMessage
 

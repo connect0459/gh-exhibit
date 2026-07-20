@@ -12,8 +12,9 @@ import (
 // infrastructure implements it (dependency inversion), symmetric to
 // EvidenceFetcher on the acquisition side. Timeline and review comment
 // pages arrive as one raw JSON element per item, matching
-// EvidenceFetcher's fetch shape; concatenating them into ADR-002's
-// single persisted array per file is this port's implementation's job.
+// EvidenceFetcher's fetch shape; concatenating them into a single
+// persisted array per file (docs/SPEC.md) is this port's implementation's
+// job.
 type EvidenceWriter interface {
 	// WriteIssue persists ref's raw issue or pull request resource
 	// verbatim.
