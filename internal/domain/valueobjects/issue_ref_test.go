@@ -187,7 +187,7 @@ func TestIssueRef_AssetPathJoinsTheIssueNumberAndFilenameUnderAssets(t *testing.
 		t.Fatalf("unexpected error building issue ref: %v", err)
 	}
 
-	got := ref.AssetPath("abc-123.png")
+	got := ref.AssetPath(newTestAssetFilename(t, "abc-123.png"))
 
 	want := "5/assets/abc-123.png"
 	if got != want {

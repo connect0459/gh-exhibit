@@ -2798,6 +2798,146 @@ linked to #30 via GitHub's native Sub-issues relationship (the `addSubIssue`
 GraphQL mutation, confirmed via `subIssuesSummary { total: 5 }` on #30), to
 be worked separately.
 
+### Attachment filename validation at the persistence boundary (2026-07-20)
+
+One of two findings from a proactive pre-release review being fixed
+directly rather than filed as a public GitHub issue, per `SECURITY.md`'s
+own scope for path-traversal-adjacent issue classes (that document asks for
+private reporting instead of a public issue for exactly this class). Fixed
+on `fix/attachment-filename-validation`:
+`attachmentWriter.WriteAsset` (`internal/infrastructure/persistence`) joined
+its caller-supplied `filename` parameter into a filesystem path
+(`filepath.Join(issueDir(...), "assets", filename)`) with no validation of
+its own. The only reason this wasn't exploitable today was that the current
+sole caller's filename happens to be indirectly constrained by an unrelated
+URL-shape regex in a different package (`internal/domain/services`) — traced
+end-to-end, with no transformation or check at the `WriteAsset` boundary
+itself, and the port's own interface doc placed no precondition on
+`filename` either.
+
+- `attachment_writer.go` gains `validateAssetFilename`, rejecting anything
+  that isn't a single, path-safe segment: empty, `.` or `..`, containing a
+  path separator (`filepath.Base(filename) != filename` catches this and an
+  absolute path both), returning an error instead of joining it into a
+  path. `WriteAsset` now calls it before `writeFile`.
+- `internal/domain/repositories/attachment_writer.go`'s `WriteAsset` doc
+  comment now states this precondition explicitly, so the abstract port's
+  contract matches what its implementation actually enforces.
+- Tests: Red/Green TDD, one test per rejected shape
+  (`TestWriteAsset_RejectsAFilenameContainingADotDotSegment`,
+  `...ContainingAPathSeparator`, `...AnAbsolutePathFilename`,
+  `...EqualToDot`, `...AnEmptyFilename`), each confirmed red against the
+  unchanged production code first.
+- `docs/specs/README.md`'s attachment-policy section updated to state this
+  in its own commit.
+
+C0 after this fix: `internal/infrastructure/persistence` 100.0% (dipped to
+98.4% immediately after the first four new tests, since none of them
+exercised the `filename == "."` branch specifically; the fifth test,
+`TestWriteAsset_RejectsAFilenameEqualToDot`, closed that gap before this
+was accepted — checked via `go tool cover -func`, not assumed complete from
+partial coverage). `go build ./...`, `go vet ./...`,
+`go test ./... -race -cover`, `gofmt -l .`, and `pre-commit run
+--all-files` all pass.
+
+The sibling finding from the same review (a pagination next-page host
+validation gap in `internal/infrastructure/github`) is fixed separately on
+`fix/pagination-host-validation`; the 5 remaining, non-security-classed
+findings from the same sweep were filed as GitHub issue
+[#30](https://github.com/connect0459/gh-exhibit/issues/30) (tracking) with
+sub-issues [#31](https://github.com/connect0459/gh-exhibit/issues/31)-[#35](https://github.com/connect0459/gh-exhibit/issues/35).
+
+### Local review of the attachment filename fix (2026-07-20)
+
+A local review of `fix/attachment-filename-validation`, before it was
+pushed or opened as a PR, found `validateAssetFilename`'s own guard had a
+gap of the same kind it was written to close:
+
+- **`filepath.Base(filename) != filename` does not catch
+  `filename == "/"`.** `filepath.Base("/")` returns `"/"` itself — a fixed
+  point the "did Base change it" comparison cannot distinguish from a
+  genuinely safe single-segment filename. `filepath.Join(assetsDir, "/")`
+  then collapses onto the assets directory path itself, so `writeFile`
+  would attempt to write attachment data to a path that should be a
+  directory. Confirmed directly (not just reasoned about):
+  `filepath.Base("/") == "/"` evaluates true. A bare backslash had the same
+  problem on a non-Windows build, since only the host OS's own
+  `filepath.Separator` was implicitly being considered, even though
+  gh-exhibit is distributed for Windows too (`.goreleaser.yml` builds a
+  `windows` target).
+- Replaced the `filepath.Base` comparison with a direct
+  `strings.ContainsAny(filename, "/\\")` scan for either separator
+  character, regardless of build platform. The explicit `"."`/`".."`
+  checks are unchanged.
+- Tests: `TestWriteAsset_RejectsAFilenameEqualToASingleSlash` and
+  `TestWriteAsset_RejectsAFilenameContainingABackslash` added, each
+  confirmed red against the unchanged code from the prior commit first.
+
+C0 after this fix: `internal/infrastructure/persistence` 100.0%, unchanged
+in shape from before this correction. `go build ./...`, `go vet ./...`,
+`go test ./... -race -cover`, `gofmt -l .`, and `pre-commit run
+--all-files` all pass.
+
+### AssetFilename value object introduced (2026-07-20)
+
+A second local review of the same branch, before it was pushed, raised a
+design question rather than a bug: `validateAssetFilename` lived in
+`internal/infrastructure/persistence` as a function over a bare `string`,
+the one place in this project's port set that trusted a caller-supplied
+primitive for an invariant, instead of a domain Value Object with a smart
+constructor — inconsistent with `IssueRef`'s own established precedent for
+exactly this kind of "string with an invariant crossing a port boundary"
+case. Confirmed with the user: fold the Value Object introduction into
+this same branch rather than deferring it to a separate refactor PR.
+
+- `internal/domain/valueobjects.AssetFilename` (new): a Value Object
+  wrapping the "single, path-safe segment" invariant `validateAssetFilename`
+  used to enforce — same rejection rules (empty, `.`/`..`, a path
+  separator via `strings.ContainsAny(filename, "/\\")`), same reasoning
+  for scanning both separator characters directly rather than comparing
+  against `filepath.Base` or the host OS's own `filepath.Separator`.
+- `repositories.AttachmentWriter.WriteAsset` now takes
+  `filename valueobjects.AssetFilename` instead of a bare `string`; its own
+  validation is removed from `internal/infrastructure/persistence` — the
+  type itself is now the guarantee, so the infrastructure layer no longer
+  needs (or has) any filename-shape checking of its own.
+- `services.Attachment.Filename` (`internal/domain/services`) now returns
+  `(valueobjects.AssetFilename, error)` instead of a bare `string`. The
+  error is defensive: `Attachment`'s own URL is already validated by
+  `NewAttachment` to match a GitHub user-attachments asset path, whose id
+  segment can never actually fail `NewAssetFilename` — but the constructor
+  is still gone through rather than a bare struct literal, so this stays
+  true regardless of how that upstream validation evolves.
+- `valueobjects.IssueRef.AssetPath` now takes `AssetFilename` instead of a
+  bare `string`, for the same reason — it is the other sink the same
+  conceptual value flows into (the rendered Markdown's relative attachment
+  link), not just the write path.
+- `application/services.ExportService.resolveAttachments`: a
+  `Filename()` failure (currently unreachable, per the above) is handled
+  as an ordinary per-attachment failure — recorded via `FetchFailed` and
+  the run's failure log, `continue`d past — rather than aborting the whole
+  export, matching this project's existing failure-isolation policy for
+  every other attachment-fetch error in the same loop.
+- Tests: Red/Green TDD. `asset_filename_test.go` (new) carries every
+  rejection case previously in `attachment_writer_test.go`, which lost its
+  own copies (the type system, not a persistence-layer function, now
+  enforces the invariant) and gained a small `testAssetFilename` helper
+  instead. `filename_test.go`/`issue_ref_test.go`/`export_service_test.go`
+  updated for the new signatures; `fakeAttachmentWriter` (`export_service_test.go`)
+  stores by `filename.String()` so its existing map-keyed assertions are
+  unchanged.
+
+C0 after this round: `internal/domain/valueobjects` 95.4% (up from
+95.2%), `internal/infrastructure/persistence` 100.0% (unchanged in shape —
+only lost the validation branches that moved to `valueobjects`),
+`internal/application/services` 94.7% (down from 97.2% — the new
+`Filename()`-error branch in `resolveAttachments`, and the `Export` call
+site wrapping it, are both defensive and unreachable for the reason
+explained above, the same "not meaningfully testable without a contrived
+fake" shape as this project's other accepted gaps, not a new kind of one).
+`go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
+`gofmt -l .`, and `pre-commit run --all-files` all pass.
+
 ### Pagination next-page host validation (2026-07-20)
 
 The first of the two directly-fixed findings, on

@@ -14,7 +14,7 @@ import (
 type AttachmentWriter interface {
 	// WriteAsset writes a single downloaded attachment's data under
 	// {repo}/{number}/assets/{filename}.
-	WriteAsset(ctx context.Context, ref valueobjects.IssueRef, filename string, data []byte) error
+	WriteAsset(ctx context.Context, ref valueobjects.IssueRef, filename valueobjects.AssetFilename, data []byte) error
 
 	// WriteFetchErrorLog persists this run's attachment fetch-failure
 	// summary to {repo}/{number}/fetch-errors.log, so a failure is
