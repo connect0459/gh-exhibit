@@ -2754,3 +2754,29 @@ C0: `internal/infrastructure/persistence` 100.0%,
 literal shortened, no branch added or removed). `go build ./...`,
 `go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
 `pre-commit run` all pass.
+
+### Local review of the output layout flattening (2026-07-20)
+
+A local review of `refactor/flatten-output-layout` found the sweep above
+missed two more `issues/{repo}/{number}` mentions, both fixed on the same
+branch:
+
+- **`internal/domain/repositories.AttachmentWriter`'s own Godoc still
+  described the old path.** The infrastructure-layer implementation
+  (`internal/infrastructure/persistence/attachment_writer.go`) had already
+  been updated, but the abstract port it implements — the interface
+  definition itself — had not, leaving the domain-layer contract
+  documentation out of sync with what its own implementation actually
+  does.
+- **`SECURITY.md`'s path-traversal scope description** still named "the
+  intended `issues/{repo}/{number}` layout" as the boundary an
+  out-of-bounds write would escape. Unlike `docs/todo.md` (an intentional
+  dated history log, left untouched by design) or the removed ADRs
+  (historical record), `SECURITY.md` describes current behavior, so it
+  needed the same update `docs/specs/README.md` already got.
+- No test file for either change: `AttachmentWriter` is an interface with
+  no logic to exercise (mirroring this project's existing precedent for
+  every other port), and `SECURITY.md` is prose. Verified via
+  `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
+  `gofmt -l .`, and `pre-commit run --all-files` (all pass, no regressions
+  — expected, since neither change touches Go logic).
