@@ -2235,6 +2235,10 @@ would actually enforce:
   flagged by the same survey, but `NewAttribution` already rejects an empty
   `url` (present since the domain layer's original implementation) — no
   change needed there; the survey's premise was stale on this one point.
+  **Reversed by the next entry below**: a later round in this same PR
+  found this conclusion itself premature and changed `Attribution.url` to
+  `valueobjects.Url` after all — this bullet describes this round's own
+  point-in-time conclusion, not the PR's final state.
 - **Considered and not pursued**: `filename`/`contentType` staying as bare
   strings through `Attachment.Filename`/`AttachmentFetcher`'s return value;
   `InlineContext.path`'s shape (only used for rendering, never filesystem
