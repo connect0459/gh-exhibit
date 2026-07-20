@@ -60,7 +60,7 @@ This project follows **Red → Green → Refactor** (Detroit-school TDD):
 - Error messages describe a concrete operation or state, not the name of
   the function/method that produced them.
 
-Coverage targets (see `docs/adrs/adr-002-language-and-domain-design.md`):
+Coverage targets (see `docs/SPEC.md`):
 domain layer (`internal/domain/...`) — C0 90% floor; boundary layer
 (`internal/infrastructure/...`, HTTP/file I/O) — qualitative branch coverage
 via real fixtures (`httptest.Server`, `t.TempDir()`), no fixed numeric floor.

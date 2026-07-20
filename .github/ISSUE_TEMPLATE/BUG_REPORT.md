@@ -24,7 +24,7 @@ about: Report a bug
 
 ## [Required] Expected Behavior
 
-<!-- What does the relevant ADR (`docs/adrs/`) say should happen? -->
+<!-- What does `docs/SPEC.md` say should happen? -->
 
 ## [Required] Actual Behavior
 
@@ -36,7 +36,7 @@ about: Report a bug
 
 ## Relevant specs or references
 
-<!-- Link to the relevant ADR or GitHub REST API doc, if applicable -->
+<!-- Link to the relevant section of docs/SPEC.md or a GitHub REST API doc, if applicable -->
 
 ## Impact
 
