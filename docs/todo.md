@@ -2185,3 +2185,71 @@ this entry itself was not part of that PR, see below):
 C0 unchanged: `internal/domain/services` 99.3%, `internal/application/
 services` 97.2%. `go build ./...`, `go vet ./...`, `go test ./... -race
 -cover`, and `gofmt -l .` all pass.
+
+### Attachment URL as a value object, not a primitive string (2026-07-20)
+
+With every checklist item above (including the `Resolution`-owns-its-url
+follow-up) merged, the user asked whether any remaining `url string` (or
+similar primitive) crossing the domain/application/infrastructure layers
+could become a Value Object for stronger type-level guarantees. A survey
+of `internal/domain/{valueobjects,services,repositories}`,
+`internal/application/services`, and `internal/infrastructure/{github,
+persistence}` found several bare-`string` domain concepts (attachment URL
+at the `AttachmentFetcher` port, `NewAttachment`/`Resolution`'s own
+un-validated `url`, `Attribution.url`, `filename`, `contentType`,
+`InlineContext.path`, `ExportService.host`), ranked by how concrete the
+invariant gap actually was rather than by how many places a `string` could
+theoretically become a type. Three were confirmed with the user and fixed
+on `refactor/attachment-url-invariants`; the rest were judged either
+already covered or not worth their own type given no invariant a new type
+would actually enforce:
+
+- **`repositories.AttachmentFetcher.Fetch` took a bare `url string`even
+  though `resolveAttachments` already held a validated `services.Attachment`
+  for every URL it fetched** — the call site unwrapped it via `a.URL()`
+  just to cross the port boundary, then the infra implementation never used
+  it as anything but a string again. `Fetch` now takes `services.Attachment`
+  directly, removing that round trip; `internal/infrastructure/github`'s
+  implementation extracts `.URL()` internally instead.
+- **`NewAttachment(url string)` had no validation**, unlike
+  `NewAttribution`/`NewIssueRef`/`NewInlineContext`, which all reject empty
+  input at construction. Now returns `(Attachment, error)`. `Detect`'s own
+  regex match can never actually be empty, so the new error branch is
+  unreachable through that path specifically — kept anyway as the same
+  defensive skip-and-continue this project already applies to other
+  value-object invariants (e.g. the sixth review round's `subject_type:
+  "file"` fix), rather than leaving a public constructor with no invariant
+  for some future caller that doesn't go through `Detect`.
+- **`Resolution`'s `Downloaded`/`FetchFailed` accepted an empty `url`**
+  with no check at all, the one gap left after the `Resolution`-owns-its-
+  url follow-up above. Both now return `(Resolution, error)`;
+  `export_service.go`'s `resolveAttachments` propagates a construction
+  failure like its other defensive fetch-loop errors (unreachable in
+  practice for the same reason as `NewAttachment`'s: every caller already
+  passes an `Attachment`-derived, non-empty URL).
+- **Checked and found already covered**: `Attribution.url` was initially
+  flagged by the same survey, but `NewAttribution` already rejects an empty
+  `url` (present since the domain layer's original implementation) — no
+  change needed there; the survey's premise was stale on this one point.
+- **Considered and not pursued**: `filename`/`contentType` staying as bare
+  strings through `Attachment.Filename`/`AttachmentFetcher`'s return value;
+  `InlineContext.path`'s shape (only used for rendering, never filesystem
+  access); `ExportService.host`. None of these has a concrete invariant a
+  new type would enforce beyond what already holds today, unlike the three
+  fixed above, each of which either removed an actual round-trip or closed
+  a real (if currently unreached) validation gap shared with this
+  package's other value objects.
+- Red/Green TDD per concern, one commit each: test files were updated to
+  the new signatures first (confirmed failing to compile), then each
+  production change followed. `newTestAttachment`/`mustDownloaded`/
+  `mustFetchFailed` test helpers replace direct constructor calls now that
+  each can fail, mirroring `newAttribution`'s own precedent.
+
+C0 after this round: `internal/domain/services` 98.7% (down slightly from
+99.3% — the new defensive, structurally-unreachable error branches in
+`Detect`/`resolveAttachments` are the only new gaps, the same
+"defensive, not meaningfully testable" shape as this project's other
+accepted gaps, not a new kind of one). `internal/application/services`
+95.7% (down from 97.2%, same reason). No behavior change and no on-disk
+output layout change. `go build ./...`, `go vet ./...`, `go test ./...
+-race -cover`, and `gofmt -l .` all pass.
