@@ -78,6 +78,15 @@ why.
       deferral reason recorded here previously. See "Concurrent
       pull-request-chain/timeline fetch (2026-07-19)" below for what was
       built.
+- [x] Decide whether the on-disk output layout's `issues/` segment
+      (`{output}/issues/{repo}/{number}...`) should stay, now that the
+      tool is publicly distributed rather than bound to the one private
+      hand-maintained convention ADR-001/ADR-002 originally modeled the
+      layout on — **flagged by the user (2026-07-20)** while
+      reconsidering how `-o`/`--output` composes with the layout,
+      resolved the same day. See "Output layout flattened: issues/
+      segment removed (2026-07-20)" below for what was decided and
+      built.
 
 ## Spike
 
@@ -2687,3 +2696,87 @@ C0 unchanged: `internal/domain/valueobjects` 95.2% (the new test exercises
 an already-reachable path, adding no new branch). `go build ./...`,
 `go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
 `pre-commit run` all pass.
+
+### Output layout flattened: issues/ segment removed (2026-07-20)
+
+While reconsidering how `-o`/`--output` composes with the on-disk
+layout, the user asked whether grouping every export under a fixed
+`issues/` segment (`{output}/issues/{repo}/{number}...`) was still the
+right default. Discussed and confirmed with the user on
+`refactor/flatten-output-layout`:
+
+- **The analysis surfaced a tension in the original rationale, not just
+  a naming question.** `docs/adrs/adr-002-language-and-domain-design.md`
+  (before its removal — recovered via `git show`) justified the
+  `issues/` segment as byte-compatibility with a pre-existing, private,
+  hand-maintained convention (ADR-001), while in the same section
+  explicitly disclaiming that "whether these files are subsequently
+  committed to a repository, and which one... is out of scope for
+  gh-exhibit's design." Anchoring a publicly distributed tool's on-disk
+  contract to one private, unnamed downstream repository's layout,
+  while simultaneously declaring that repository out of scope, was the
+  actual defect — not which literal string to use for the segment. With
+  exactly one resource kind in this tool's scope, the segment also
+  disambiguated nothing it could collide with.
+- **Three options were compared**: keep `issues/` fixed; flatten to
+  `{output}/{repo}/{number}...`; rename the fixed segment to
+  `gh-exhibit/`. The third was rejected: renaming keeps the same
+  forced-segment problem the user raised, and the "record what produced
+  this" concern it would address is already covered by the
+  document-level provenance line (see "Document-level provenance line
+  (2026-07-20)" above) — a directory-level echo of the same fact would
+  be redundant.
+- **Decided with the user: flatten.** `-o`/`--output` now owns all of
+  "how to group this run's output on disk"; a caller who still wants
+  the old `issues/`-grouped shape (e.g. to drop straight into an
+  existing evidence repository using that convention) gets it for free
+  by passing `-o .../issues` themselves, so no capability is lost.
+- `internal/infrastructure/persistence`'s `issuePath`/`issueDir`
+  (shared by `evidenceWriter`, `documentWriter`, `attachmentWriter`) and
+  `internal/presentation/cli.RunExports`'s own independently-built
+  success-message path both dropped the `"issues"` literal — this
+  project's error-message-tag sweep precedent applies here too: a
+  value duplicated across sites is swept in one pass, not patched
+  piecemeal. Red/Green TDD: every path-asserting test in
+  `evidence_writer_test.go`/`document_writer_test.go`/
+  `attachment_writer_test.go`/`run_test.go` was updated first (renaming
+  `...UnderIssuesRepoNumber...` test names to `...UnderRepoNumber...`
+  where they named the old shape directly), confirmed red against the
+  unchanged production code, then the production code updated to
+  green.
+- `docs/specs/README.md`'s on-disk layout section updated to the new
+  layout in its own commit; the `CHANGELOG.md` entry is deferred to the
+  release PR rather than added per feature commit, per this project's
+  own convention for that file.
+
+C0: `internal/infrastructure/persistence` 100.0%,
+`internal/presentation/cli` 98.8% — both unchanged in shape (only a
+literal shortened, no branch added or removed). `go build ./...`,
+`go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
+`pre-commit run` all pass.
+
+### Local review of the output layout flattening (2026-07-20)
+
+A local review of `refactor/flatten-output-layout` found the sweep above
+missed two more `issues/{repo}/{number}` mentions, both fixed on the same
+branch:
+
+- **`internal/domain/repositories.AttachmentWriter`'s own Godoc still
+  described the old path.** The infrastructure-layer implementation
+  (`internal/infrastructure/persistence/attachment_writer.go`) had already
+  been updated, but the abstract port it implements — the interface
+  definition itself — had not, leaving the domain-layer contract
+  documentation out of sync with what its own implementation actually
+  does.
+- **`SECURITY.md`'s path-traversal scope description** still named "the
+  intended `issues/{repo}/{number}` layout" as the boundary an
+  out-of-bounds write would escape. Unlike `docs/todo.md` (an intentional
+  dated history log, left untouched by design) or the removed ADRs
+  (historical record), `SECURITY.md` describes current behavior, so it
+  needed the same update `docs/specs/README.md` already got.
+- No test file for either change: `AttachmentWriter` is an interface with
+  no logic to exercise (mirroring this project's existing precedent for
+  every other port), and `SECURITY.md` is prose. Verified via
+  `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
+  `gofmt -l .`, and `pre-commit run --all-files` (all pass, no regressions
+  — expected, since neither change touches Go logic).

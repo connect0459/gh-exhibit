@@ -35,7 +35,7 @@ issues are in scope:
   an unintended destination.
 - **Path traversal in output paths** — any `--repo`, issue/PR number, or
   fetched-content value that causes `gh-exhibit` to read or write outside
-  the intended `issues/{repo}/{number}` layout under the configured output
+  the intended `{repo}/{number}` layout under the configured output
   directory.
 - **Resource exhaustion** — an attacker-controlled response (timeline page,
   attachment body) that causes unbounded memory growth, an unbounded

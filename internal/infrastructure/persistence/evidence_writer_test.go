@@ -31,7 +31,7 @@ func readFile(t *testing.T, path string) string {
 	return string(b)
 }
 
-func TestWriteIssue_WritesResponseBodyVerbatimUnderIssuesRepoNumber(t *testing.T) {
+func TestWriteIssue_WritesResponseBodyVerbatimUnderRepoNumber(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewEvidenceWriter(baseDir)
 	const body = `{
@@ -44,7 +44,7 @@ func TestWriteIssue_WritesResponseBodyVerbatimUnderIssuesRepoNumber(t *testing.T
 		t.Fatalf("WriteIssue() error = %v", err)
 	}
 
-	got := readFile(t, filepath.Join(baseDir, "issues", "hello-world", "42.json"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42.json"))
 	if got != body {
 		t.Fatalf("WriteIssue() wrote %q, want %q", got, body)
 	}
@@ -62,8 +62,8 @@ func TestWriteIssue_OmitsOwnerFromThePath(t *testing.T) {
 		t.Fatalf("WriteIssue() error = %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42.json")); err != nil {
-		t.Fatalf("expected file at issues/hello-world/42.json regardless of owner, stat error = %v", err)
+	if _, err := os.Stat(filepath.Join(baseDir, "hello-world", "42.json")); err != nil {
+		t.Fatalf("expected file at hello-world/42.json regardless of owner, stat error = %v", err)
 	}
 }
 
@@ -77,7 +77,7 @@ func TestWritePullRequest_WritesResponseBodyVerbatimWithPullSuffix(t *testing.T)
 		t.Fatalf("WritePullRequest() error = %v", err)
 	}
 
-	got := readFile(t, filepath.Join(baseDir, "issues", "hello-world", "42.pull.json"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42.pull.json"))
 	if got != body {
 		t.Fatalf("WritePullRequest() wrote %q, want %q", got, body)
 	}
@@ -97,7 +97,7 @@ func TestWriteTimeline_ConcatenatesPagesIntoOneArrayFilePreservingEachItemVerbat
 	}
 
 	want := "[{\n  \"id\": 1\n},{\"id\":2}]"
-	got := readFile(t, filepath.Join(baseDir, "issues", "hello-world", "42.timeline.json"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42.timeline.json"))
 	if got != want {
 		t.Fatalf("WriteTimeline() wrote %q, want %q", got, want)
 	}
@@ -112,7 +112,7 @@ func TestWriteTimeline_WritesAnEmptyArrayWhenGivenNoPages(t *testing.T) {
 		t.Fatalf("WriteTimeline() error = %v", err)
 	}
 
-	got := readFile(t, filepath.Join(baseDir, "issues", "hello-world", "42.timeline.json"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42.timeline.json"))
 	if got != "[]" {
 		t.Fatalf("WriteTimeline() wrote %q, want \"[]\"", got)
 	}
@@ -132,7 +132,7 @@ func TestWriteReviewComments_ConcatenatesItemsIntoOneArrayFileWithReviewComments
 	}
 
 	want := `[{"id":10},{"id":20}]`
-	got := readFile(t, filepath.Join(baseDir, "issues", "hello-world", "42.review-comments.json"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42.review-comments.json"))
 	if got != want {
 		t.Fatalf("WriteReviewComments() wrote %q, want %q", got, want)
 	}
@@ -147,7 +147,7 @@ func TestWriteTimeline_ReturnsAnErrorInsteadOfWritingAMalformedArrayForAnEmptyEl
 	if err == nil {
 		t.Fatal("WriteTimeline() error = nil, want an error for the empty element")
 	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42.timeline.json")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42.timeline.json")); !os.IsNotExist(statErr) {
 		t.Fatalf("WriteTimeline() wrote a file despite the invalid element, stat error = %v", statErr)
 	}
 }
@@ -161,7 +161,7 @@ func TestWriteReviewComments_ReturnsAnErrorInsteadOfWritingAMalformedArrayForAnE
 	if err == nil {
 		t.Fatal("WriteReviewComments() error = nil, want an error for the empty element")
 	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42.review-comments.json")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42.review-comments.json")); !os.IsNotExist(statErr) {
 		t.Fatalf("WriteReviewComments() wrote a file despite the invalid element, stat error = %v", statErr)
 	}
 }
@@ -176,7 +176,7 @@ func TestWriteIssue_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCancelle
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("WriteIssue() error = %v, want context.Canceled", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42.json")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42.json")); !os.IsNotExist(statErr) {
 		t.Fatalf("WriteIssue() wrote a file despite the cancelled context, stat error = %v", statErr)
 	}
 }
@@ -191,7 +191,7 @@ func TestWriteTimeline_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCance
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("WriteTimeline() error = %v, want context.Canceled", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42.timeline.json")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42.timeline.json")); !os.IsNotExist(statErr) {
 		t.Fatalf("WriteTimeline() wrote a file despite the cancelled context, stat error = %v", statErr)
 	}
 }
@@ -206,7 +206,7 @@ func TestWritePullRequest_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCa
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("WritePullRequest() error = %v, want context.Canceled", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42.pull.json")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42.pull.json")); !os.IsNotExist(statErr) {
 		t.Fatalf("WritePullRequest() wrote a file despite the cancelled context, stat error = %v", statErr)
 	}
 }
@@ -221,14 +221,14 @@ func TestWriteReviewComments_ReturnsContextErrorAndSkipsWriteWhenContextIsAlread
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("WriteReviewComments() error = %v, want context.Canceled", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42.review-comments.json")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42.review-comments.json")); !os.IsNotExist(statErr) {
 		t.Fatalf("WriteReviewComments() wrote a file despite the cancelled context, stat error = %v", statErr)
 	}
 }
 
 func TestWriteIssue_ReturnsWrappedErrorWhenDirectoryCannotBeCreated(t *testing.T) {
 	baseDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(baseDir, "issues"), []byte("not a directory"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(baseDir, "hello-world"), []byte("not a directory"), 0o644); err != nil {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
 	writer := NewEvidenceWriter(baseDir)
@@ -241,7 +241,7 @@ func TestWriteIssue_ReturnsWrappedErrorWhenDirectoryCannotBeCreated(t *testing.T
 
 func TestWriteIssue_ReturnsWrappedErrorWhenFileCannotBeWritten(t *testing.T) {
 	baseDir := t.TempDir()
-	dir := filepath.Join(baseDir, "issues", "hello-world")
+	dir := filepath.Join(baseDir, "hello-world")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("os.MkdirAll() error = %v", err)
 	}
@@ -269,7 +269,7 @@ func TestWriteIssue_OverwritesAnExistingFileForTheSameRef(t *testing.T) {
 		t.Fatalf("WriteIssue() error = %v", err)
 	}
 
-	got := readFile(t, filepath.Join(baseDir, "issues", "hello-world", "42.json"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42.json"))
 	if got != `{"title":"second"}` {
 		t.Fatalf("WriteIssue() wrote %q, want %q", got, `{"title":"second"}`)
 	}
