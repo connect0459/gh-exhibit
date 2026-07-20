@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -14,6 +15,9 @@ import (
 const (
 	maxRetryAttempts = 3
 	fixedBackoffBase = 1 * time.Second
+	// maxRetryAfterSeconds is the largest Retry-After value (in seconds) that
+	// converts to nanoseconds without overflowing time.Duration.
+	maxRetryAfterSeconds = int64(math.MaxInt64) / int64(time.Second)
 )
 
 // requester is the subset of *api.RESTClient's interface doWithRetry needs;
@@ -92,8 +96,8 @@ func retryAfterDelay(h http.Header) (time.Duration, bool) {
 	if raw == "" {
 		return 0, false
 	}
-	seconds, err := strconv.Atoi(raw)
-	if err != nil {
+	seconds, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || seconds < 0 || seconds > maxRetryAfterSeconds {
 		return 0, false
 	}
 	return time.Duration(seconds) * time.Second, true

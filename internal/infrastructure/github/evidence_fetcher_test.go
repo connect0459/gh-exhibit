@@ -346,6 +346,46 @@ func TestFetchIssue_UsesFixedBackoffWhenRateLimitHeadersAreMalformed(t *testing.
 	}
 }
 
+func TestFetchIssue_UsesFixedBackoffWhenRetryAfterIsNegative(t *testing.T) {
+	req := &fakeRequester{calls: []fakeCall{
+		{err: &api.HTTPError{StatusCode: http.StatusTooManyRequests, Headers: http.Header{
+			"Retry-After": []string{"-5"},
+		}}},
+		{resp: okResponse()},
+	}}
+	spy := &sleepSpy{}
+	fetcher := &evidenceFetcher{client: req, sleep: spy.sleep}
+
+	_, err := fetcher.FetchIssue(context.Background(), testIssueRef(t))
+
+	if err != nil {
+		t.Fatalf("FetchIssue() error = %v, want nil", err)
+	}
+	if len(spy.waits) != 1 || spy.waits[0] != fixedBackoffBase {
+		t.Fatalf("waits = %v, want [%v] (a negative Retry-After must fall through to the fixed-backoff fallback)", spy.waits, fixedBackoffBase)
+	}
+}
+
+func TestFetchIssue_UsesFixedBackoffWhenRetryAfterOverflowsDuration(t *testing.T) {
+	req := &fakeRequester{calls: []fakeCall{
+		{err: &api.HTTPError{StatusCode: http.StatusTooManyRequests, Headers: http.Header{
+			"Retry-After": []string{"9223372037"},
+		}}},
+		{resp: okResponse()},
+	}}
+	spy := &sleepSpy{}
+	fetcher := &evidenceFetcher{client: req, sleep: spy.sleep}
+
+	_, err := fetcher.FetchIssue(context.Background(), testIssueRef(t))
+
+	if err != nil {
+		t.Fatalf("FetchIssue() error = %v, want nil", err)
+	}
+	if len(spy.waits) != 1 || spy.waits[0] != fixedBackoffBase {
+		t.Fatalf("waits = %v, want [%v] (a Retry-After that overflows time.Duration must fall through to the fixed-backoff fallback)", spy.waits, fixedBackoffBase)
+	}
+}
+
 func TestFetchIssue_DoesNotRetryANetworkLevelError(t *testing.T) {
 	wantErr := errors.New("connection refused")
 	req := &fakeRequester{calls: []fakeCall{{err: wantErr}}}
