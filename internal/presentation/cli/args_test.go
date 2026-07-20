@@ -199,6 +199,32 @@ func TestParseArgs_ReturnsAnErrorWhenAValueFlagIsTheLastToken(t *testing.T) {
 	}
 }
 
+func TestParseArgs_RejectsAShorthandOutputFlagImmediatelyFollowedByAnAttachedFlag(t *testing.T) {
+	_, err := ParseArgs([]string{"-o", "--repo=x", "123"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since -o has no value before the next flag")
+	}
+}
+
+func TestParseArgs_RejectsARepoFlagImmediatelyFollowedByAnAttachedFlag(t *testing.T) {
+	_, err := ParseArgs([]string{"--repo", "--output=custom", "123"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since --repo has no value before the next flag")
+	}
+}
+
+// A value flag immediately followed by "--" is rejected the same as one
+// followed by any other flag-shaped token: "--" conventionally means "no
+// more flags follow", so treating it as a flag's literal value would be
+// the same silent-adjacency misparse this issue targets, just with the
+// flag terminator instead of another named flag.
+func TestParseArgs_RejectsARepoFlagImmediatelyFollowedByTheFlagTerminator(t *testing.T) {
+	_, err := ParseArgs([]string{"--repo", "--", "123"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since --repo has no value before the flag terminator")
+	}
+}
+
 func TestParseArgs_AcceptsTheVersionFlagWithoutAPositionalArgument(t *testing.T) {
 	got, err := ParseArgs([]string{"--version"})
 	if err != nil {
@@ -224,6 +250,41 @@ func TestParseArgs_WrapsFlagErrHelpForTheHelpFlag(t *testing.T) {
 	if !errors.Is(err, flag.ErrHelp) {
 		t.Errorf("ParseArgs() error = %v, want it to wrap flag.ErrHelp", err)
 	}
+}
+
+// This targets splitFlagsAndPositional directly rather than ParseArgs
+// because a triple-dash token is always rejected by flag.FlagSet.Parse's
+// own "bad flag syntax" check before it would ever try to consume a value
+// for it — so ParseArgs's returned error is identical whether or not the
+// pre-scanner over-consumes the next token. The over-consumption is only
+// observable in what the pre-scanner itself classifies as positional.
+func TestSplitFlagsAndPositional_DoesNotConsumeTheNextTokenForAThreeDashFlag(t *testing.T) {
+	flagArgs, positional, err := splitFlagsAndPositional([]string{"123", "---repo", "456"})
+	if err != nil {
+		t.Fatalf("splitFlagsAndPositional() error = %v", err)
+	}
+
+	wantPositional := []string{"123", "456"}
+	if !equalStrings(positional, wantPositional) {
+		t.Errorf("positional = %v, want %v", positional, wantPositional)
+	}
+
+	wantFlagArgs := []string{"---repo"}
+	if !equalStrings(flagArgs, wantFlagArgs) {
+		t.Errorf("flagArgs = %v, want %v", flagArgs, wantFlagArgs)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func equalInts(a, b []int) bool {
