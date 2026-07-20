@@ -38,6 +38,59 @@ func TestWriteAsset_OmitsOwnerFromThePath(t *testing.T) {
 	}
 }
 
+func TestWriteAsset_RejectsAFilenameContainingADotDotSegment(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), "../../../../tmp/evil", []byte("data"))
+	if err == nil {
+		t.Fatal("WriteAsset() error = nil, want an error for a filename containing a \"..\" segment")
+	}
+	if _, statErr := os.Stat(filepath.Join(baseDir, "..", "..", "..", "tmp", "evil")); !os.IsNotExist(statErr) {
+		t.Fatalf("WriteAsset() wrote outside the intended directory, stat error = %v", statErr)
+	}
+}
+
+func TestWriteAsset_RejectsAFilenameContainingAPathSeparator(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), "sub/evil.png", []byte("data"))
+	if err == nil {
+		t.Fatal("WriteAsset() error = nil, want an error for a filename containing a path separator")
+	}
+}
+
+func TestWriteAsset_RejectsAnAbsolutePathFilename(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), "/etc/cron.d/evil", []byte("data"))
+	if err == nil {
+		t.Fatal("WriteAsset() error = nil, want an error for an absolute-path filename")
+	}
+}
+
+func TestWriteAsset_RejectsAFilenameEqualToDot(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), ".", []byte("data"))
+	if err == nil {
+		t.Fatal("WriteAsset() error = nil, want an error for a filename equal to \".\"")
+	}
+}
+
+func TestWriteAsset_RejectsAnEmptyFilename(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), "", []byte("data"))
+	if err == nil {
+		t.Fatal("WriteAsset() error = nil, want an error for an empty filename")
+	}
+}
+
 func TestWriteAsset_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCancelled(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewAttachmentWriter(baseDir)

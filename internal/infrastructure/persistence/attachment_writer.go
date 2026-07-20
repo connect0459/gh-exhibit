@@ -35,7 +35,29 @@ func (w *attachmentWriter) WriteAsset(ctx context.Context, ref valueobjects.Issu
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if err := validateAssetFilename(filename); err != nil {
+		return fmt.Errorf("write asset for %s/%d: %w", ref.Repo(), ref.Number(), err)
+	}
 	return writeFile(filepath.Join(issueDir(w.baseDir, ref), "assets", filename), data)
+}
+
+// validateAssetFilename rejects a filename that isn't a single, path-safe
+// segment — empty, "." or "..", containing a path separator, or an absolute
+// path — any of which could otherwise escape the intended
+// {repo}/{number}/assets/ directory once joined into a filesystem path.
+// This defends the boundary directly rather than relying solely on
+// whatever shape a caller's filename derivation happens to produce.
+func validateAssetFilename(filename string) error {
+	if filename == "" {
+		return fmt.Errorf("attachment filename must not be empty")
+	}
+	if filename == "." || filename == ".." {
+		return fmt.Errorf("attachment filename must not be %q", filename)
+	}
+	if filepath.Base(filename) != filename {
+		return fmt.Errorf("attachment filename %q must be a single path segment", filename)
+	}
+	return nil
 }
 
 // WriteFetchErrorLog persists log verbatim, except an empty log removes any

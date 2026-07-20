@@ -13,7 +13,9 @@ import (
 // assets, not JSON or Markdown).
 type AttachmentWriter interface {
 	// WriteAsset writes a single downloaded attachment's data under
-	// {repo}/{number}/assets/{filename}.
+	// {repo}/{number}/assets/{filename}. filename must be a single,
+	// path-safe segment (non-empty, no path separator, not "." or ".."):
+	// implementations reject anything else rather than trust the caller.
 	WriteAsset(ctx context.Context, ref valueobjects.IssueRef, filename string, data []byte) error
 
 	// WriteFetchErrorLog persists this run's attachment fetch-failure
