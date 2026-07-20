@@ -291,6 +291,79 @@ func TestBuildEntries_FallsBackToOriginalLineForAnOutdatedReviewComment(t *testi
 	}
 }
 
+func TestBuildEntries_RecordsAStartLineForARangeAnchoredReviewComment(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{json.RawMessage(`{
+		"pull_request_review_id": 1001,
+		"user": {"login": "octocat"},
+		"body": "This whole block needs a rework.",
+		"path": "main.go",
+		"start_line": 10,
+		"line": 15,
+		"diff_hunk": "",
+		"created_at": "2026-07-02T14:19:39Z",
+		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
+	}`)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(entries))
+	}
+
+	comment, ok := entries[1].(valueobjects.InlineReviewComment)
+	if !ok {
+		t.Fatalf("entries[1] = %#v, want InlineReviewComment", entries[1])
+	}
+	if comment.Context().Line() == nil || *comment.Context().Line() != 15 {
+		t.Fatalf("Context().Line() = %v, want 15", comment.Context().Line())
+	}
+	if comment.Context().StartLine() == nil || *comment.Context().StartLine() != 10 {
+		t.Fatalf("Context().StartLine() = %v, want 10", comment.Context().StartLine())
+	}
+}
+
+func TestBuildEntries_FallsBackToOriginalStartLineForAnOutdatedRangeReviewComment(t *testing.T) {
+	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
+	rawComments := []json.RawMessage{json.RawMessage(`{
+		"pull_request_review_id": 1001,
+		"user": {"login": "octocat"},
+		"body": "This diff has since changed underneath the comment.",
+		"path": "main.go",
+		"line": null,
+		"original_line": 346,
+		"start_line": null,
+		"original_start_line": 340,
+		"diff_hunk": "",
+		"created_at": "2026-07-02T14:19:39Z",
+		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
+	}`)}
+
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(entries))
+	}
+
+	comment, ok := entries[1].(valueobjects.InlineReviewComment)
+	if !ok {
+		t.Fatalf("entries[1] = %#v, want InlineReviewComment", entries[1])
+	}
+	if comment.Context().Line() == nil || *comment.Context().Line() != 346 {
+		t.Fatalf("Context().Line() = %v, want 346 (original_line)", comment.Context().Line())
+	}
+	if comment.Context().StartLine() == nil || *comment.Context().StartLine() != 340 {
+		t.Fatalf("Context().StartLine() = %v, want 340 (original_start_line)", comment.Context().StartLine())
+	}
+	if !comment.Context().Outdated() {
+		t.Fatal("expected the comment's context to be marked outdated")
+	}
+}
+
 func TestBuildEntries_AttributesAReviewCommentFromADeletedAccountToGhost(t *testing.T) {
 	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
 	rawComments := []json.RawMessage{json.RawMessage(`{

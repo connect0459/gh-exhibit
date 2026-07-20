@@ -70,8 +70,8 @@ func buildReviewComment(raw json.RawMessage) (valueobjects.InlineReviewComment, 
 	if err != nil {
 		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("review comment attribution: %w", err)
 	}
-	line, outdated := w.resolvedLine()
-	ctx, err := valueobjects.NewInlineContext(w.Path, line, nil, w.DiffHunk, outdated)
+	line, startLine, outdated := w.resolvedLine()
+	ctx, err := valueobjects.NewInlineContext(w.Path, line, startLine, w.DiffHunk, outdated)
 	if err != nil {
 		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("review comment context: %w", err)
 	}

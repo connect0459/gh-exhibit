@@ -40,6 +40,8 @@ type reviewCommentWire struct {
 	User                actorWire `json:"user"`
 	Body                string    `json:"body"`
 	Path                string    `json:"path"`
+	StartLine           int       `json:"start_line"`
+	OriginalStartLine   int       `json:"original_start_line"`
 	Line                int       `json:"line"`
 	OriginalLine        int       `json:"original_line"`
 	DiffHunk            string    `json:"diff_hunk"`
@@ -47,20 +49,31 @@ type reviewCommentWire struct {
 	HTMLURL             string    `json:"html_url"`
 }
 
-// resolvedLine falls back to original_line, marked outdated, when line is
-// null (0 after unmarshal) — GitHub clears a review comment's line once the
-// diff it anchored to has changed, but original_line still records where it
-// pointed when the comment was made. If both are null/zero, the comment has
-// no line at all (GitHub's subject_type "file", a comment on the whole file
-// rather than a position within it), not an outdated one.
-func (w reviewCommentWire) resolvedLine() (line *int, outdated bool) {
+// resolvedLine falls back to original_line/original_start_line, marked
+// outdated, when line is null (0 after unmarshal) — GitHub clears a review
+// comment's line once the diff it anchored to has changed, but
+// original_line still records where it pointed when the comment was made.
+// If both line and original_line are null/zero, the comment has no line at
+// all (GitHub's subject_type "file", a comment on the whole file rather
+// than a position within it), not an outdated one. startLine is nil unless
+// the comment is anchored to a range of lines rather than a single one, in
+// which case it is drawn from whichever of start_line/original_start_line
+// pairs with the line/original_line that resolved line.
+func (w reviewCommentWire) resolvedLine() (line, startLine *int, outdated bool) {
 	if w.Line > 0 {
 		v := w.Line
-		return &v, false
+		return &v, resolvedStartLine(w.StartLine), false
 	}
 	if w.OriginalLine > 0 {
 		v := w.OriginalLine
-		return &v, true
+		return &v, resolvedStartLine(w.OriginalStartLine), true
 	}
-	return nil, false
+	return nil, nil, false
+}
+
+func resolvedStartLine(startLine int) *int {
+	if startLine <= 0 {
+		return nil
+	}
+	return &startLine
 }
