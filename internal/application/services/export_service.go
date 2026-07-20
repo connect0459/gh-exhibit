@@ -267,7 +267,7 @@ func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects
 	}
 	wg.Wait()
 
-	resolutions := make(map[string]services.Resolution, len(attachments))
+	resolutions := make([]services.Resolution, 0, len(attachments))
 	var downloads []downloadedAsset
 	var failureLog bytes.Buffer
 	for _, r := range results {
@@ -275,14 +275,14 @@ func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects
 			if errors.Is(r.err, context.Canceled) || errors.Is(r.err, context.DeadlineExceeded) {
 				return nil, nil, nil, fmt.Errorf("could not download the attachment at %s: %w", r.attachment.URL(), r.err)
 			}
-			resolutions[r.attachment.URL()] = services.FetchFailed(r.err.Error())
+			resolutions = append(resolutions, services.FetchFailed(r.attachment.URL(), r.err.Error()))
 			fmt.Fprintf(&failureLog, "%s: %s\n", r.attachment.URL(), r.err)
 			continue
 		}
 
 		filename := r.attachment.Filename(r.contentType)
 		downloads = append(downloads, downloadedAsset{filename: filename, data: r.data})
-		resolutions[r.attachment.URL()] = services.Downloaded(ref.AssetPath(filename))
+		resolutions = append(resolutions, services.Downloaded(r.attachment.URL(), ref.AssetPath(filename)))
 	}
 
 	return services.Rewrite(rendered, resolutions), downloads, failureLog.Bytes(), nil
