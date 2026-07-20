@@ -2780,3 +2780,52 @@ branch:
   `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
   `gofmt -l .`, and `pre-commit run --all-files` (all pass, no regressions
   — expected, since neither change touches Go logic).
+
+### Attachment filename validation at the persistence boundary (2026-07-20)
+
+One of two findings from a proactive pre-release review being fixed
+directly rather than filed as a public GitHub issue, per `SECURITY.md`'s
+own scope for path-traversal-adjacent issue classes (that document asks for
+private reporting instead of a public issue for exactly this class). Fixed
+on `fix/attachment-filename-validation`:
+`attachmentWriter.WriteAsset` (`internal/infrastructure/persistence`) joined
+its caller-supplied `filename` parameter into a filesystem path
+(`filepath.Join(issueDir(...), "assets", filename)`) with no validation of
+its own. The only reason this wasn't exploitable today was that the current
+sole caller's filename happens to be indirectly constrained by an unrelated
+URL-shape regex in a different package (`internal/domain/services`) — traced
+end-to-end, with no transformation or check at the `WriteAsset` boundary
+itself, and the port's own interface doc placed no precondition on
+`filename` either.
+
+- `attachment_writer.go` gains `validateAssetFilename`, rejecting anything
+  that isn't a single, path-safe segment: empty, `.` or `..`, containing a
+  path separator (`filepath.Base(filename) != filename` catches this and an
+  absolute path both), returning an error instead of joining it into a
+  path. `WriteAsset` now calls it before `writeFile`.
+- `internal/domain/repositories/attachment_writer.go`'s `WriteAsset` doc
+  comment now states this precondition explicitly, so the abstract port's
+  contract matches what its implementation actually enforces.
+- Tests: Red/Green TDD, one test per rejected shape
+  (`TestWriteAsset_RejectsAFilenameContainingADotDotSegment`,
+  `...ContainingAPathSeparator`, `...AnAbsolutePathFilename`,
+  `...EqualToDot`, `...AnEmptyFilename`), each confirmed red against the
+  unchanged production code first.
+- `docs/specs/README.md`'s attachment-policy section updated to state this
+  in its own commit.
+
+C0 after this fix: `internal/infrastructure/persistence` 100.0% (dipped to
+98.4% immediately after the first four new tests, since none of them
+exercised the `filename == "."` branch specifically; the fifth test,
+`TestWriteAsset_RejectsAFilenameEqualToDot`, closed that gap before this
+was accepted — checked via `go tool cover -func`, not assumed complete from
+partial coverage). `go build ./...`, `go vet ./...`,
+`go test ./... -race -cover`, `gofmt -l .`, and `pre-commit run
+--all-files` all pass.
+
+The sibling finding from the same review (a pagination next-page host
+validation gap in `internal/infrastructure/github`) is fixed separately on
+`fix/pagination-host-validation`; the 5 remaining, non-security-classed
+findings from the same sweep were filed as GitHub issue
+[#30](https://github.com/connect0459/gh-exhibit/issues/30) (tracking) with
+sub-issues [#31](https://github.com/connect0459/gh-exhibit/issues/31)-[#35](https://github.com/connect0459/gh-exhibit/issues/35).
