@@ -2226,7 +2226,11 @@ would actually enforce:
   `export_service.go`'s `resolveAttachments` propagates a construction
   failure like its other defensive fetch-loop errors (unreachable in
   practice for the same reason as `NewAttachment`'s: every caller already
-  passes an `Attachment`-derived, non-empty URL).
+  passes an `Attachment`-derived, non-empty URL). **Superseded by the next
+  entry below**: a later round in this same PR replaced this non-empty
+  check with `valueobjects.Url` itself, and `Downloaded`/`FetchFailed` no
+  longer return an error at all — this bullet describes this round's own
+  point-in-time design, not the PR's final state.
 - **Checked and found already covered**: `Attribution.url` was initially
   flagged by the same survey, but `NewAttribution` already rejects an empty
   `url` (present since the domain layer's original implementation) — no
