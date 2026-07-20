@@ -122,13 +122,13 @@ self-authored wrapper, to keep each file's content a literal, verbatim REST
 response:
 
 ```text
-{output}/issues/{repo}/{number}.json               issue or pull request resource
-{output}/issues/{repo}/{number}.timeline.json       timeline (paginated responses concatenated into one array)
-{output}/issues/{repo}/{number}.pull.json           pull request resource (PRs only)
-{output}/issues/{repo}/{number}.review-comments.json inline review comments (PRs only)
-{output}/issues/{repo}/{number}.md                  rendered Markdown
-{output}/issues/{repo}/{number}/assets/{filename}   downloaded attachments
-{output}/issues/{repo}/{number}/fetch-errors.log    this run's attachment fetch failures, if any
+{output}/{repo}/{number}.json               issue or pull request resource
+{output}/{repo}/{number}.timeline.json       timeline (paginated responses concatenated into one array)
+{output}/{repo}/{number}.pull.json           pull request resource (PRs only)
+{output}/{repo}/{number}.review-comments.json inline review comments (PRs only)
+{output}/{repo}/{number}.md                  rendered Markdown
+{output}/{repo}/{number}/assets/{filename}   downloaded attachments
+{output}/{repo}/{number}/fetch-errors.log    this run's attachment fetch failures, if any
 ```
 
 `{repo}` only — the owner is deliberately not part of the path. Multi-page
