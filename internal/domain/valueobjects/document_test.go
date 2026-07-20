@@ -105,7 +105,7 @@ func TestDocument_Render_WritesTheTitleAsAnH1HeadingFollowedByASingleEntry(t *te
 
 	want := `# Some title
 
-meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}
+<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}} -->
 
 Issue description.
 `
@@ -132,13 +132,13 @@ func TestDocument_Render_JoinsMultipleEntriesWithASeparatorLine(t *testing.T) {
 
 	want := `# Some title
 
-meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}
+<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}} -->
 
 Issue description.
 
 ------
 
-meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1#issuecomment-1"}
+<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1#issuecomment-1"}} -->
 
 A follow-up comment.
 `
@@ -169,11 +169,11 @@ func TestDocument_Render_JoinsAnEmptyBodyEntryWithASingleBlankLineBeforeTheSepar
 
 	want := `# Some title
 
-meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","state":"commented","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}
+<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","state":"commented","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}} -->
 
 ------
 
-meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/pull/1#issuecomment-1"}
+<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/pull/1#issuecomment-1"}} -->
 
 A follow-up comment.
 `

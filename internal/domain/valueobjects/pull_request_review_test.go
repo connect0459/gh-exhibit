@@ -35,7 +35,7 @@ func TestPullRequestReview_Render_IncludesTheReviewStateInTheMetaLine(t *testing
 				t.Fatalf("unexpected error rendering review: %v", err)
 			}
 
-			want := `meta:{"author":"octocat","created":"2026-07-02T14:19:40Z","state":"` + c.want + `","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}
+			want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","state":"` + c.want + `","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}} -->
 
 Looks solid overall.
 `
@@ -54,7 +54,7 @@ func TestPullRequestReview_Render_AcceptsAnEmptyBody(t *testing.T) {
 		t.Fatalf("unexpected error rendering review: %v", err)
 	}
 
-	want := `meta:{"author":"octocat","created":"2026-07-02T14:19:40Z","state":"approved","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}
+	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","state":"approved","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}} -->
 `
 	if buf.String() != want {
 		t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
@@ -69,7 +69,7 @@ func TestPullRequestReview_Render_CollapsesTrailingNewlinesInTheBodyToASingleOne
 		t.Fatalf("unexpected error rendering review: %v", err)
 	}
 
-	want := `meta:{"author":"octocat","created":"2026-07-02T14:19:40Z","state":"approved","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}
+	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","state":"approved","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}} -->
 
 Looks solid overall.
 `
@@ -86,7 +86,7 @@ func TestPullRequestReview_Render_NormalizesCRLFLineEndingsInTheBody(t *testing.
 		t.Fatalf("unexpected error rendering review: %v", err)
 	}
 
-	want := `meta:{"author":"octocat","created":"2026-07-02T14:19:40Z","state":"approved","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}
+	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","state":"approved","url":"https://github.com/example/repo/pull/1#pullrequestreview-1"}} -->
 
 Line one.
 Line two.

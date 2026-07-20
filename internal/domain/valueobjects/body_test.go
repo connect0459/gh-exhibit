@@ -23,7 +23,7 @@ func TestBody_Render_OmitsClosedAndMergedForAnOpenIssue(t *testing.T) {
 		t.Fatalf("unexpected error rendering body: %v", err)
 	}
 
-	want := `meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}
+	want := `<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}} -->
 
 Issue description.
 `
@@ -41,7 +41,7 @@ func TestBody_Render_IncludesClosedTimestampForAClosedIssue(t *testing.T) {
 		t.Fatalf("unexpected error rendering body: %v", err)
 	}
 
-	want := `meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","closed":"2026-03-16T04:27:50Z","url":"https://github.com/example/repo/issues/1"}
+	want := `<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","closed":"2026-03-16T04:27:50Z","url":"https://github.com/example/repo/issues/1"}} -->
 
 Issue description.
 `
@@ -60,7 +60,7 @@ func TestBody_Render_IncludesBothClosedAndMergedTimestampsForAMergedPullRequest(
 		t.Fatalf("unexpected error rendering body: %v", err)
 	}
 
-	want := `meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","closed":"2026-03-16T04:27:50Z","merged":"2026-03-16T04:27:50Z","url":"https://github.com/example/repo/issues/1"}
+	want := `<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","closed":"2026-03-16T04:27:50Z","merged":"2026-03-16T04:27:50Z","url":"https://github.com/example/repo/issues/1"}} -->
 
 PR description.
 `
@@ -77,7 +77,7 @@ func TestBody_Render_CollapsesTrailingNewlinesInTheContentToASingleOne(t *testin
 		t.Fatalf("unexpected error rendering body: %v", err)
 	}
 
-	want := `meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}
+	want := `<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}} -->
 
 Issue description.
 `
@@ -94,7 +94,7 @@ func TestBody_Render_NormalizesCRLFLineEndingsInTheContent(t *testing.T) {
 		t.Fatalf("unexpected error rendering body: %v", err)
 	}
 
-	want := `meta:{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}
+	want := `<!-- {"meta":{"author":"connect0459","created":"2025-09-19T02:31:29Z","url":"https://github.com/example/repo/issues/1"}} -->
 
 Line one.
 Line two.

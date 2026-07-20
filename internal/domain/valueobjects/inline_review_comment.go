@@ -45,8 +45,8 @@ func (c InlineReviewComment) Equals(other InlineReviewComment) bool {
 		c.body == other.body
 }
 
-// Render writes c's meta:{...} line, its body, and — when present — its
-// diff hunk under a "**Diff:**" label, satisfying Entry.
+// Render writes c's <!-- {"meta":...} --> line, its body, and — when
+// present — its diff hunk under a "**Diff:**" label, satisfying Entry.
 func (c InlineReviewComment) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta

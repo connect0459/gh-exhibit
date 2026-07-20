@@ -9,7 +9,7 @@ import (
 )
 
 // Attribution is the (author, created, url) triple shared by every Tier 1
-// entry, corresponding to the meta:{...} line's common fields.
+// entry, corresponding to the <!-- {"meta":...} --> line's common fields.
 type Attribution struct {
 	author  string
 	created time.Time

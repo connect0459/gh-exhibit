@@ -27,7 +27,7 @@ func TestInlineReviewComment_Render_IncludesPathAndLineInTheMetaLine(t *testing.
 		t.Fatalf("unexpected error rendering inline review comment: %v", err)
 	}
 
-	want := `meta:{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","line":195,"url":"https://github.com/example/repo/pull/1#discussion_r1"}
+	want := `<!-- {"meta":{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","line":195,"url":"https://github.com/example/repo/pull/1#discussion_r1"}} -->
 
 This looks off.
 `
@@ -48,7 +48,7 @@ func TestInlineReviewComment_Render_LabelsTheDiffHunkSeparatelyFromTheCommentBod
 		t.Fatalf("unexpected error rendering inline review comment: %v", err)
 	}
 
-	want := "meta:{\"author\":\"Copilot\",\"created\":\"2026-07-02T14:19:39Z\",\"path\":\"docs/example.md\",\"line\":195,\"url\":\"https://github.com/example/repo/pull/1#discussion_r1\"}\n" +
+	want := "<!-- {\"meta\":{\"author\":\"Copilot\",\"created\":\"2026-07-02T14:19:39Z\",\"path\":\"docs/example.md\",\"line\":195,\"url\":\"https://github.com/example/repo/pull/1#discussion_r1\"}} -->\n" +
 		"\n" +
 		"This looks off.\n" +
 		"\n" +
@@ -75,7 +75,7 @@ func TestInlineReviewComment_Render_WidensTheDiffFenceWhenTheHunkContainsBacktic
 		t.Fatalf("unexpected error rendering inline review comment: %v", err)
 	}
 
-	want := "meta:{\"author\":\"Copilot\",\"created\":\"2026-07-02T14:19:39Z\",\"path\":\"README.md\",\"line\":3,\"url\":\"https://github.com/example/repo/pull/1#discussion_r1\"}\n" +
+	want := "<!-- {\"meta\":{\"author\":\"Copilot\",\"created\":\"2026-07-02T14:19:39Z\",\"path\":\"README.md\",\"line\":3,\"url\":\"https://github.com/example/repo/pull/1#discussion_r1\"}} -->\n" +
 		"\n" +
 		"This looks off.\n" +
 		"\n" +
@@ -101,7 +101,7 @@ func TestInlineReviewComment_Render_CollapsesTrailingNewlinesInTheBodyToASingleO
 		t.Fatalf("unexpected error rendering inline review comment: %v", err)
 	}
 
-	want := `meta:{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","line":195,"url":"https://github.com/example/repo/pull/1#discussion_r1"}
+	want := `<!-- {"meta":{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","line":195,"url":"https://github.com/example/repo/pull/1#discussion_r1"}} -->
 
 This looks off.
 `
@@ -122,7 +122,7 @@ func TestInlineReviewComment_Render_NormalizesCRLFLineEndingsInTheBody(t *testin
 		t.Fatalf("unexpected error rendering inline review comment: %v", err)
 	}
 
-	want := `meta:{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","line":195,"url":"https://github.com/example/repo/pull/1#discussion_r1"}
+	want := `<!-- {"meta":{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","line":195,"url":"https://github.com/example/repo/pull/1#discussion_r1"}} -->
 
 Line one.
 Line two.
@@ -144,7 +144,7 @@ func TestInlineReviewComment_Render_MarksAnOutdatedContextInTheMetaLine(t *testi
 		t.Fatalf("unexpected error rendering inline review comment: %v", err)
 	}
 
-	want := `meta:{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","line":346,"outdated":true,"url":"https://github.com/example/repo/pull/1#discussion_r1"}
+	want := `<!-- {"meta":{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","line":346,"outdated":true,"url":"https://github.com/example/repo/pull/1#discussion_r1"}} -->
 
 This looks off.
 `
@@ -165,7 +165,7 @@ func TestInlineReviewComment_Render_OmitsTheLineKeyForAFileLevelComment(t *testi
 		t.Fatalf("unexpected error rendering inline review comment: %v", err)
 	}
 
-	want := `meta:{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","url":"https://github.com/example/repo/pull/1#discussion_r1"}
+	want := `<!-- {"meta":{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","url":"https://github.com/example/repo/pull/1#discussion_r1"}} -->
 
 This file needs a rewrite.
 `
