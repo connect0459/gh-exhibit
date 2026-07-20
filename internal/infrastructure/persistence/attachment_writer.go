@@ -1,6 +1,6 @@
 // Package persistence implements gh-exhibit's domain-layer repository
 // ports (EvidenceWriter, DocumentWriter, AttachmentWriter) against the
-// local filesystem, per docs/SPEC.md's on-disk layout.
+// local filesystem, per docs/specs/README.md's on-disk layout.
 package persistence
 
 import (
@@ -15,16 +15,16 @@ import (
 )
 
 // attachmentWriter implements repositories.AttachmentWriter against the
-// local filesystem, per docs/SPEC.md's on-disk layout. Unexported so
-// callers depend only on the repositories.AttachmentWriter interface, not
-// this infrastructure-layer type.
+// local filesystem, per docs/specs/README.md's on-disk layout. Unexported
+// so callers depend only on the repositories.AttachmentWriter interface,
+// not this infrastructure-layer type.
 type attachmentWriter struct {
 	baseDir string
 }
 
 // NewAttachmentWriter builds a repositories.AttachmentWriter that persists
 // fetched attachments and this run's failure log under baseDir, following
-// docs/SPEC.md's issues/{repo}/{number}/assets/{filename} and
+// docs/specs/README.md's issues/{repo}/{number}/assets/{filename} and
 // issues/{repo}/{number}/fetch-errors.log layout.
 func NewAttachmentWriter(baseDir string) repositories.AttachmentWriter {
 	return &attachmentWriter{baseDir: baseDir}

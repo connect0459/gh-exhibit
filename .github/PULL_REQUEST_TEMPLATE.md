@@ -13,7 +13,7 @@
 
 - Describe the problem being solved, its background, and what changes when
   this PR is merged.
-- Links to `docs/SPEC.md`, `docs/todo.md` entries, or other references are
+- Links to `docs/specs/README.md`, `docs/todo.md` entries, or other references are
   welcome.
 
 ```txt
@@ -28,7 +28,7 @@ It is difficult to review without knowing the specifications and background.
 - [ ] `internal/presentation` package(s)
 - [ ] `cmd/gh-exhibit`
 - [ ] Tooling / CI
-- [ ] Documentation (`docs/todo.md`, `docs/SPEC.md`, README)
+- [ ] Documentation (`docs/todo.md`, `docs/specs/README.md`, README)
 
 ## Breaking Changes
 
@@ -36,9 +36,9 @@ It is difficult to review without knowing the specifications and background.
 - [ ] Breaking changes (describe below)
 
 <!--
-If this changes a public API or the on-disk output layout (docs/SPEC.md),
+If this changes a public API or the on-disk output layout (docs/specs/README.md),
 describe what breaks and why the breakage is justified, and update
-docs/SPEC.md to match.
+docs/specs/README.md to match.
 -->
 
 ## Deferred Items and TODOs
@@ -56,7 +56,7 @@ without this information.
 - Describe the tests added, following Red/Green TDD (which test was written
   first, and what it confirmed failed before the implementation existed).
 - Note per-package C0 coverage if it changed meaningfully (see
-  `docs/SPEC.md` for this project's coverage targets).
+  `docs/specs/README.md` for this project's coverage targets).
 - Confirm `go build ./...`, `go vet ./...`, and `go test ./...` all pass
   with no regressions.
 

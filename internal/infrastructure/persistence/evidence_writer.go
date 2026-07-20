@@ -13,16 +13,17 @@ import (
 )
 
 // evidenceWriter implements repositories.EvidenceWriter against the local
-// filesystem, per docs/SPEC.md's on-disk layout. Unexported so callers
-// depend only on the repositories.EvidenceWriter interface, not this
-// infrastructure-layer type.
+// filesystem, per docs/specs/README.md's on-disk layout. Unexported so
+// callers depend only on the repositories.EvidenceWriter interface, not
+// this infrastructure-layer type.
 type evidenceWriter struct {
 	baseDir string
 }
 
 // NewEvidenceWriter builds a repositories.EvidenceWriter that persists raw
-// evidence under baseDir, following docs/SPEC.md's issues/{repo}/{number}...
-// layout (owner is deliberately not part of the path).
+// evidence under baseDir, following docs/specs/README.md's
+// issues/{repo}/{number}... layout (owner is deliberately not part of the
+// path).
 func NewEvidenceWriter(baseDir string) repositories.EvidenceWriter {
 	return &evidenceWriter{baseDir: baseDir}
 }
@@ -69,7 +70,7 @@ func (w *evidenceWriter) WriteReviewComments(ctx context.Context, ref valueobjec
 
 // issuePath builds the on-disk path for ref's evidence file with the given
 // suffix, shared by evidenceWriter and documentWriter (owner is
-// deliberately not part of the path — see docs/SPEC.md).
+// deliberately not part of the path — see docs/specs/README.md).
 func issuePath(baseDir string, ref valueobjects.IssueRef, suffix string) string {
 	return filepath.Join(baseDir, "issues", ref.Repo(), fmt.Sprintf("%d.%s", ref.Number(), suffix))
 }

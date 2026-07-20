@@ -1,6 +1,6 @@
-// Package valueobjects models the Tier 1 render set (see docs/SPEC.md): the
-// issue/PR body, issue comments, PR reviews, and inline review comments
-// that gh-exhibit renders into Markdown.
+// Package valueobjects models the Tier 1 render set (see
+// docs/specs/README.md): the issue/PR body, issue comments, PR reviews,
+// and inline review comments that gh-exhibit renders into Markdown.
 package valueobjects
 
 import "io"
