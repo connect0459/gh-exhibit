@@ -205,7 +205,10 @@ is mandatory, to keep the exported directory offline-verifiable. After a
    resolved from the response's `Content-Type` header (via an explicit,
    hermetic lookup table, not the host's own mime database) — the URL path
    itself does not reliably encode one. An unrecognized content type yields
-   no extension.
+   no extension. `AttachmentWriter.WriteAsset` independently rejects any
+   `filename` that isn't a single, path-safe segment (empty, `.`/`..`, a
+   path separator, or an absolute path), rather than trusting whatever
+   shape a caller's filename derivation happens to produce.
 4. A failed fetch (broken link, access denied, network error) does not fail
    the export: the reference is rewritten to an inline placeholder noting
    the original URL and failure reason, and the run's failures are
