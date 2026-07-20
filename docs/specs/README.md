@@ -231,6 +231,14 @@ Attachment fetches (a separate rate-limit domain, the CDN rather than the
 REST API) have no retry/backoff — a fetch failure there goes straight to
 the attachment-fetch-failure path described above.
 
+Paginated timeline/review-comment fetches follow the `Link` response
+header's `rel="next"` relation, but only when its host matches the host the
+current page was actually fetched from; a `next` URL naming a different
+host is refused with an error instead of followed. This guards against a
+compromised, misconfigured, or proxy-broken host (including a GitHub
+Enterprise Server host) redirecting gh-exhibit's next request somewhere
+else.
+
 ## Concurrency
 
 `ExportService.Export` runs `FetchTimeline` concurrently with the
