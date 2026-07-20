@@ -173,11 +173,20 @@ claiming the same values.
 deliberately non-standard tokens chosen to avoid collision with legitimate
 Markdown content (code blocks, YAML samples, `---` rules), on the condition
 that parsing stays anchored to the start of a line. An HTML comment's own
-terminator is the literal 3-character sequence `-->`; none of these lines'
-fields (GitHub-username-shaped, RFC 3339 timestamps, an enum state, a
-validated `Url`, or the tool/version/commit identifiers gh-exhibit's own
-build supplies) can contain a literal `>`, so none of them can prematurely
-close the comment.
+terminator is the literal 3-character sequence `-->`; this is never
+produced from a field's own content, because both lines are built through
+plain `encoding/json.Marshal`, whose documented default behavior replaces
+every `<`, `>`, and `&` byte with its 6-character numeric escape instead of
+emitting it raw (verified directly: marshaling a `>`-containing string
+never yields a literal `>` in the output). This holds regardless of what a
+field's own value contains — notably, `InlineReviewComment`'s `path` has
+no character-set constraint at all (`NewInlineContext` only rejects an
+empty one, since a git path may contain almost any byte), so it is this
+escaping behavior, not any field's content being inherently `>`-free, that
+keeps the comment from closing early. This does depend on
+`writeMetaLine`/`writeProvenanceLine` never switching to a `json.Encoder`
+with HTML escaping disabled, or to building the line by hand instead of
+through `encoding/json`.
 
 ## Attachment policy
 
