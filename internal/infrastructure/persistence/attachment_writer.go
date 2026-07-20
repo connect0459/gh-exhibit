@@ -1,6 +1,6 @@
 // Package persistence implements gh-exhibit's domain-layer repository
 // ports (EvidenceWriter, DocumentWriter, AttachmentWriter) against the
-// local filesystem, per ADR-002's on-disk layout.
+// local filesystem.
 package persistence
 
 import (
@@ -15,17 +15,17 @@ import (
 )
 
 // attachmentWriter implements repositories.AttachmentWriter against the
-// local filesystem, per ADR-002's on-disk layout. Unexported so callers
-// depend only on the repositories.AttachmentWriter interface, not this
-// infrastructure-layer type.
+// local filesystem. Unexported so callers depend only on the
+// repositories.AttachmentWriter interface, not this infrastructure-layer
+// type.
 type attachmentWriter struct {
 	baseDir string
 }
 
 // NewAttachmentWriter builds a repositories.AttachmentWriter that persists
-// fetched attachments and this run's failure log under baseDir, following
-// ADR-002's issues/{repo}/{number}/assets/{filename} and
-// issues/{repo}/{number}/fetch-errors.log layout.
+// fetched attachments and this run's failure log under baseDir, at
+// issues/{repo}/{number}/assets/{filename} and
+// issues/{repo}/{number}/fetch-errors.log respectively.
 func NewAttachmentWriter(baseDir string) repositories.AttachmentWriter {
 	return &attachmentWriter{baseDir: baseDir}
 }
@@ -40,8 +40,8 @@ func (w *attachmentWriter) WriteAsset(ctx context.Context, ref valueobjects.Issu
 
 // WriteFetchErrorLog persists log verbatim, except an empty log removes any
 // existing fetch-errors.log instead of writing one: the evidence directory
-// is a regenerable view (ADR-002), so a rerun where every attachment now
-// resolves successfully must not leave a prior run's failure log behind.
+// is a regenerable view, so a rerun where every attachment now resolves
+// successfully must not leave a prior run's failure log behind.
 func (w *attachmentWriter) WriteFetchErrorLog(ctx context.Context, ref valueobjects.IssueRef, log []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -57,8 +57,8 @@ func (w *attachmentWriter) WriteFetchErrorLog(ctx context.Context, ref valueobje
 	return writeFile(path, log)
 }
 
-// issueDir builds the ADR-002 on-disk directory for ref's per-issue
-// attachment artifacts (owner is deliberately not part of the path, matching
+// issueDir builds the on-disk directory for ref's per-issue attachment
+// artifacts (owner is deliberately not part of the path, matching
 // issuePath's own precedent).
 func issueDir(baseDir string, ref valueobjects.IssueRef) string {
 	return filepath.Join(baseDir, "issues", ref.Repo(), strconv.Itoa(ref.Number()))

@@ -2,8 +2,14 @@
 
 ## Design (open decisions)
 
-All items below are formally recorded in
-`docs/adrs/adr-002-language-and-domain-design.md`.
+All items below were originally recorded in this project's now-removed ADR
+documents (`docs/adrs/adr-001-initial-plan.md`,
+`docs/adrs/adr-002-language-and-domain-design.md`); their still-valid
+conclusions live in `docs/specs/README.md` now, and their full original reasoning
+remains readable via `git log --follow -- docs/adrs/` or
+`git show <commit>:docs/adrs/adr-002-language-and-domain-design.md` on a
+commit before their removal. See "ADRs replaced by docs/specs/README.md" below for
+why.
 
 - [x] Decide the implementation language/stack — Go, with `go-gh` as the
       full-native acquisition layer (no `gh api` shellout). Driven by
@@ -2339,3 +2345,127 @@ valueobjects` 95.9% (up slightly — `Attribution`'s stronger check adds
 covered branches). No behavior change and no on-disk output layout
 change. `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
 and `gofmt -l .` all pass.
+
+### ADRs replaced by docs/specs/README.md (2026-07-20)
+
+With every implementation slice long closed, the user raised whether the
+two ADRs (`docs/adrs/adr-001-initial-plan.md`,
+`docs/adrs/adr-002-language-and-domain-design.md`) and the ~40 Go comments
+citing them across ~20 files should be discontinued. Both were already
+Accepted, never Deprecated, and both had been revised in place with dated
+addenda (e.g. "Timeline API correction", "Naming addendum") rather than
+superseded by a new ADR — the template (`docs/adrs/adr-000-template.md`)
+itself invited this via its own "Revision" section, unlike the classical
+Nygard ADR convention (immutable once Accepted; changed only by a new,
+superseding ADR). Discussed with the user and resolved on
+`docs/deprecate-adrs-in-favor-of-spec`:
+
+- **The two premises behind full removal were checked, not just accepted.**
+  (1) "`docs/todo.md` already records everything" does not fully hold: this
+  file's own Design section only summarizes each ADR's conclusion in 1-3
+  sentences and explicitly deferred to the ADR body for detail: several
+  investigation findings existed only there (the `gh-dossier`/
+  `gh-paper-trail`/`gh-attest` naming-candidate rejections; the GraphQL
+  timeline-union member-count findings; `gh api rate_limit --include`'s
+  actual output shape and the confirmation that neither `gh api` nor
+  `go-gh` retries rate limits; the MoonBit-disqualification reasoning; the
+  Entity-vs-Value-Object argument tied to this project's git-diff-based
+  YAGNI stance). (2) "Decision records don't matter at this project's
+  scale" was accepted as scoped to this project specifically (a
+  single-maintainer OSS tool, no regulatory or financial stakes), not
+  generalized.
+  - This is resolved by the same reasoning this project already applies to
+    other historical information: nothing is destroyed by deleting a
+    committed file — `git log --follow -- docs/adrs/` and
+    `git show <commit>:docs/adrs/adr-002-language-and-domain-design.md`
+    (on a commit prior to their removal) still surface it. Discoverability
+    moves from "always-visible doc" to "deliberately searched git
+    history," which matches this project's own "commit messages = why,
+    tests = what, code = how" convention more closely than a permanently
+    live, separately-maintained decision-record document does.
+- **A grep-verified survey preceded any comment deletion**, not an
+  assumption: every one of the ~40 `ADR-00X`-citing Go comments across ~20
+  files was inspected before removal. All were restatements of *current*
+  behavior ("per ADR-002's on-disk layout", "ADR-001's Markdown dialect")
+  rather than references to rejected-alternative reasoning — i.e., already
+  a violation of this project's own "code = How, comments only for
+  non-obvious WHY" policy, independent of the ADR-removal question. None
+  needed migrating; each was either deleted outright or reworded to point
+  at `docs/specs/README.md` where a live pointer was still useful (on-disk layout,
+  Markdown dialect, coverage targets).
+- **`docs/specs/README.md` (new)**: a single, always-in-place-edited specification
+  of gh-exhibit's *current* behavior — distribution/stack, CLI shape,
+  domain model, timeline classification, on-disk layout, Markdown dialect,
+  attachment policy, rate-limit/retry policy, concurrency, package layout,
+  coverage targets, and error-message conventions. Written from the current
+  code and this file's own history, not transcribed from the ADRs' text as
+  originally accepted — several details had already drifted since
+  acceptance (e.g. `entry`/`timeline`/`attachment` renamed to
+  `valueobjects`/`services`; `EvidenceRepository` renamed to
+  `EvidenceFetcher`; distribution migrated from
+  `cli/gh-extension-precompile` to GoReleaser). Explicitly states its own
+  maintenance convention up front (edited in place to match current
+  behavior; no dated addenda; rationale belongs in commit messages and
+  this file, not here) so it does not silently drift into the same
+  live-history/current-truth conflation this entry is resolving.
+- `docs/adrs/` deleted in full (all three files, including the template).
+  `.github/ISSUE_TEMPLATE/BUG_REPORT.md`, `FEATURE_REQUEST.md`,
+  `PULL_REQUEST_TEMPLATE.md`, and `CONTRIBUTING.md`'s ADR references
+  repointed to `docs/specs/README.md`.
+- No test file for any of this — none of it is Go logic (only comments and
+  Markdown changed); verified via `go build ./...`, `go vet ./...`,
+  `go test ./... -race -cover`, and `gofmt -l .` (no behavior change, so no
+  coverage figure moved), plus `pre-commit run --all-files`.
+
+### docs/SPEC.md moved to docs/specs/README.md, then emptied out of source comments entirely (2026-07-20)
+
+Two follow-up rounds on the same branch, both raised by the user after the
+entry above:
+
+- **Moved to `docs/specs/README.md`**, anticipating a future split of the
+  specification into multiple topic files under `docs/specs/`; `README.md`
+  acts as that directory's landing page in the meantime (mirroring how
+  `docs/adrs/` was itself organized as a directory). Every reference this
+  entry's own commits had just added (`docs/SPEC.md`, in ~15 Go comments,
+  the three `.github` templates, `CONTRIBUTING.md`, and this file) was
+  swept to the new path in the same pass — the exact kind of churn a
+  literal path reference in source code creates, immediately demonstrated
+  by having to do it twice within one branch.
+- **That demonstration prompted the sharper question**: should a source
+  comment cite a `docs/specs/` path at all, even once per package? Two
+  categories existed among the ~15-16 sites: a handful of package-level
+  "per docs/specs/README.md's on-disk layout" mentions, and many more
+  per-method repetitions of the same phrase. The per-method repetitions
+  were uncontroversially redundant — once a package doc states the
+  pointer, restating it on every constructor's Godoc added nothing. The
+  package-level case was genuinely debated, then resolved against it too:
+  this project has exactly one specification document covering the whole
+  project, not one per package or layer, so there is no case where a
+  specific source location should point a reader at a *different* section
+  than any other — a single link from `README.md`'s own new
+  "## Documentation" section (mirroring `connect0459/starlark-mbt`'s own
+  README structure) already gives a reader that one entry point, and nothing
+  in-source needs to repeat it. If `docs/specs/` is later split into topic
+  files, the same reasoning still holds: README.md's Documentation section
+  is where the mapping from topic to file lives, not scattered
+  per-package source comments that would need to track a topic's file
+  each time it moves.
+- Every `docs/specs/README.md` citation added by the entry above (~15-16
+  sites across 10 Go files, both package- and method-level) was removed.
+  Where a genuine, non-obvious WHY remained once the citation was
+  stripped (e.g. `issuePath`'s "owner is deliberately not part of the
+  path"), the comment was kept minus the path clause; where nothing but
+  the citation was left, the comment shrank to a plain, path-free
+  restatement of the method's own return shape (e.g. "at
+  issues/{repo}/{number}.md" instead of "following docs/specs/README.md's
+  issues/{repo}/{number}.md layout").
+- `CONTRIBUTING.md`'s Code style section gains a bullet codifying this:
+  code comments must not cite `docs/specs/` paths, since
+  `docs/specs/README.md` (linked once from `README.md`) is already the
+  single always-current reference, and a repeated in-source pointer both
+  adds nothing beyond what that link already provides and breaks the
+  moment a path inside `docs/specs/` moves.
+- No test file for any of this — comments, `README.md`, and
+  `CONTRIBUTING.md` only; verified via `go build ./...`, `go vet ./...`,
+  `go test ./... -race -cover` (coverage figures unchanged), `gofmt -l .`,
+  and `pre-commit run --all-files`.

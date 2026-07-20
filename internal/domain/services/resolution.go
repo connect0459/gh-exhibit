@@ -12,8 +12,8 @@ import (
 // empty — otherwise FetchFailed(url, "") (or a zero-value Resolution) would
 // be indistinguishable from Downloaded(url, ""), and Rewrite would silently
 // treat a failed fetch as a successful one, dropping the attachment
-// reference instead of emitting ADR-002's placeholder. A zero Resolution is
-// never constructed directly by a caller outside this package — use
+// reference instead of emitting the failure placeholder. A zero Resolution
+// is never constructed directly by a caller outside this package — use
 // Downloaded or FetchFailed. url is a valueobjects.Url, not a bare string:
 // every caller already holds one (an already-fetched Attachment's own URL),
 // so Resolution carries that proof forward instead of re-validating it.
@@ -25,15 +25,15 @@ type Resolution struct {
 }
 
 // Downloaded builds a Resolution for a successfully fetched attachment at
-// url, identified by the path (relative to the rendered Markdown file, per
-// ADR-002's assets/ layout) it was written to.
+// url, identified by the path (relative to the rendered Markdown file) it
+// was written to.
 func Downloaded(url valueobjects.Url, localPath string) Resolution {
 	return Resolution{url: url, localPath: localPath, succeeded: true}
 }
 
 // FetchFailed builds a Resolution for an attachment at url that could not
 // be fetched, carrying reason for the placeholder Rewrite substitutes in
-// its place (ADR-002: skip, continue, note the original URL and why).
+// its place: skip, continue, note the original URL and why.
 func FetchFailed(url valueobjects.Url, reason string) Resolution {
 	return Resolution{url: url, reason: reason}
 }
@@ -41,7 +41,7 @@ func FetchFailed(url valueobjects.Url, reason string) Resolution {
 // Substitute returns r's Markdown replacement text: on a successful fetch,
 // its local path; on a failed fetch, an inline placeholder noting r's URL
 // and the failure reason, so the evidence that an attachment existed is not
-// silently lost (ADR-002).
+// silently lost.
 func (r Resolution) Substitute() string {
 	if r.succeeded {
 		return r.localPath

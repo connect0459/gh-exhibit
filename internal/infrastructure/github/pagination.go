@@ -1,6 +1,5 @@
 // Package github implements repositories.EvidenceFetcher (internal/domain/
-// repositories) against GitHub's REST API via go-gh, per ADR-002's
-// full-native acquisition decision.
+// repositories) against GitHub's REST API via go-gh.
 package github
 
 import (

@@ -87,9 +87,9 @@ func (r IssueRef) Number() int {
 }
 
 // AssetPath returns the relative path — from the rendered document's own
-// on-disk location — to a downloaded attachment named filename, per
-// ADR-002's {number}/assets/{filename} layout for referencing an issue's own
-// downloaded attachments from its rendered Markdown.
+// on-disk location — to a downloaded attachment named filename
+// ({number}/assets/{filename}), for referencing an issue's own downloaded
+// attachments from its rendered Markdown.
 func (r IssueRef) AssetPath(filename string) string {
 	return fmt.Sprintf("%d/assets/%s", r.number, filename)
 }

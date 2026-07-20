@@ -26,8 +26,7 @@ func newAttributionMeta(a Attribution) attributionMeta {
 }
 
 // writeMetaLine writes meta as a single line-anchored `meta:{...}` JSON
-// line followed by body, the shape every Tier 1 entry's Render() shares
-// (ADR-001's Markdown dialect).
+// line followed by body, the shape every Tier 1 entry's Render() shares.
 func writeMetaLine(w io.Writer, meta any, body string) error {
 	line, err := json.Marshal(meta)
 	if err != nil {

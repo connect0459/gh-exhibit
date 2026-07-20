@@ -24,9 +24,9 @@ var extensionsByContentType = map[string]string{
 
 // Filename derives a's local asset filename: the UUID GitHub assigns in its
 // URL path (unique and stable) as the base name, plus an extension resolved
-// from the response's Content-Type header (ADR-002) — the URL path itself
-// does not reliably encode one. An unrecognized content type yields no
-// extension rather than a guessed one.
+// from the response's Content-Type header — the URL path itself does not
+// reliably encode one. An unrecognized content type yields no extension
+// rather than a guessed one.
 func (a Attachment) Filename(contentType string) string {
 	id := path.Base(a.url.Path())
 

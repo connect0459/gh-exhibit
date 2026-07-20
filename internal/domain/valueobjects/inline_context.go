@@ -3,10 +3,9 @@ package valueobjects
 import "errors"
 
 // InlineContext is the (path, line, diff_hunk) triple that usually co-occurs
-// on an inline PR review comment, restoring the file/line context ADR-001
-// identifies as lost by the current hand-maintained export format. Line is
-// nil for a file-level comment (GitHub's subject_type "file"), which has no
-// line at all rather than an outdated one. Outdated marks a context whose
+// on an inline PR review comment. Line is nil for a file-level comment
+// (GitHub's subject_type "file"), which has no line at all rather than an
+// outdated one. Outdated marks a context whose
 // line was resolved from GitHub's original_line fallback because the diff
 // changed and the comment's own line became null.
 type InlineContext struct {

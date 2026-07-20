@@ -17,14 +17,15 @@ about: Request a new feature or enhancement
 ## Background, Purpose, and Goals
 
 - Why is this needed?
-- Which ADR (`docs/adrs/`) or `docs/todo.md` slice covers this, if
+- Does `docs/specs/README.md` or a `docs/todo.md` entry already cover this, if
   applicable?
 - What goals are we trying to achieve?
 
 ## Requirements and Specifications
 
 - Describe the behaviour that needs to be implemented.
-- Link to the relevant GitHub REST API docs or ADR when available.
+- Link to the relevant GitHub REST API docs or `docs/specs/README.md` section when
+  available.
 - Details do not need to be final at first; please update as decisions
   are made.
 

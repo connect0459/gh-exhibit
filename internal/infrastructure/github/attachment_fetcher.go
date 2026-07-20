@@ -39,9 +39,9 @@ const maxAttachmentBytes = 100 * 1024 * 1024
 
 // NewAttachmentFetcher builds a repositories.AttachmentFetcher backed by an
 // authenticated *http.Client, required to fetch attachments on private
-// repositories (ADR-002). Passing api.ClientOptions{} resolves host and auth
-// token from the gh environment; tests override Host and Transport to point
-// at a local fake server instead.
+// repositories. Passing api.ClientOptions{} resolves host and auth token
+// from the gh environment; tests override Host and Transport to point at a
+// local fake server instead.
 func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetcher, error) {
 	client, err := api.NewHTTPClient(opts)
 	if err != nil {

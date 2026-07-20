@@ -60,7 +60,7 @@ This project follows **Red → Green → Refactor** (Detroit-school TDD):
 - Error messages describe a concrete operation or state, not the name of
   the function/method that produced them.
 
-Coverage targets (see `docs/adrs/adr-002-language-and-domain-design.md`):
+Coverage targets (see `docs/specs/README.md`):
 domain layer (`internal/domain/...`) — C0 90% floor; boundary layer
 (`internal/infrastructure/...`, HTTP/file I/O) — qualitative branch coverage
 via real fixtures (`httptest.Server`, `t.TempDir()`), no fixed numeric floor.
@@ -114,5 +114,11 @@ diff already shows what changed.
 - Avoid code comments unless the **why** is genuinely non-obvious — let
   tests document behavior. Exported functions/methods carry a one-line
   Godoc.
+- Don't cite `docs/specs/` paths from code comments. `docs/specs/README.md`
+  is the single, always-current reference for behavior (linked from
+  `README.md`'s own Documentation section) — a comment repeating that
+  pointer is redundant with it and breaks the moment a path inside
+  `docs/specs/` moves, without carrying any WHY a reader couldn't get from
+  the doc itself.
 - All identifiers, test names, error messages, and documentation must be in
   **English** (see `AGENTS.md`).

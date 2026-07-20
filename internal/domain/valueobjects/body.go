@@ -7,7 +7,7 @@ import (
 
 // Body is an issue or pull request's own body content. Unlike the other
 // three Tier 1 types, it is not sourced from the timeline array; closed/
-// merged timestamps come from the issue/pull resource itself (ADR-001).
+// merged timestamps come from the issue/pull resource itself.
 type Body struct {
 	attribution Attribution
 	content     string

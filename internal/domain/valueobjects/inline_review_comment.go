@@ -8,8 +8,8 @@ import (
 
 // InlineReviewComment is a file/line-anchored comment on a pull request
 // review, sourced from GET /pulls/{number}/comments and joined to its
-// parent PullRequestReview via pull_request_review_id (ADR-001/ADR-002) —
-// it is not classified out of the timeline array.
+// parent PullRequestReview via pull_request_review_id — it is not
+// classified out of the timeline array.
 type InlineReviewComment struct {
 	attribution Attribution
 	context     InlineContext

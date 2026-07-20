@@ -13,17 +13,16 @@ import (
 )
 
 // evidenceWriter implements repositories.EvidenceWriter against the local
-// filesystem, per ADR-002's on-disk layout. Unexported so callers depend
-// only on the repositories.EvidenceWriter interface, not this
-// infrastructure-layer type.
+// filesystem. Unexported so callers depend only on the
+// repositories.EvidenceWriter interface, not this infrastructure-layer
+// type.
 type evidenceWriter struct {
 	baseDir string
 }
 
 // NewEvidenceWriter builds a repositories.EvidenceWriter that persists raw
-// evidence under baseDir, following ADR-002's issues/{repo}/{number}...
-// layout (owner is deliberately not part of the path, matching the
-// hand-maintained export directory ADR-001 modeled this format on).
+// evidence under baseDir, at issues/{repo}/{number}... (owner is
+// deliberately not part of the path).
 func NewEvidenceWriter(baseDir string) repositories.EvidenceWriter {
 	return &evidenceWriter{baseDir: baseDir}
 }
@@ -68,10 +67,9 @@ func (w *evidenceWriter) WriteReviewComments(ctx context.Context, ref valueobjec
 	return writeFile(issuePath(w.baseDir, ref, "review-comments.json"), joined)
 }
 
-// issuePath builds the ADR-002 on-disk path for ref's evidence file with
-// the given suffix, shared by evidenceWriter and documentWriter (owner is
-// deliberately not part of the path, matching the hand-maintained export
-// directory ADR-002 was modeled on).
+// issuePath builds the on-disk path for ref's evidence file with the given
+// suffix, shared by evidenceWriter and documentWriter (owner is
+// deliberately not part of the path).
 func issuePath(baseDir string, ref valueobjects.IssueRef, suffix string) string {
 	return filepath.Join(baseDir, "issues", ref.Repo(), fmt.Sprintf("%d.%s", ref.Number(), suffix))
 }
@@ -79,7 +77,7 @@ func issuePath(baseDir string, ref valueobjects.IssueRef, suffix string) string 
 // joinRawArray concatenates items into a JSON array by splicing their raw
 // bytes directly, rather than json.Marshal-ing the slice: encoding/json
 // compacts each json.RawMessage element (stripping insignificant
-// whitespace), which would break ADR-001's verbatim-evidence guarantee.
+// whitespace), which would break the verbatim-evidence guarantee.
 func joinRawArray(items []json.RawMessage) ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteByte('[')

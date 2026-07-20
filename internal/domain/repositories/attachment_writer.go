@@ -8,7 +8,7 @@ import (
 
 // AttachmentWriter is the abstract port the application layer depends on to
 // persist a fetched attachment and this run's failure summary to local
-// storage (ADR-002); infrastructure implements it, symmetric to
+// storage; infrastructure implements it, symmetric to
 // EvidenceWriter/DocumentWriter but for a different artifact shape (binary
 // assets, not JSON or Markdown).
 type AttachmentWriter interface {
