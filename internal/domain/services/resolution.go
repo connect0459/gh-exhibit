@@ -25,8 +25,8 @@ type Resolution struct {
 }
 
 // Downloaded builds a Resolution for a successfully fetched attachment at
-// url, identified by the path (relative to the rendered Markdown file, per
-// docs/specs/README.md's assets/ layout) it was written to.
+// url, identified by the path (relative to the rendered Markdown file) it
+// was written to.
 func Downloaded(url valueobjects.Url, localPath string) Resolution {
 	return Resolution{url: url, localPath: localPath, succeeded: true}
 }

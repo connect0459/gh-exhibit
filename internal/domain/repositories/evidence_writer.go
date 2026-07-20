@@ -13,8 +13,7 @@ import (
 // EvidenceFetcher on the acquisition side. Timeline and review comment
 // pages arrive as one raw JSON element per item, matching
 // EvidenceFetcher's fetch shape; concatenating them into a single
-// persisted array per file (docs/specs/README.md) is this port's
-// implementation's job.
+// persisted array per file is this port's implementation's job.
 type EvidenceWriter interface {
 	// WriteIssue persists ref's raw issue or pull request resource
 	// verbatim.

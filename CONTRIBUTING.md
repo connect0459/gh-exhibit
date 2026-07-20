@@ -114,5 +114,11 @@ diff already shows what changed.
 - Avoid code comments unless the **why** is genuinely non-obvious — let
   tests document behavior. Exported functions/methods carry a one-line
   Godoc.
+- Don't cite `docs/specs/` paths from code comments. `docs/specs/README.md`
+  is the single, always-current reference for behavior (linked from
+  `README.md`'s own Documentation section) — a comment repeating that
+  pointer is redundant with it and breaks the moment a path inside
+  `docs/specs/` moves, without carrying any WHY a reader couldn't get from
+  the doc itself.
 - All identifiers, test names, error messages, and documentation must be in
   **English** (see `AGENTS.md`).

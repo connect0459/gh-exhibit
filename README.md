@@ -37,3 +37,9 @@ gh exhibit 10
 # Export multiple issues/PRs from an explicit repository
 gh exhibit 10,11,12 --repo connect0459/gh-exhibit -o ./evidence
 ```
+
+## Documentation
+
+- [Specification](docs/specs/README.md) — current behavior: CLI shape,
+  domain model, on-disk layout, Markdown dialect, attachment and retry
+  policy, coverage targets.

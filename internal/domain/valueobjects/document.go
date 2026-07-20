@@ -9,8 +9,7 @@ import (
 
 // Document is the full rendered output for a single issue or pull request:
 // an H1 title line followed by each Tier 1 entry's Render() output, joined
-// by a "------" separator line (see docs/specs/README.md's Markdown
-// dialect).
+// by a "------" separator line.
 type Document struct {
 	title   string
 	entries []Entry
@@ -46,8 +45,7 @@ func (d Document) Entries() []Entry {
 }
 
 // Render writes the H1 title line followed by each entry's Render() output,
-// separated by "------" lines (see docs/specs/README.md's Markdown
-// dialect).
+// separated by "------" lines.
 func (d Document) Render(w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "# %s\n\n", d.title); err != nil {
 		return err
