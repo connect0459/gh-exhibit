@@ -2829,3 +2829,34 @@ validation gap in `internal/infrastructure/github`) is fixed separately on
 findings from the same sweep were filed as GitHub issue
 [#30](https://github.com/connect0459/gh-exhibit/issues/30) (tracking) with
 sub-issues [#31](https://github.com/connect0459/gh-exhibit/issues/31)-[#35](https://github.com/connect0459/gh-exhibit/issues/35).
+
+### Local review of the attachment filename fix (2026-07-20)
+
+A local review of `fix/attachment-filename-validation`, before it was
+pushed or opened as a PR, found `validateAssetFilename`'s own guard had a
+gap of the same kind it was written to close:
+
+- **`filepath.Base(filename) != filename` does not catch
+  `filename == "/"`.** `filepath.Base("/")` returns `"/"` itself — a fixed
+  point the "did Base change it" comparison cannot distinguish from a
+  genuinely safe single-segment filename. `filepath.Join(assetsDir, "/")`
+  then collapses onto the assets directory path itself, so `writeFile`
+  would attempt to write attachment data to a path that should be a
+  directory. Confirmed directly (not just reasoned about):
+  `filepath.Base("/") == "/"` evaluates true. A bare backslash had the same
+  problem on a non-Windows build, since only the host OS's own
+  `filepath.Separator` was implicitly being considered, even though
+  gh-exhibit is distributed for Windows too (`.goreleaser.yml` builds a
+  `windows` target).
+- Replaced the `filepath.Base` comparison with a direct
+  `strings.ContainsAny(filename, "/\\")` scan for either separator
+  character, regardless of build platform. The explicit `"."`/`".."`
+  checks are unchanged.
+- Tests: `TestWriteAsset_RejectsAFilenameEqualToASingleSlash` and
+  `TestWriteAsset_RejectsAFilenameContainingABackslash` added, each
+  confirmed red against the unchanged code from the prior commit first.
+
+C0 after this fix: `internal/infrastructure/persistence` 100.0%, unchanged
+in shape from before this correction. `go build ./...`, `go vet ./...`,
+`go test ./... -race -cover`, `gofmt -l .`, and `pre-commit run
+--all-files` all pass.
