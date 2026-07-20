@@ -3,7 +3,9 @@
 package github
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -17,15 +19,55 @@ func nextPageURL(resp *http.Response) string {
 			continue
 		}
 
-		url := strings.Trim(strings.TrimSpace(parts[0]), "<>")
+		nextURL := strings.Trim(strings.TrimSpace(parts[0]), "<>")
 		for _, param := range parts[1:] {
 			if strings.TrimSpace(param) == `rel="next"` {
-				return url
+				return nextURL
 			}
 		}
 	}
 
 	return ""
+}
+
+// requestOrigin returns the scheme and host actually used for resp's own
+// request (e.g. "https://api.github.com"), or "" if unavailable. This is
+// the trusted reference a subsequent "next" page URL is checked against,
+// since it reflects where the request genuinely went rather than a value
+// gh-exhibit only asked for.
+func requestOrigin(resp *http.Response) string {
+	if resp.Request == nil || resp.Request.URL == nil {
+		return ""
+	}
+	return resp.Request.URL.Scheme + "://" + resp.Request.URL.Host
+}
+
+// validatePaginationOrigin rejects a next-page URL whose scheme and host
+// (its origin) does not match expectedOrigin (the origin the current page
+// was actually fetched from). A paginated GitHub endpoint's Link header
+// always names the same origin across every page in legitimate use; a
+// mismatch means either a malformed response or a server (compromised,
+// misconfigured, or sitting behind a broken proxy) trying to redirect
+// gh-exhibit's next request somewhere else — including a same-host scheme
+// downgrade (https to http), which loses transport security even though
+// the host itself didn't change. expectedOrigin being unknown (e.g.
+// requestOrigin couldn't determine it) is treated as a mismatch too,
+// failing closed rather than trusting an unverified destination.
+//
+// The comparison is case-insensitive: both a URL scheme (RFC 3986) and a
+// hostname (DNS, and by extension HTTP's Host) are themselves
+// case-insensitive, so a next-page URL differing from expectedOrigin only
+// in letter case is the same origin, not a mismatch.
+func validatePaginationOrigin(nextURL, expectedOrigin string) error {
+	parsed, err := url.Parse(nextURL)
+	if err != nil {
+		return fmt.Errorf("parse next-page URL %q: %w", nextURL, err)
+	}
+	origin := parsed.Scheme + "://" + parsed.Host
+	if expectedOrigin == "" || !strings.EqualFold(origin, expectedOrigin) {
+		return fmt.Errorf("next-page URL %q origin %q does not match the expected origin %q", nextURL, origin, expectedOrigin)
+	}
+	return nil
 }
 
 // splitLinkHeader splits a Link header into its comma-separated <url>;

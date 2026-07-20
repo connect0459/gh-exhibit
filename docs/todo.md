@@ -2781,6 +2781,23 @@ branch:
   `gofmt -l .`, and `pre-commit run --all-files` (all pass, no regressions
   — expected, since neither change touches Go logic).
 
+### Pre-release bug sweep (2026-07-20)
+
+A proactive review ahead of the next tagged release (5 parallel layer-scoped
+passes — domain, `infrastructure/github`, `infrastructure/persistence`,
+`application`, `presentation/cli`+`registry`+`cmd` — each independently
+re-verified against current source before being accepted) found 7 issues.
+Two are being fixed directly, without a public GitHub issue, since they fall
+under `SECURITY.md`'s own scope for host-confusion/path-traversal-adjacent
+classes of issue (that document asks for private reporting rather than a
+public issue for exactly these classes). The other 5 were filed as GitHub
+issue [#30](https://github.com/connect0459/gh-exhibit/issues/30) (tracking)
+with sub-issues
+[#31](https://github.com/connect0459/gh-exhibit/issues/31)-[#35](https://github.com/connect0459/gh-exhibit/issues/35),
+linked to #30 via GitHub's native Sub-issues relationship (the `addSubIssue`
+GraphQL mutation, confirmed via `subIssuesSummary { total: 5 }` on #30), to
+be worked separately.
+
 ### Attachment filename validation at the persistence boundary (2026-07-20)
 
 One of two findings from a proactive pre-release review being fixed
@@ -2920,3 +2937,107 @@ explained above, the same "not meaningfully testable without a contrived
 fake" shape as this project's other accepted gaps, not a new kind of one).
 `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
 `gofmt -l .`, and `pre-commit run --all-files` all pass.
+
+### Pagination next-page host validation (2026-07-20)
+
+The first of the two directly-fixed findings, on
+`fix/pagination-host-validation`: `fetchPaginated`
+(`internal/infrastructure/github/evidence_fetcher.go`) followed a paginated
+response's `Link` header `rel="next"` URL unconditionally, including to a
+host other than the one the current page was actually fetched from.
+Verified against `go-gh v2.13.0`'s own `restURL` (`rest_client.go`): an
+absolute `http(s)://` URL bypasses the client's configured `Host` entirely,
+and nothing in gh-exhibit's own code checked the "next" URL's host before
+following it. `go-gh`'s `headerRoundTripper` separately strips the
+`Authorization` header when the outgoing host doesn't match the configured
+one, so the auth token itself was never at risk — but the unauthenticated
+request would still fire, a confused-deputy/SSRF pattern relevant here since
+gh-exhibit explicitly supports GitHub Enterprise Server hosts it doesn't
+otherwise control.
+
+- `internal/infrastructure/github/pagination.go` gains `requestHost` (reads
+  the host actually used for a response's own request, via
+  `resp.Request.URL.Host` — the trusted reference, since it reflects where
+  the request genuinely went) and `validatePaginationHost` (rejects a
+  next-page URL whose host doesn't match that reference, failing closed
+  when the reference itself is unknown).
+- `fetchPaginated` records the first page's actual host once, then validates
+  every subsequent `next` URL against it before following.
+- Tests: Red/Green TDD.
+  `TestFetchTimeline_RefusesToFollowANextPageURLPointingToADifferentHost`
+  asserts the local test server does not receive a second call when the
+  first page's `Link` header names a different host. The existing
+  `alwaysNextRequester` fake (used by the unbounded-pagination-chain test)
+  now sets its response's `Request.URL` so that test keeps exercising the
+  page-cap behavior it was written for, unconfounded by the new host check.
+- `docs/specs/README.md`'s "Rate limiting and retry" section updated to
+  describe this in its own commit.
+
+C0 after this fix: `internal/infrastructure/github` 91.2% (from 91.7% before
+this change — the new `expectedHost == ""` fail-closed branch in
+`validatePaginationHost` is defensive and not reachable via any real
+`go-gh`-backed request, consistent with this project's other accepted
+not-meaningfully-testable-without-a-contrived-fake gaps). `go build ./...`,
+`go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
+`pre-commit run --all-files` all pass.
+
+### Pagination host check widened to scheme + host, on PR #37 review (2026-07-20)
+
+A local review of `fix/pagination-host-validation` (PR #37) found one
+cosmetic issue and one scope question, both addressed on the same branch:
+
+- **`nextPageURL`'s local variable `url` shadowed the `net/url` package
+  name** the same file's new `validatePaginationHost` had just started
+  importing — legal Go, but confusing to read next to a function that
+  calls `url.Parse` a few lines away. Renamed to `nextURL`.
+- **The validation only compared host, not scheme** — a `next` URL naming
+  the same host under `http` instead of `https` passed unchanged, silently
+  downgrading the connection's transport security even though the
+  confused-deputy/redirection risk this check exists for is just as real
+  for a scheme downgrade as for a different host. Confirmed with the user:
+  widen the check. `requestHost`/`validatePaginationHost` are renamed to
+  `requestOrigin`/`validatePaginationOrigin` and now compare
+  `scheme://host` as a unit.
+- **Caught while writing the scheme regression test**: an httptest-based
+  end-to-end test for the scheme case (mirroring the existing host-mismatch
+  test) passed even before `validatePaginationOrigin` existed — not because
+  any real validation caught it, but because the test harness's
+  `rewriteTransport` only rewrites a request's `Host`, not its `Scheme`, so
+  an `https`-addressed "next" URL triggered a genuine TLS-handshake failure
+  against the local plain-HTTP test server before any of gh-exhibit's own
+  code ran. That accidental failure would have made a false-Green test look
+  like it verified the scheme check when it verified nothing. Replaced with
+  direct unit tests of `requestOrigin`/`validatePaginationOrigin` in a new
+  `pagination_test.go` (this package had none before — every prior case was
+  covered only indirectly through `evidence_fetcher_test.go`'s httptest
+  harness), which exercise the origin-comparison logic itself independent
+  of any real network behavior.
+- `docs/specs/README.md`'s rate-limiting section updated to describe the
+  origin (scheme + host) check.
+
+C0 after this round: `internal/infrastructure/github` 92.8% (up from
+91.2% — the new direct unit tests cover `validatePaginationOrigin`'s
+branches more precisely than the httptest-only approach did). `go build
+./...`, `go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
+`pre-commit run --all-files` all pass.
+
+### Pagination origin comparison made case-insensitive, per Copilot review on PR #37 (2026-07-20)
+
+GitHub's automated PR reviewer flagged that `validatePaginationOrigin`
+compared `origin != expectedOrigin` as plain, case-sensitive strings, even
+though both a URL scheme (RFC 3986) and a hostname (DNS, and by extension
+HTTP's `Host`) are themselves case-insensitive — a legitimate next-page URL
+differing from the current origin only in letter case would have been
+wrongly rejected as a mismatch. This is an over-rejection/availability
+concern, not a security regression: the check would still fail closed on
+anything that wasn't a genuine case-only variant.
+
+- `validatePaginationOrigin` now compares with `strings.EqualFold` instead
+  of `!=`.
+- Test: `TestValidatePaginationOrigin_AcceptsAnOriginDifferingOnlyByCase`
+  added, confirmed red against the unchanged comparison first.
+
+C0 unchanged: `internal/infrastructure/github` 92.8% (the new test exercises
+an already-reachable comparison branch, adding no new one). `go build
+./...`, `go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
+`pre-commit run --all-files` all pass.

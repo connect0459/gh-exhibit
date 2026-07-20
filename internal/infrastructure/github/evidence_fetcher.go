@@ -103,6 +103,7 @@ const maxPaginationPages = 1000
 // fetcher, concatenates pages into a single persisted array.
 func (r *evidenceFetcher) fetchPaginated(ctx context.Context, path string) ([]json.RawMessage, error) {
 	var all []json.RawMessage
+	var expectedOrigin string
 
 	for pages := 0; path != ""; pages++ {
 		if pages == maxPaginationPages {
@@ -113,6 +114,9 @@ func (r *evidenceFetcher) fetchPaginated(ctx context.Context, path string) ([]js
 		if err != nil {
 			return nil, fmt.Errorf("fetch GitHub resource %s: %w", path, err)
 		}
+		if expectedOrigin == "" {
+			expectedOrigin = requestOrigin(resp)
+		}
 
 		var page []json.RawMessage
 		decodeErr := json.NewDecoder(resp.Body).Decode(&page)
@@ -122,7 +126,13 @@ func (r *evidenceFetcher) fetchPaginated(ctx context.Context, path string) ([]js
 		}
 		all = append(all, page...)
 
-		path = nextPageURL(resp)
+		next := nextPageURL(resp)
+		if next != "" {
+			if err := validatePaginationOrigin(next, expectedOrigin); err != nil {
+				return nil, fmt.Errorf("fetch GitHub resource %s: %w", path, err)
+			}
+		}
+		path = next
 	}
 
 	return all, nil
