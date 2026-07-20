@@ -50,6 +50,13 @@ func TestValidatePaginationOrigin_AcceptsAMatchingOrigin(t *testing.T) {
 	}
 }
 
+func TestValidatePaginationOrigin_AcceptsAnOriginDifferingOnlyByCase(t *testing.T) {
+	err := validatePaginationOrigin("https://API.GitHub.com/repos/octocat/hello-world/issues/42?page=2", "https://api.github.com")
+	if err != nil {
+		t.Fatalf("validatePaginationOrigin() error = %v, want nil — hostnames are case-insensitive", err)
+	}
+}
+
 func TestValidatePaginationOrigin_RejectsADifferentHost(t *testing.T) {
 	err := validatePaginationOrigin("https://attacker.invalid/next", "https://api.github.com")
 	if err == nil {

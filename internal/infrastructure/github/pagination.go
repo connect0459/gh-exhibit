@@ -53,13 +53,18 @@ func requestOrigin(resp *http.Response) string {
 // the host itself didn't change. expectedOrigin being unknown (e.g.
 // requestOrigin couldn't determine it) is treated as a mismatch too,
 // failing closed rather than trusting an unverified destination.
+//
+// The comparison is case-insensitive: both a URL scheme (RFC 3986) and a
+// hostname (DNS, and by extension HTTP's Host) are themselves
+// case-insensitive, so a next-page URL differing from expectedOrigin only
+// in letter case is the same origin, not a mismatch.
 func validatePaginationOrigin(nextURL, expectedOrigin string) error {
 	parsed, err := url.Parse(nextURL)
 	if err != nil {
 		return fmt.Errorf("parse next-page URL %q: %w", nextURL, err)
 	}
 	origin := parsed.Scheme + "://" + parsed.Host
-	if expectedOrigin == "" || origin != expectedOrigin {
+	if expectedOrigin == "" || !strings.EqualFold(origin, expectedOrigin) {
 		return fmt.Errorf("next-page URL %q origin %q does not match the expected origin %q", nextURL, origin, expectedOrigin)
 	}
 	return nil
