@@ -77,9 +77,9 @@ separate repository the evidence is copied into, not gh-exhibit's):
 All four implement the sealed `valueobjects.Entry` interface
 (`Render(io.Writer) error` plus an unexported marker method) — the closest
 Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
-(author, created, url — the common `meta:{...}` fields), `Url` (an absolute
-http/https URL, parsed and validated once at construction), `IssueRef`
-(owner, repo, number — validated against GitHub's own username/
+(author, created, url — the common `<!-- {"meta":...} -->` fields), `Url`
+(an absolute http/https URL, parsed and validated once at construction),
+`IssueRef` (owner, repo, number — validated against GitHub's own username/
 repository-name character-set and length rules).
 
 ### Timeline classification
@@ -148,19 +148,25 @@ itself (the raw JSON is).
 
 One Markdown file per issue/PR: an H1 title line, then each entry's
 rendered output, separated by a `------` (6-hyphen) line. Each entry starts
-with a `meta:{...}` line anchored to the start of a line (JSON: `author`,
-`created` in RFC 3339 UTC, `url`, plus type-specific fields —
-`PullRequestReview` includes `state`), optionally followed by a blank line
-and the entry's body content. `InlineReviewComment` renders its diff hunk
-under an explicit `**Diff:**` label in a fenced code block, using a fence
-one backtick longer than the longest backtick run inside the hunk itself
-(minimum 3), so a hunk containing its own triple-backtick run cannot
-prematurely close the fence.
+with a `<!-- {"meta":{...}} -->` line anchored to the start of a line — an
+HTML comment, hidden from a rendered Markdown preview but still greppable
+as raw text, wrapping a standalone-parseable JSON object (`meta` nested
+under its own key: `author`, `created` in RFC 3339 UTC, `url`, plus
+type-specific fields — `PullRequestReview` includes `state`), optionally
+followed by a blank line and the entry's body content. `InlineReviewComment`
+renders its diff hunk under an explicit `**Diff:**` label in a fenced code
+block, using a fence one backtick longer than the longest backtick run
+inside the hunk itself (minimum 3), so a hunk containing its own
+triple-backtick run cannot prematurely close the fence.
 
-`meta:{...}` and `------` are deliberately non-standard tokens chosen to
-avoid collision with legitimate Markdown content (code blocks, YAML
-samples, `---` rules), on the condition that parsing stays anchored to the
-start of a line.
+`<!-- {"meta":...} -->` and `------` are deliberately non-standard tokens
+chosen to avoid collision with legitimate Markdown content (code blocks,
+YAML samples, `---` rules), on the condition that parsing stays anchored to
+the start of a line. An HTML comment's own terminator is the literal
+3-character sequence `-->`; none of `meta`'s current fields (all either
+GitHub-username-shaped, RFC 3339 timestamps, an enum state, or a validated
+`Url`, none of which can contain a literal `>`) can produce that sequence,
+so no meta value can prematurely close the comment.
 
 ## Attachment policy
 
