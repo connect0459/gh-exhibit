@@ -1,8 +1,10 @@
 package services
 
 import (
-	"errors"
+	"fmt"
 	"regexp"
+
+	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
 // Attachment/Rewrite/Resolution below implement ADR-002's mandatory-
@@ -16,20 +18,22 @@ import (
 // (Filename derivation) rather than spreading it across free functions each
 // taking a bare url string.
 type Attachment struct {
-	url string
+	url valueobjects.Url
 }
 
 // NewAttachment constructs an Attachment from its GitHub URL. It returns an
-// error if url is empty.
-func NewAttachment(url string) (Attachment, error) {
-	if url == "" {
-		return Attachment{}, errors.New("attachment url must not be empty")
+// error if rawURL is not a well-formed absolute http(s) URL (see
+// valueobjects.NewUrl).
+func NewAttachment(rawURL string) (Attachment, error) {
+	url, err := valueobjects.NewUrl(rawURL)
+	if err != nil {
+		return Attachment{}, fmt.Errorf("attachment url: %w", err)
 	}
 	return Attachment{url: url}, nil
 }
 
 // URL returns the attachment's original GitHub URL.
-func (a Attachment) URL() string {
+func (a Attachment) URL() valueobjects.Url {
 	return a.url
 }
 
@@ -61,10 +65,13 @@ func Detect(markdown []byte, host string) []Attachment {
 			continue
 		}
 		seen[url] = true
-		// urlPattern's own match shape guarantees url is never empty, so
-		// this error is unreachable in practice; skipping rather than
-		// panicking still matches this project's defensive, skip-and-
-		// continue handling of every other value-object invariant.
+		// urlPattern's own match shape guarantees a well-formed
+		// https?://host/... string for any host made of ordinary hostname
+		// characters (the only case this project's own host configuration
+		// produces), so this error is unreachable in practice; skipping
+		// rather than panicking still matches this project's defensive,
+		// skip-and-continue handling of every other value-object
+		// invariant.
 		attachment, err := NewAttachment(url)
 		if err != nil {
 			continue

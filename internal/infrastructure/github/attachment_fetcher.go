@@ -53,7 +53,7 @@ func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetche
 
 // Fetch implements repositories.AttachmentFetcher.
 func (f *attachmentFetcher) Fetch(ctx context.Context, attachment services.Attachment) ([]byte, string, error) {
-	url := attachment.URL()
+	url := attachment.URL().String()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("build request for %s: %w", url, err)

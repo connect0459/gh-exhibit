@@ -13,7 +13,7 @@ import (
 func urlsOf(attachments []services.Attachment) []string {
 	urls := make([]string, len(attachments))
 	for i, a := range attachments {
-		urls[i] = a.URL()
+		urls[i] = a.URL().String()
 	}
 	return urls
 }

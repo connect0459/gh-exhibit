@@ -14,7 +14,7 @@ func TestNewAttachment_URLReturnsTheURLItWasConstructedFrom(t *testing.T) {
 		t.Fatalf("NewAttachment(%q) error = %v", url, err)
 	}
 
-	if got := attachment.URL(); got != url {
+	if got := attachment.URL().String(); got != url {
 		t.Fatalf("URL() = %q, want %q", got, url)
 	}
 }

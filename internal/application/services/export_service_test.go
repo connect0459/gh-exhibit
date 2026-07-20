@@ -106,7 +106,7 @@ type fakeAttachmentFetcher struct {
 
 func (f *fakeAttachmentFetcher) Fetch(_ context.Context, attachment services.Attachment) ([]byte, string, error) {
 	f.mu.Lock()
-	f.fetchedURLs = append(f.fetchedURLs, attachment.URL())
+	f.fetchedURLs = append(f.fetchedURLs, attachment.URL().String())
 	f.mu.Unlock()
 	return f.data, f.contentType, f.err
 }
