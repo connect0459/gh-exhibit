@@ -3020,3 +3020,24 @@ C0 after this round: `internal/infrastructure/github` 92.8% (up from
 branches more precisely than the httptest-only approach did). `go build
 ./...`, `go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
 `pre-commit run --all-files` all pass.
+
+### Pagination origin comparison made case-insensitive, per Copilot review on PR #37 (2026-07-20)
+
+GitHub's automated PR reviewer flagged that `validatePaginationOrigin`
+compared `origin != expectedOrigin` as plain, case-sensitive strings, even
+though both a URL scheme (RFC 3986) and a hostname (DNS, and by extension
+HTTP's `Host`) are themselves case-insensitive — a legitimate next-page URL
+differing from the current origin only in letter case would have been
+wrongly rejected as a mismatch. This is an over-rejection/availability
+concern, not a security regression: the check would still fail closed on
+anything that wasn't a genuine case-only variant.
+
+- `validatePaginationOrigin` now compares with `strings.EqualFold` instead
+  of `!=`.
+- Test: `TestValidatePaginationOrigin_AcceptsAnOriginDifferingOnlyByCase`
+  added, confirmed red against the unchanged comparison first.
+
+C0 unchanged: `internal/infrastructure/github` 92.8% (the new test exercises
+an already-reachable comparison branch, adding no new one). `go build
+./...`, `go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
+`pre-commit run --all-files` all pass.
