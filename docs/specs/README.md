@@ -82,7 +82,9 @@ Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 `IssueRef` (owner, repo, number — validated against GitHub's own username/
 repository-name character-set and length rules), `Provenance` (tool,
 version, commit — the document-level `<!-- {"tool":...} -->` fields
-recording which gh-exhibit build produced a `Document`).
+recording which gh-exhibit build produced a `Document`), `AssetFilename` (a
+downloaded attachment's on-disk filename, guaranteed by its constructor to
+be a single path-safe segment — see "Attachment policy" below).
 
 ### Timeline classification
 
@@ -201,14 +203,15 @@ is mandatory, to keep the exported directory offline-verifiable. After a
    private-repository attachments), up to 4 concurrently, capped at 100 MiB
    per attachment.
 3. A successful fetch is saved under `{number}/assets/{filename}`, where
-   `filename` is the UUID GitHub assigns in the URL path plus an extension
-   resolved from the response's `Content-Type` header (via an explicit,
-   hermetic lookup table, not the host's own mime database) — the URL path
-   itself does not reliably encode one. An unrecognized content type yields
-   no extension. `AttachmentWriter.WriteAsset` independently rejects any
-   `filename` that isn't a single, path-safe segment (empty, `.`/`..`, a
-   path separator, or an absolute path), rather than trusting whatever
-   shape a caller's filename derivation happens to produce.
+   `filename` is a `valueobjects.AssetFilename` built from the UUID GitHub
+   assigns in the URL path plus an extension resolved from the response's
+   `Content-Type` header (via an explicit, hermetic lookup table, not the
+   host's own mime database) — the URL path itself does not reliably
+   encode one. An unrecognized content type yields no extension.
+   `AssetFilename`'s constructor guarantees the result is always a single,
+   path-safe segment (rejecting empty, `.`/`..`, a path separator, or an
+   absolute path), so `AttachmentWriter.WriteAsset` can trust any value of
+   this type without re-validating it itself.
 4. A failed fetch (broken link, access denied, network error) does not fail
    the export: the reference is rewritten to an inline placeholder noting
    the original URL and failure reason, and the run's failures are
@@ -254,7 +257,8 @@ Onion architecture, following this project's own reference layout:
 
 - `internal/domain/valueobjects` — the four Tier 1 entry types and their
   supporting Value Objects (`Attribution`, `Url`, `ReviewState`,
-  `InlineContext`, `IssueRef`, `Document`). No I/O.
+  `InlineContext`, `IssueRef`, `Document`, `Provenance`, `AssetFilename`).
+  No I/O.
 - `internal/domain/services` — stateless domain transformations: timeline
   classification/joining (`classify.go`, `join.go`, `body.go`), and
   attachment detection/rewriting (`attachment.go`, `resolution.go`,
