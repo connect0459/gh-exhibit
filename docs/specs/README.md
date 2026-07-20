@@ -77,10 +77,12 @@ separate repository the evidence is copied into, not gh-exhibit's):
 All four implement the sealed `valueobjects.Entry` interface
 (`Render(io.Writer) error` plus an unexported marker method) — the closest
 Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
-(author, created, url — the common `meta:{...}` fields), `Url` (an absolute
-http/https URL, parsed and validated once at construction), `IssueRef`
-(owner, repo, number — validated against GitHub's own username/
-repository-name character-set and length rules).
+(author, created, url — the common `<!-- {"meta":...} -->` fields), `Url`
+(an absolute http/https URL, parsed and validated once at construction),
+`IssueRef` (owner, repo, number — validated against GitHub's own username/
+repository-name character-set and length rules), `Provenance` (tool,
+version, commit — the document-level `<!-- {"tool":...} -->` fields
+recording which gh-exhibit build produced a `Document`).
 
 ### Timeline classification
 
@@ -146,21 +148,45 @@ itself (the raw JSON is).
 
 ## Markdown dialect
 
-One Markdown file per issue/PR: an H1 title line, then each entry's
-rendered output, separated by a `------` (6-hyphen) line. Each entry starts
-with a `meta:{...}` line anchored to the start of a line (JSON: `author`,
-`created` in RFC 3339 UTC, `url`, plus type-specific fields —
-`PullRequestReview` includes `state`), optionally followed by a blank line
-and the entry's body content. `InlineReviewComment` renders its diff hunk
-under an explicit `**Diff:**` label in a fenced code block, using a fence
-one backtick longer than the longest backtick run inside the hunk itself
-(minimum 3), so a hunk containing its own triple-backtick run cannot
-prematurely close the fence.
+One Markdown file per issue/PR: an H1 title line, then a document-level
+`<!-- {"tool":...,"version":...,"commit":...} -->` provenance line, then
+each entry's rendered output, separated by a `------` (6-hyphen) line. Each
+entry starts with a `<!-- {"meta":{...}} -->` line anchored to the start of
+a line — an HTML comment, hidden from a rendered Markdown preview but still
+greppable as raw text, wrapping a standalone-parseable JSON object (`meta`
+nested under its own key: `author`, `created` in RFC 3339 UTC, `url`, plus
+type-specific fields — `PullRequestReview` includes `state`), optionally
+followed by a blank line and the entry's body content. `InlineReviewComment`
+renders its diff hunk under an explicit `**Diff:**` label in a fenced code
+block, using a fence one backtick longer than the longest backtick run
+inside the hunk itself (minimum 3), so a hunk containing its own
+triple-backtick run cannot prematurely close the fence.
 
-`meta:{...}` and `------` are deliberately non-standard tokens chosen to
-avoid collision with legitimate Markdown content (code blocks, YAML
-samples, `---` rules), on the condition that parsing stays anchored to the
-start of a line.
+The provenance line (`valueobjects.Provenance`) records which tool,
+version, and commit produced the file, once per document, so a copy taken
+out of its own repository/directory context still carries a record of its
+own origin. This is a self-reported identifier, not a tamper-resistant
+guarantee: nothing prevents a different tool (or a hand-written file) from
+claiming the same values.
+
+`<!-- {"meta":...} -->`, `<!-- {"tool":...} -->`, and `------` are
+deliberately non-standard tokens chosen to avoid collision with legitimate
+Markdown content (code blocks, YAML samples, `---` rules), on the condition
+that parsing stays anchored to the start of a line. An HTML comment's own
+terminator is the literal 3-character sequence `-->`; this is never
+produced from a field's own content, because both lines are built through
+plain `encoding/json.Marshal`, whose documented default behavior replaces
+every `<`, `>`, and `&` byte with its 6-character numeric escape instead of
+emitting it raw (verified directly: marshaling a `>`-containing string
+never yields a literal `>` in the output). This holds regardless of what a
+field's own value contains — notably, `InlineReviewComment`'s `path` has
+no character-set constraint at all (`NewInlineContext` only rejects an
+empty one, since a git path may contain almost any byte), so it is this
+escaping behavior, not any field's content being inherently `>`-free, that
+keeps the comment from closing early. This does depend on
+`writeMetaLine`/`writeProvenanceLine` never switching to a `json.Encoder`
+with HTML escaping disabled, or to building the line by hand instead of
+through `encoding/json`.
 
 ## Attachment policy
 

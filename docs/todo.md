@@ -2469,3 +2469,221 @@ entry above:
   `CONTRIBUTING.md` only; verified via `go build ./...`, `go vet ./...`,
   `go test ./... -race -cover` (coverage figures unchanged), `gofmt -l .`,
   and `pre-commit run --all-files`.
+
+### Meta line hidden behind an HTML comment (2026-07-20)
+
+The user proposed changing the visible `meta:{...}` line to
+`{"meta":{...}}` (nesting it under its own key so the line is
+independently parseable JSON) and wrapping its `url` field in `<...>` so
+GitHub's Markdown preview would autolink it, then separately raised
+whether the whole line should instead be hidden as an HTML comment.
+Discussed and confirmed with the user on `feat/hidden-meta-line`:
+
+- **The three changes bundled into one proposal are independent axes,
+  separated before deciding**: (1) nesting the object under a `"meta"` key
+  for standalone JSON-parseability, (2) decorating `url` for Markdown
+  autolinking, (3) hiding the whole line as an HTML comment. Axis 2 was
+  rejected regardless of the other two: `url` is a `valueobjects.Url`,
+  validated once at construction so every downstream consumer can trust it
+  is a plain URI without re-parsing; embedding `<`/`>` in its JSON value
+  would break that guarantee and make `url` the only meta field carrying
+  rendering markup, inconsistent with `author`/`created`/`closed`/`merged`.
+  It is also moot once axis 3 hides the line from any preview.
+- **A collision risk initially raised against axis 3 (HTML comment) turned
+  out to rest on an incorrect recollection of the comment-termination
+  rule, corrected after the user tested it directly.** The claim was that
+  a repository name containing consecutive hyphens (`repoPattern` in
+  `issue_ref.go` allows this; `ownerPattern` does not) would prematurely
+  close an HTML comment via its URL, mirroring the previously-fixed
+  `diffFence` backtick-collision bug. The user tested a real double-hyphen
+  repository name directly and found the comment stayed intact. The actual
+  termination condition (both the HTML5 tokenizer and every renderer that
+  matters here) is the literal 3-character sequence `-->`, not any bare
+  `--`. None of `meta`'s current fields (GitHub-username-shaped `author`,
+  RFC 3339 timestamps, an enum `state`, or a validated `Url`) can contain a
+  literal `>`, so no meta value can produce that sequence — the collision
+  risk is effectively nil for this field set, and the objection was
+  withdrawn once corrected.
+- **Decided**: axis 1 (nest under `"meta"`) and axis 3 (hide as an HTML
+  comment) are both adopted; axis 2 (URL decoration) is dropped. The line
+  becomes `<!-- {"meta":{...}} -->`, anchored to the start of a line like
+  the token it replaces.
+- `internal/domain/valueobjects/render.go`'s `writeMetaLine` wraps its
+  `meta any` parameter in an anonymous `struct{ Meta any }` before
+  marshaling, then formats the result as `<!-- %s -->` instead of
+  `meta:%s`. This is the only production code change — every Tier 1 type's
+  own `Render()` method is unchanged, since the wrapping/formatting was
+  already centralized in this one shared helper.
+- Every existing byte-exact `Render()` test across all four Tier 1 types,
+  plus `Document`'s own multi-entry rendering tests, was updated to the new
+  expected line; no new test case was needed; the existing suite's field
+  and error-branch combinations already exercised every path this change
+  touches, confirmed by reading each updated assertion against
+  `writeMetaLine`'s new implementation before treating the suite as
+  sufficient. `TestWriteMetaLine_WrapsAMetaMarshalFailure` needed no change
+  — wrapping `meta` in an outer struct does not change the marshal-failure
+  branch, since the outer struct fails to marshal for the same reason its
+  formerly-bare `meta` value did.
+- `docs/specs/README.md`'s Markdown dialect section and its `Attribution`
+  description were updated to the new token and to state the `-->`
+  termination reasoning above, so the risk analysis isn't only preserved
+  in this file's own history.
+
+No coverage regression: `internal/domain/valueobjects` 95.9% unchanged.
+`go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
+`gofmt -l .`, and `pre-commit run` all pass.
+
+### Document-level provenance line (2026-07-20)
+
+A follow-up discussion on the same day raised two further questions about
+the hidden meta line above, resolved on `feat/hidden-meta-line`:
+
+- **Whether the per-entry `"meta"` wrapper key should be renamed to
+  something self-identifying (e.g. `"gh_exhibit_meta"`), to avoid confusion
+  with a similar tool's own output.** Analyzed and not pursued: every
+  sibling field in that object (`author`, `created`, `url`, `state`,
+  `path`, `line`, `outdated`) is an unqualified name, so namespacing only
+  the wrapper key would be an asymmetric application of "add a project
+  identifier" with no concrete collision scenario driving it — the
+  consumer of `issues/{repo}/{number}.md` already knows it's gh-exhibit's
+  own output from the file's path and surrounding document shape, before
+  ever looking at a JSON key.
+- **The user's actual, more concrete concern, once restated: a rendered
+  `.md` file taken outside its repository/directory context carries no
+  record of what produced it** — whether a human, an AI, this tool, or a
+  similarly-shaped export from an unrelated tool or Claude skill. This is a
+  real gap in ADR-001's original audit-trail goal, not speculative scope
+  creep like the per-entry key-naming question above, since the driving
+  scenario (a file leaving its directory) is concrete rather than
+  hypothetical.
+- **Confirmed with the user via three questions**: (1) provenance is
+  represented as split JSON keys (`"tool"`, `"version"`) rather than one
+  combined string, with a third key, `"commit"`, added per the user's own
+  answer to reflect the tool name, version, and full build commit hash
+  (`cmd/gh-exhibit/main.go` already carries all three as
+  `-ldflags`-injected vars, previously used only by `--version`); (2)
+  `NewDocument`'s signature is extended to take this value directly,
+  rather than inserting it as a post-render byte-level transform (the
+  pattern `internal/domain/services`' attachment rewriting already uses) —
+  `Document` already owns "the whole rendered shape" (title + entries), so
+  a document-level provenance field belongs there for the same reason the
+  title does, and unlike attachment URLs it isn't a free-text pattern match
+  over arbitrary body content.
+- **This is explicitly a self-reported identifier, not a tamper-resistant
+  guarantee**: nothing prevents a different tool, or a hand-written file,
+  from claiming the same tool/version/commit values. Stated plainly in
+  `Provenance`'s own doc comment and in `docs/specs/README.md`, so the
+  feature isn't read as stronger proof than it actually is.
+- `internal/domain/valueobjects.Provenance` (new): a Value Object bundling
+  `tool`, `version`, `commit`, all required non-empty by `NewProvenance` —
+  matching this package's own established "reject empty" constructor
+  convention, applied here even though (unlike `Attribution`/`IssueRef`)
+  this data is always internally supplied, never external/untrusted input.
+- `Document` gains a `provenance Provenance` field (via a new required
+  `NewDocument(title, entries, provenance)` parameter, not re-validated at
+  this layer — the same trust every other Value Object parameter here
+  already gets) and a `writeProvenanceLine` helper, rendering
+  `<!-- {"tool":...,"version":...,"commit":...} -->` plus a blank line
+  right after the H1 title and before the first entry.
+- **`ExportService.NewExportService` takes `provenance valueobjects.Provenance`
+  as its own new parameter, not three more bare strings alongside `host`**:
+  three positional strings would have reintroduced the exact
+  transposition risk `registry.Config{Host, OutputDir}` was already
+  introduced to eliminate elsewhere in this codebase; a distinct type
+  can't be silently swapped with a bare `string` the way another `string`
+  could. `registry.Config` gains `Version`/`Commit` fields (mirroring its
+  existing `Host`/`OutputDir` pair) and a `toolName` constant
+  (`"connect0459/gh-exhibit"`), constructing the `Provenance` once inside
+  `registry.NewExportService`. `cmd/gh-exhibit/main.go` passes its
+  existing `version`/`commit` vars into `registry.Config` (`date` is not
+  included — no concrete need identified for it beyond what `--version`
+  already reports).
+- Tests: Red/Green TDD throughout. `provenance_test.go` follows
+  `url_test.go`'s existing style (reject-empty cases per field, an
+  exposes-constructed-values case, two `Equals` cases). All 24
+  `NewExportService(...)` call sites in `export_service_test.go` and every
+  `NewDocument(...)` call site in `document_test.go` were updated to pass
+  a shared `testProvenance(t)`/`newTestProvenance(t)` fixture — mechanical,
+  confirmed via `go build ./...` failing first and then succeeding, not
+  assumed complete from a partial `grep`.
+  `TestDocument_Render_WritesOnlyTheTitleWhenThereAreNoEntries` was renamed
+  to `..._WritesTheTitleAndProvenanceWhenThereAreNoEntries`, since the
+  behavior it documents changed (the provenance line is now written
+  unconditionally, not only alongside entries) — its old name would have
+  described what it used to verify, not what it verifies now.
+- `internal/registry` still has no dedicated test file, consistent with
+  its established precedent (sequential composition of already-tested
+  collaborators, no branching logic of its own worth a separate test) —
+  including the new `NewProvenance` call, which can only fail given an
+  empty `Version`/`Commit`, something no real caller (`main.go`'s own
+  `-ldflags` defaults are always non-empty: `"dev"`/`"none"`) currently
+  passes.
+
+C0 after this round: `internal/domain/valueobjects` 95.2% (down slightly
+from 95.9% — `Document.Render`'s io-error-propagation branches, already an
+accepted "not meaningfully testable without a fake failing writer" gap
+before this change, now also cover `writeProvenanceLine`'s call site;
+`writeProvenanceLine`'s own marshal-error branch is unreachable for the
+same reason `writeMetaLine`'s already-accepted one is — a fixed struct of
+plain strings can never fail `json.Marshal` — and was left uncovered
+rather than given a contrived direct test, since it isn't the sole gap in
+an otherwise-100%-covered file the way `writeMetaLine`'s was when that
+exception was made). `internal/application/services` 97.2% and
+`internal/presentation/cli` 98.8% unchanged. `go build ./...`,
+`go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
+`pre-commit run` all pass.
+
+### Local review: the `-->` safety argument was resting on the wrong invariant (2026-07-20)
+
+A local review of `feat/hidden-meta-line` before opening its PR found the
+`-->`-collision reasoning the two entries above (and `docs/specs/README.md`)
+had settled on was itself imprecise, addressed on the same branch:
+
+- **The claim "none of these lines' fields can contain a literal `>`" is
+  false for `InlineReviewComment`'s `path`.** `NewInlineContext` (in
+  `internal/domain/valueobjects/inline_context.go`) only rejects an empty
+  `path`; it has no character-set constraint at all. `path` is sourced
+  from a real git file path (via `internal/domain/services/classify.go`),
+  and git permits almost any byte in a path other than `NUL` and `/`, so a
+  contributor's PR could in principle introduce a path like
+  `src/foo-->bar.go`.
+- **What actually prevents the collision is `encoding/json.Marshal`'s own
+  default behavior, not any field's content**: verified directly —
+  `json.Marshal` of a struct containing a `>`-bearing string field never
+  emits a literal `>` in its output; it is escaped as part of
+  `encoding/json`'s documented default HTML-safety behavior (escaping
+  `<`, `>`, and `&`, disabled only via an explicit `json.Encoder` with that
+  behavior turned off — neither `writeMetaLine` nor `writeProvenanceLine`
+  does this, both using plain `json.Marshal`). The two entries above
+  attributed safety to the wrong layer: the previous, corrected claim about
+  `--` was already right that the termination condition is the literal
+  sequence `-->`, but its follow-up reasoning for why no field can produce
+  that sequence was itself unverified and, for `path`, false as stated —
+  it happened to still be safe, but for a different reason than written.
+- **`docs/specs/README.md`'s Markdown dialect section was rewritten** to
+  attribute the guarantee to `encoding/json.Marshal`'s escaping behavior,
+  name `path`'s lack of a character-set constraint explicitly as the
+  counterexample that makes the distinction matter (rather than asserting
+  the false premise it doesn't), and note the guarantee's actual
+  dependency: it holds only as long as `writeMetaLine`/`writeProvenanceLine`
+  keep going through `encoding/json.Marshal` with its default escaping.
+- **A new regression test locks in the real invariant**:
+  `TestInlineReviewComment_Render_EscapesAPathThatWouldOtherwiseCloseTheSurroundingHTMLComment`
+  renders an `InlineReviewComment` whose `path` contains a literal `-->`
+  and asserts the rendered output has it json-escaped, not left intact —
+  a test that would catch a future regression (e.g. switching to
+  `SetEscapeHTML(false)`, or hand-building the line via string
+  concatenation instead of `json.Marshal`) that the previous, imprecise
+  documentation would not have.
+- **Secondary finding, also fixed**: `writeProvenanceLine` (in
+  `document.go`) read `provenance.tool`/`.version`/`.commit` directly
+  instead of through `Provenance`'s own `Tool()`/`Version()`/`Commit()`
+  accessors — legal (same package) but inconsistent with this package's
+  own sibling convention (`render.go`'s `newAttributionMeta` goes through
+  `Attribution`'s accessors, not its fields, despite being in the same
+  package too). No behavior change; fixed to match.
+
+C0 unchanged: `internal/domain/valueobjects` 95.2% (the new test exercises
+an already-reachable path, adding no new branch). `go build ./...`,
+`go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
+`pre-commit run` all pass.

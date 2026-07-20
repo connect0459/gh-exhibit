@@ -30,7 +30,8 @@ func (c IssueComment) Equals(other IssueComment) bool {
 	return c.attribution.Equals(other.attribution) && c.body == other.body
 }
 
-// Render writes c's meta:{...} line followed by its body, satisfying Entry.
+// Render writes c's <!-- {"meta":...} --> line followed by its body,
+// satisfying Entry.
 func (c IssueComment) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta

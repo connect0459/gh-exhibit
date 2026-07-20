@@ -25,21 +25,28 @@ func newAttributionMeta(a Attribution) attributionMeta {
 	}
 }
 
-// writeMetaLine writes meta as a single line-anchored `meta:{...}` JSON
-// line followed by body, the shape every Tier 1 entry's Render() shares.
+// writeMetaLine writes meta, nested under a "meta" key so the line is
+// independently valid JSON, as a single line-anchored `<!-- {"meta":...} -->`
+// HTML comment — hidden from a rendered Markdown preview but still
+// greppable as raw text — followed by body, the shape every Tier 1 entry's
+// Render() shares.
 func writeMetaLine(w io.Writer, meta any, body string) error {
-	line, err := json.Marshal(meta)
+	wrapped := struct {
+		Meta any `json:"meta"`
+	}{Meta: meta}
+
+	line, err := json.Marshal(wrapped)
 	if err != nil {
 		return fmt.Errorf("marshal meta: %w", err)
 	}
 
 	body = normalizeBody(body)
 	if body == "" {
-		_, err = fmt.Fprintf(w, "meta:%s\n", line)
+		_, err = fmt.Fprintf(w, "<!-- %s -->\n", line)
 		return err
 	}
 
-	_, err = fmt.Fprintf(w, "meta:%s\n\n%s\n", line, body)
+	_, err = fmt.Fprintf(w, "<!-- %s -->\n\n%s\n", line, body)
 	return err
 }
 

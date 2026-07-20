@@ -55,8 +55,8 @@ func equalTimePointers(a, b *time.Time) bool {
 	return equalPointers(a, b, func(x, y time.Time) bool { return x.Equal(y) })
 }
 
-// Render writes b's meta:{...} line followed by its content, satisfying
-// Entry.
+// Render writes b's <!-- {"meta":...} --> line followed by its content,
+// satisfying Entry.
 func (b Body) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta

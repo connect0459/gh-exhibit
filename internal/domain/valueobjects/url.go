@@ -66,8 +66,8 @@ func (u Url) Equals(other Url) bool {
 }
 
 // MarshalText renders url as its raw string, so a Url-typed struct field
-// marshals to JSON identically to a plain string field (the meta:{...}
-// line requires byte-exact output).
+// marshals to JSON identically to a plain string field (the
+// <!-- {"meta":...} --> line requires byte-exact output).
 func (u Url) MarshalText() ([]byte, error) {
 	return []byte(u.raw), nil
 }

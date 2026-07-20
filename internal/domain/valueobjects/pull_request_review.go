@@ -41,7 +41,8 @@ func (r PullRequestReview) Equals(other PullRequestReview) bool {
 		r.body == other.body
 }
 
-// Render writes r's meta:{...} line followed by its body, satisfying Entry.
+// Render writes r's <!-- {"meta":...} --> line followed by its body,
+// satisfying Entry.
 func (r PullRequestReview) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta

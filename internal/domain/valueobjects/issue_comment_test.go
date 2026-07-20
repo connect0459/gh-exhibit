@@ -23,7 +23,7 @@ func TestIssueComment_Render_WritesAnAnchoredMetaLineFollowedByTheBody(t *testin
 		t.Fatalf("unexpected error rendering issue comment: %v", err)
 	}
 
-	want := `meta:{"author":"octocat","created":"2026-07-02T14:19:40Z","url":"https://github.com/example/repo/issues/1#issuecomment-1"}
+	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","url":"https://github.com/example/repo/issues/1#issuecomment-1"}} -->
 
 Looks good to me.
 `
@@ -40,7 +40,7 @@ func TestIssueComment_Render_CollapsesTrailingNewlinesInTheBodyToASingleOne(t *t
 		t.Fatalf("unexpected error rendering issue comment: %v", err)
 	}
 
-	want := `meta:{"author":"octocat","created":"2026-07-02T14:19:40Z","url":"https://github.com/example/repo/issues/1#issuecomment-1"}
+	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","url":"https://github.com/example/repo/issues/1#issuecomment-1"}} -->
 
 Looks good to me.
 `
@@ -57,7 +57,7 @@ func TestIssueComment_Render_NormalizesCRLFLineEndingsInTheBody(t *testing.T) {
 		t.Fatalf("unexpected error rendering issue comment: %v", err)
 	}
 
-	want := `meta:{"author":"octocat","created":"2026-07-02T14:19:40Z","url":"https://github.com/example/repo/issues/1#issuecomment-1"}
+	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","url":"https://github.com/example/repo/issues/1#issuecomment-1"}} -->
 
 Line one.
 Line two.

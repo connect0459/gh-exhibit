@@ -29,15 +29,17 @@ type ExportService struct {
 	attachments repositories.AttachmentFetcher
 	assets      repositories.AttachmentWriter
 	host        string
+	provenance  valueobjects.Provenance
 }
 
 // NewExportService builds an ExportService from its five collaborating
 // ports (dependency inversion — this constructor takes abstract types,
-// not infrastructure-layer concrete implementations) plus host, the target
+// not infrastructure-layer concrete implementations), host, the target
 // repository's own host (e.g. "github.com" or a GitHub Enterprise Server
-// hostname), used to recognize that host's own attachment URLs.
-func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.EvidenceWriter, docs repositories.DocumentWriter, attachments repositories.AttachmentFetcher, assets repositories.AttachmentWriter, host string) *ExportService {
-	return &ExportService{fetcher: fetcher, writer: writer, docs: docs, attachments: attachments, assets: assets, host: host}
+// hostname) used to recognize that host's own attachment URLs, and
+// provenance, recorded in every Document this ExportService renders.
+func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.EvidenceWriter, docs repositories.DocumentWriter, attachments repositories.AttachmentFetcher, assets repositories.AttachmentWriter, host string, provenance valueobjects.Provenance) *ExportService {
+	return &ExportService{fetcher: fetcher, writer: writer, docs: docs, attachments: attachments, assets: assets, host: host, provenance: provenance}
 }
 
 // Export fetches, classifies, and renders the evidence for ref, returning
@@ -75,7 +77,7 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 	classified, skipped := services.BuildEntries(fetched.timeline, fetched.reviewComments)
 	entries := append([]valueobjects.Entry{body}, classified...)
 
-	doc, err := valueobjects.NewDocument(title, entries)
+	doc, err := valueobjects.NewDocument(title, entries, s.provenance)
 	if err != nil {
 		return nil, fmt.Errorf("assemble document: %w", err)
 	}
