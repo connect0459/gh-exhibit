@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -254,6 +255,86 @@ func TestWriteIssue_ReturnsWrappedErrorWhenFileCannotBeWritten(t *testing.T) {
 	err := writer.WriteIssue(context.Background(), testIssueRef(t), json.RawMessage(`{}`))
 	if err == nil {
 		t.Fatal("WriteIssue() error = nil, want a file-write error")
+	}
+}
+
+func TestWriteIssue_LeavesAnAlreadyOpenReaderAbleToReadTheCompleteOldContentDuringARewrite(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+	ref := testIssueRef(t)
+	const oldBody = `{"title":"first"}`
+
+	if err := writer.WriteIssue(context.Background(), ref, json.RawMessage(oldBody)); err != nil {
+		t.Fatalf("WriteIssue() error = %v", err)
+	}
+
+	// A reader that opened the file before the rewrite must keep seeing the
+	// old file's inode: a rename swaps the directory entry to a new inode
+	// rather than truncating and overwriting the one this handle refers to.
+	oldHandle, err := os.Open(filepath.Join(baseDir, "hello-world", "42.json"))
+	if err != nil {
+		t.Fatalf("os.Open() error = %v", err)
+	}
+	defer func() { _ = oldHandle.Close() }()
+
+	if err := writer.WriteIssue(context.Background(), ref, json.RawMessage(`{"title":"second"}`)); err != nil {
+		t.Fatalf("WriteIssue() error = %v", err)
+	}
+
+	got, err := io.ReadAll(oldHandle)
+	if err != nil {
+		t.Fatalf("io.ReadAll() error = %v", err)
+	}
+	if string(got) != oldBody {
+		t.Fatalf("a reader open since before the rewrite saw %q, want the untouched old content %q", got, oldBody)
+	}
+}
+
+func TestWriteIssue_LeavesNoTemporaryFilesBehindAfterASuccessfulWrite(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+
+	if err := writer.WriteIssue(context.Background(), testIssueRef(t), json.RawMessage(`{}`)); err != nil {
+		t.Fatalf("WriteIssue() error = %v", err)
+	}
+
+	entries, err := os.ReadDir(filepath.Join(baseDir, "hello-world"))
+	if err != nil {
+		t.Fatalf("os.ReadDir() error = %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "42.json" {
+		names := make([]string, len(entries))
+		for i, e := range entries {
+			names[i] = e.Name()
+		}
+		t.Fatalf("directory contains %v after write, want only 42.json (no leaked temporary file)", names)
+	}
+}
+
+func TestWriteIssue_LeavesNoTemporaryFileBehindWhenTheWriteFails(t *testing.T) {
+	baseDir := t.TempDir()
+	dir := filepath.Join(baseDir, "hello-world")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll() error = %v", err)
+	}
+	writer := NewEvidenceWriter(baseDir)
+	ref := testIssueRef(t)
+
+	if err := writer.WriteIssue(context.Background(), ref, json.RawMessage(`{"title":"first"}`)); err != nil {
+		t.Fatalf("WriteIssue() error = %v", err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("os.Chmod() error = %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+	if err := writer.WriteIssue(context.Background(), ref, json.RawMessage(`{"title":"second"}`)); err == nil {
+		t.Fatal("WriteIssue() error = nil, want an error when the directory forbids creating the temporary file")
+	}
+
+	got := readFile(t, filepath.Join(dir, "42.json"))
+	if got != `{"title":"first"}` {
+		t.Fatalf("WriteIssue() left %q after a failed rewrite, want the untouched original %q", got, `{"title":"first"}`)
 	}
 }
 

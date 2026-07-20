@@ -94,11 +94,40 @@ func joinRawArray(items []json.RawMessage) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// writeFile persists data to path atomically: it writes to a temporary
+// file in the same directory, syncs it to stable storage, and renames it
+// into place. A rename replaces the directory entry in a single step, so
+// a crash at any point during the write leaves the old file (untouched,
+// under its original name) or the new file (complete, under the
+// temporary name) — never a truncated file where the old one used to be.
 func writeFile(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create directory for %s: %w", path, err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("could not save data to %s: %w", path, err)
+	}
+	tmpPath := tmp.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("could not save data to %s: %w", path, err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("could not save data to %s: %w", path, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("could not save data to %s: %w", path, err)
+	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
+		return fmt.Errorf("could not save data to %s: %w", path, err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("could not save data to %s: %w", path, err)
 	}
 	return nil
