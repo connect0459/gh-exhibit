@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/connect0459/gh-exhibit/internal/domain/services"
+	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
 func TestResolution_SubstituteReturnsTheLocalPathForADownloadedAttachment(t *testing.T) {
@@ -41,40 +42,30 @@ func TestResolution_SubstituteDistinguishesAFailedFetchWithAnEmptyReasonFromASuc
 	}
 }
 
-func TestDownloaded_RejectsAnEmptyURL(t *testing.T) {
-	if _, err := services.Downloaded("", "1/assets/abc-123.png"); err == nil {
-		t.Fatal("Downloaded(\"\", ...) error = nil, want an error for an empty url")
-	}
-}
-
-func TestFetchFailed_RejectsAnEmptyURL(t *testing.T) {
-	if _, err := services.FetchFailed("", "404 Not Found"); err == nil {
-		t.Fatal("FetchFailed(\"\", ...) error = nil, want an error for an empty url")
-	}
-}
-
 // mustDownloaded builds a Resolution via Downloaded, failing t immediately
-// if construction errors — for tests exercising some other behavior of
-// Resolution, not Downloaded's own construction.
-func mustDownloaded(t *testing.T, url, localPath string) services.Resolution {
+// if url fails to parse — for tests exercising some other behavior of
+// Resolution, not url parsing itself (see valueobjects.NewUrl's own tests
+// for that).
+func mustDownloaded(t *testing.T, rawURL, localPath string) services.Resolution {
 	t.Helper()
 
-	res, err := services.Downloaded(url, localPath)
+	url, err := valueobjects.NewUrl(rawURL)
 	if err != nil {
-		t.Fatalf("Downloaded(%q, %q) error = %v", url, localPath, err)
+		t.Fatalf("NewUrl(%q) error = %v", rawURL, err)
 	}
-	return res
+	return services.Downloaded(url, localPath)
 }
 
 // mustFetchFailed builds a Resolution via FetchFailed, failing t immediately
-// if construction errors — for tests exercising some other behavior of
-// Resolution, not FetchFailed's own construction.
-func mustFetchFailed(t *testing.T, url, reason string) services.Resolution {
+// if url fails to parse — for tests exercising some other behavior of
+// Resolution, not url parsing itself (see valueobjects.NewUrl's own tests
+// for that).
+func mustFetchFailed(t *testing.T, rawURL, reason string) services.Resolution {
 	t.Helper()
 
-	res, err := services.FetchFailed(url, reason)
+	url, err := valueobjects.NewUrl(rawURL)
 	if err != nil {
-		t.Fatalf("FetchFailed(%q, %q) error = %v", url, reason, err)
+		t.Fatalf("NewUrl(%q) error = %v", rawURL, err)
 	}
-	return res
+	return services.FetchFailed(url, reason)
 }
