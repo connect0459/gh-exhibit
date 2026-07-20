@@ -62,7 +62,7 @@ func (b Body) Render(w io.Writer) error {
 		attributionMeta
 		Closed string `json:"closed,omitempty"`
 		Merged string `json:"merged,omitempty"`
-		URL    string `json:"url"`
+		URL    Url    `json:"url"`
 	}{
 		attributionMeta: newAttributionMeta(b.attribution),
 		URL:             b.attribution.URL(),

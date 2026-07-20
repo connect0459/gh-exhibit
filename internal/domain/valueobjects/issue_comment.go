@@ -34,7 +34,7 @@ func (c IssueComment) Equals(other IssueComment) bool {
 func (c IssueComment) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta
-		URL string `json:"url"`
+		URL Url `json:"url"`
 	}{
 		attributionMeta: newAttributionMeta(c.attribution),
 		URL:             c.attribution.URL(),

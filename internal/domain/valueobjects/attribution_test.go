@@ -32,6 +32,14 @@ func TestNewAttribution_RejectsEmptyURL(t *testing.T) {
 	}
 }
 
+func TestNewAttribution_RejectsANonAbsoluteURL(t *testing.T) {
+	_, err := valueobjects.NewAttribution("octocat", time.Now(), "not-a-url")
+
+	if err == nil {
+		t.Fatal("expected an error for a non-absolute url, got nil")
+	}
+}
+
 func TestAttribution_Equals_TreatsMatchingValuesAsEqual(t *testing.T) {
 	created := time.Date(2026, 7, 2, 14, 19, 40, 0, time.UTC)
 	a, err := valueobjects.NewAttribution("octocat", created, "https://github.com/example/repo/issues/1")

@@ -13,21 +13,23 @@ import (
 type Attribution struct {
 	author  string
 	created time.Time
-	url     string
+	url     Url
 }
 
-// NewAttribution constructs an Attribution from author, created, and url.
-// It returns an error if author or url is empty, or if author contains a
-// non-ASCII character (see isASCII).
-func NewAttribution(author string, created time.Time, url string) (Attribution, error) {
+// NewAttribution constructs an Attribution from author, created, and
+// rawURL. It returns an error if author is empty or contains a non-ASCII
+// character (see isASCII), or if rawURL is not a well-formed absolute
+// http(s) URL (see NewUrl).
+func NewAttribution(author string, created time.Time, rawURL string) (Attribution, error) {
 	if author == "" {
 		return Attribution{}, errors.New("attribution author must not be empty")
 	}
 	if !isASCII(author) {
 		return Attribution{}, fmt.Errorf("attribution author %q must contain only ASCII characters", author)
 	}
-	if url == "" {
-		return Attribution{}, errors.New("attribution url must not be empty")
+	url, err := NewUrl(rawURL)
+	if err != nil {
+		return Attribution{}, fmt.Errorf("attribution url: %w", err)
 	}
 	return Attribution{author: author, created: created, url: url}, nil
 }
@@ -57,7 +59,7 @@ func (a Attribution) CreatedAt() time.Time {
 }
 
 // URL returns the GitHub HTML URL of the attributed content.
-func (a Attribution) URL() string {
+func (a Attribution) URL() Url {
 	return a.url
 }
 
@@ -67,6 +69,6 @@ func (a Attribution) URL() string {
 // created are compared exactly.
 func (a Attribution) Equals(other Attribution) bool {
 	return strings.EqualFold(a.author, other.author) &&
-		a.url == other.url &&
+		a.url.Equals(other.url) &&
 		a.created.Equal(other.created)
 }
