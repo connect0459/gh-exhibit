@@ -25,6 +25,12 @@ func TestNewAttachment_RejectsAnEmptyURL(t *testing.T) {
 	}
 }
 
+func TestNewAttachment_RejectsAURLThatIsNotAGitHubAttachmentPath(t *testing.T) {
+	if _, err := services.NewAttachment("https://github.com"); err == nil {
+		t.Fatal("NewAttachment(\"https://github.com\") error = nil, want an error for a url that is not a user-attachments asset path")
+	}
+}
+
 // newTestAttachment builds an Attachment from url, failing t immediately if
 // construction errors — for tests exercising some other behavior of
 // Attachment, not NewAttachment's own construction.
