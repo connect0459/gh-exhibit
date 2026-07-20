@@ -72,7 +72,8 @@ separate repository the evidence is copied into, not gh-exhibit's):
 - `PullRequestReview` — a review, carrying a `ReviewState`
   (`approved` / `changes_requested` / `commented`).
 - `InlineReviewComment` — a comment anchored to a diff position, carrying an
-  `InlineContext` (`path`, optional `line`, `diff_hunk`, `outdated`).
+  `InlineContext` (`path`, optional `line`, optional `start_line`,
+  `diff_hunk`, `outdated`).
 
 All four implement the sealed `valueobjects.Entry` interface
 (`Render(io.Writer) error` plus an unexported marker method) — the closest
@@ -104,9 +105,12 @@ Object's invariant does not abort the whole export: it is recorded as a
 Deleted-account authors (`user: null`) are attributed to `"ghost"`. An
 outdated inline comment (`line: null`) falls back to `original_line` and
 renders an `outdated` flag; a file-level comment (`subject_type: "file"`,
-both `line` and `original_line` null) has no line at all. Duplicate timeline
-items/review comments sharing the same id (e.g. overlapping pagination) are
-deduplicated, not re-rendered.
+both `line` and `original_line` null) has no line at all; a comment
+anchored to a range of lines carries a `start_line` (or, once outdated,
+`original_start_line`) alongside its `line`, rendering both so the export
+preserves the comment's full span rather than only its last line.
+Duplicate timeline items/review comments sharing the same id (e.g.
+overlapping pagination) are deduplicated, not re-rendered.
 
 `Attribution.author`/`IssueRef.owner`/`IssueRef.repo` compare
 case-insensitively via `Equals` (GitHub's own case-insensitive uniqueness
