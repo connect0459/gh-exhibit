@@ -2204,7 +2204,7 @@ on `refactor/attachment-url-invariants`; the rest were judged either
 already covered or not worth their own type given no invariant a new type
 would actually enforce:
 
-- **`repositories.AttachmentFetcher.Fetch` took a bare `url string`even
+- **`repositories.AttachmentFetcher.Fetch` took a bare `url string` even
   though `resolveAttachments` already held a validated `services.Attachment`
   for every URL it fetched** — the call site unwrapped it via `a.URL()`
   just to cross the port boundary, then the infra implementation never used
