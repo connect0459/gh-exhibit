@@ -2125,3 +2125,63 @@ final step, `actions/attest-build-provenance`, failed:
   run --files .github/workflows/release.yml` (`check-yaml` passes) and by
   reproducing the exact on-disk paths from the failed run's own artifact
   JSON, not by re-running GoReleaser locally.
+
+### Anemic Domain Model fixes in attachment handling (2026-07-20)
+
+With every `docs/todo.md` checklist item already closed and `v0.1.1`
+released, a review of `internal/domain/services`'s attachment-download half
+(ADR-002's mandatory-local-download policy) for Anemic Domain Model smells —
+behavior that belongs on a domain object but is instead scattered across a
+service — found three instances, all fixed on
+`refactor/anemic-domain-model-in-attachment-services` (merged as PR #21;
+this entry itself was not part of that PR, see below):
+
+- **`Rewrite` reached into `Resolution`'s fields to decide what Markdown
+  text should replace an attachment URL**, even though `Resolution` already
+  carried every field that decision depends on (success/local path/failure
+  reason). The decision is now `Resolution.Substitute`, a method on the
+  type that owns that state; `Rewrite` is reduced to a thin loop calling it.
+- **`Detect`, `Filename`, and `Resolution` were three independent fragments
+  of the same "GitHub attachment" concept**, with `Filename` a free function
+  taking a bare URL string re-passed at every call site. A new `Attachment`
+  type now carries that URL; `Filename` is a method on it, so filename
+  derivation travels with the URL it derives from.
+- **The `{number}/assets/{filename}` relative path a rendered document uses
+  to reference its own downloaded attachments was an inline `fmt.Sprintf` in
+  the application layer**, duplicating a layout decision that belongs with
+  `IssueRef`, which already owns the issue number it depends on. It is now
+  `IssueRef.AssetPath`.
+- No behavior change; no public API or on-disk output layout change — this
+  only moves existing logic to where it already conceptually belonged.
+  Tests were updated in lockstep with each signature change
+  (`detect_test.go`, `filename_test.go`), and a direct test was added for
+  each newly-introduced method before wiring it in
+  (`resolution_test.go`'s `TestResolution_Substitute*` cases,
+  `issue_ref_test.go`'s `TestIssueRef_AssetPath...`).
+- **This `docs/todo.md` entry itself is a corrective, not a same-PR
+  record**: PR #21's own Quality Checklist claimed `docs/todo.md` was
+  updated, but no commit on that PR actually touched this file — the first
+  gap of this kind found in the project's otherwise-consistent history of
+  recording every PR's work here. Written after the fact, once noticed
+  during a routine "what's next" check with no open issues/PRs and a fully
+  green `go build`/`go vet`/`gofmt`/`go test -race -cover` baseline to work
+  from.
+- **Deferred item, now resolved**: PR #21's own "Deferred Items and TODOs"
+  section flagged that `Resolution.Substitute` still took `url` as a
+  parameter rather than `Resolution` storing its own URL, so the
+  `map[string]Resolution` at the call site left the URL duplicated as both
+  key and field — deliberately not pursued in that PR to keep its scope to
+  the three findings above. Fixed here, on
+  `refactor/resolution-owns-its-url`: `Downloaded`/`FetchFailed` now take
+  `url` as their first argument and `Resolution` stores it; `Substitute`
+  takes no argument; `Rewrite` takes `[]Resolution` instead of
+  `map[string]Resolution`, since `Detect` already guarantees unique URLs
+  (deduplicated, first-seen order) so a map's key-uniqueness was never
+  load-bearing here. Red/Green TDD: `resolution_test.go`/`rewrite_test.go`
+  were updated to the new signatures first and confirmed failing to compile
+  against the pre-change code, then the implementation and
+  `export_service.go`'s call site were updated to match.
+
+C0 unchanged: `internal/domain/services` 99.3%, `internal/application/
+services` 97.2%. `go build ./...`, `go vet ./...`, `go test ./... -race
+-cover`, and `gofmt -l .` all pass.
