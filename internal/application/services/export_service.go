@@ -223,11 +223,11 @@ type downloadedAsset struct {
 // github.com.
 const maxConcurrentAttachmentFetches = 4
 
-// attachmentFetchResult carries one URL's Fetch outcome out of
+// attachmentFetchResult carries one Attachment's Fetch outcome out of
 // resolveAttachments' worker pool for sequential, deterministic handling
 // once every fetch has finished.
 type attachmentFetchResult struct {
-	url         string
+	attachment  services.Attachment
 	data        []byte
 	contentType string
 	err         error
@@ -247,42 +247,42 @@ type attachmentFetchResult struct {
 // matching how FetchIssue/FetchTimeline and the other fetch steps treat
 // the same error.
 func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects.IssueRef, rendered []byte) ([]byte, []downloadedAsset, []byte, error) {
-	urls := services.Detect(rendered, s.host)
-	if len(urls) == 0 {
+	attachments := services.Detect(rendered, s.host)
+	if len(attachments) == 0 {
 		return rendered, nil, nil, nil
 	}
 
-	results := make([]attachmentFetchResult, len(urls))
+	results := make([]attachmentFetchResult, len(attachments))
 	sem := make(chan struct{}, maxConcurrentAttachmentFetches)
 	var wg sync.WaitGroup
-	for i, url := range urls {
+	for i, a := range attachments {
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(i int, url string) {
+		go func(i int, a services.Attachment) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			data, contentType, err := s.attachments.Fetch(ctx, url)
-			results[i] = attachmentFetchResult{url: url, data: data, contentType: contentType, err: err}
-		}(i, url)
+			data, contentType, err := s.attachments.Fetch(ctx, a.URL())
+			results[i] = attachmentFetchResult{attachment: a, data: data, contentType: contentType, err: err}
+		}(i, a)
 	}
 	wg.Wait()
 
-	resolutions := make(map[string]services.Resolution, len(urls))
+	resolutions := make(map[string]services.Resolution, len(attachments))
 	var downloads []downloadedAsset
 	var failureLog bytes.Buffer
 	for _, r := range results {
 		if r.err != nil {
 			if errors.Is(r.err, context.Canceled) || errors.Is(r.err, context.DeadlineExceeded) {
-				return nil, nil, nil, fmt.Errorf("could not download the attachment at %s: %w", r.url, r.err)
+				return nil, nil, nil, fmt.Errorf("could not download the attachment at %s: %w", r.attachment.URL(), r.err)
 			}
-			resolutions[r.url] = services.FetchFailed(r.err.Error())
-			fmt.Fprintf(&failureLog, "%s: %s\n", r.url, r.err)
+			resolutions[r.attachment.URL()] = services.FetchFailed(r.err.Error())
+			fmt.Fprintf(&failureLog, "%s: %s\n", r.attachment.URL(), r.err)
 			continue
 		}
 
-		filename := services.Filename(r.url, r.contentType)
+		filename := r.attachment.Filename(r.contentType)
 		downloads = append(downloads, downloadedAsset{filename: filename, data: r.data})
-		resolutions[r.url] = services.Downloaded(fmt.Sprintf("%d/assets/%s", ref.Number(), filename))
+		resolutions[r.attachment.URL()] = services.Downloaded(ref.AssetPath(filename))
 	}
 
 	return services.Rewrite(rendered, resolutions), downloads, failureLog.Bytes(), nil

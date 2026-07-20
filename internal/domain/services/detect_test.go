@@ -7,11 +7,22 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/services"
 )
 
+// urlsOf extracts each attachment's URL, so a test can assert on the plain
+// []string it already knows rather than reaching into Attachment's
+// internals.
+func urlsOf(attachments []services.Attachment) []string {
+	urls := make([]string, len(attachments))
+	for i, a := range attachments {
+		urls[i] = a.URL()
+	}
+	return urls
+}
+
 func TestDetect_FindsAMarkdownImageReference(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte("before\n![alt](" + url + ")\nafter")
 
-	got := services.Detect(markdown, "github.com")
+	got := urlsOf(services.Detect(markdown, "github.com"))
 
 	want := []string{url}
 	if !reflect.DeepEqual(got, want) {
@@ -23,7 +34,7 @@ func TestDetect_FindsAnHTMLImgTagReference(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte(`<img width="1756" alt="Image" src="` + url + `" />`)
 
-	got := services.Detect(markdown, "github.com")
+	got := urlsOf(services.Detect(markdown, "github.com"))
 
 	want := []string{url}
 	if !reflect.DeepEqual(got, want) {
@@ -36,7 +47,7 @@ func TestDetect_DeduplicatesARepeatedURLInFirstSeenOrder(t *testing.T) {
 	second := "https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000002"
 	markdown := []byte(first + "\n" + second + "\n" + first)
 
-	got := services.Detect(markdown, "github.com")
+	got := urlsOf(services.Detect(markdown, "github.com"))
 
 	want := []string{first, second}
 	if !reflect.DeepEqual(got, want) {
@@ -66,7 +77,7 @@ func TestDetect_MatchesAttachmentsOverPlainHTTP(t *testing.T) {
 	url := "http://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte("before\n![alt](" + url + ")\nafter")
 
-	got := services.Detect(markdown, "github.com")
+	got := urlsOf(services.Detect(markdown, "github.com"))
 
 	want := []string{url}
 	if !reflect.DeepEqual(got, want) {
@@ -78,7 +89,7 @@ func TestDetect_MatchesAttachmentsOnAGitHubEnterpriseServerHost(t *testing.T) {
 	url := "https://github.example.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte("before\n![alt](" + url + ")\nafter")
 
-	got := services.Detect(markdown, "github.example.com")
+	got := urlsOf(services.Detect(markdown, "github.example.com"))
 
 	want := []string{url}
 	if !reflect.DeepEqual(got, want) {
@@ -90,7 +101,7 @@ func TestDetect_MatchesAttachmentsOnAGitHubEnterpriseServerHostOverPlainHTTP(t *
 	url := "http://github.example.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte("before\n![alt](" + url + ")\nafter")
 
-	got := services.Detect(markdown, "github.example.com")
+	got := urlsOf(services.Detect(markdown, "github.example.com"))
 
 	want := []string{url}
 	if !reflect.DeepEqual(got, want) {

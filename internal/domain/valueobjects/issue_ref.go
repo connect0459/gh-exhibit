@@ -86,6 +86,14 @@ func (r IssueRef) Number() int {
 	return r.number
 }
 
+// AssetPath returns the relative path — from the rendered document's own
+// on-disk location — to a downloaded attachment named filename, per
+// ADR-002's {number}/assets/{filename} layout for referencing an issue's own
+// downloaded attachments from its rendered Markdown.
+func (r IssueRef) AssetPath(filename string) string {
+	return fmt.Sprintf("%d/assets/%s", r.number, filename)
+}
+
 // Equals reports whether r and other identify the same owner, repo, and
 // number. Owner and repo are compared case-insensitively
 // (strings.EqualFold), matching GitHub's own case-insensitive uniqueness
