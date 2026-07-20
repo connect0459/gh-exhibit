@@ -71,7 +71,7 @@ func buildReviewComment(raw json.RawMessage) (valueobjects.InlineReviewComment, 
 		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("review comment attribution: %w", err)
 	}
 	line, outdated := w.resolvedLine()
-	ctx, err := valueobjects.NewInlineContext(w.Path, line, w.DiffHunk, outdated)
+	ctx, err := valueobjects.NewInlineContext(w.Path, line, nil, w.DiffHunk, outdated)
 	if err != nil {
 		return valueobjects.InlineReviewComment{}, 0, 0, fmt.Errorf("review comment context: %w", err)
 	}
