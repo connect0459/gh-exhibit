@@ -16,7 +16,7 @@ type documentWriter struct {
 }
 
 // NewDocumentWriter builds a repositories.DocumentWriter that persists
-// rendered Markdown under baseDir, at issues/{repo}/{number}.md.
+// rendered Markdown under baseDir, at {repo}/{number}.md.
 func NewDocumentWriter(baseDir string) repositories.DocumentWriter {
 	return &documentWriter{baseDir: baseDir}
 }

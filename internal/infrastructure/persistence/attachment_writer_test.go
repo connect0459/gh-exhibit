@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestWriteAsset_WritesDataVerbatimUnderIssuesRepoNumberAssets(t *testing.T) {
+func TestWriteAsset_WritesDataVerbatimUnderRepoNumberAssets(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewAttachmentWriter(baseDir)
 	const data = "binary-ish content"
@@ -18,7 +18,7 @@ func TestWriteAsset_WritesDataVerbatimUnderIssuesRepoNumberAssets(t *testing.T) 
 		t.Fatalf("WriteAsset() error = %v", err)
 	}
 
-	got := readFile(t, filepath.Join(baseDir, "issues", "hello-world", "42", "assets", "abc-123.png"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "assets", "abc-123.png"))
 	if got != data {
 		t.Fatalf("WriteAsset() wrote %q, want %q", got, data)
 	}
@@ -33,8 +33,8 @@ func TestWriteAsset_OmitsOwnerFromThePath(t *testing.T) {
 		t.Fatalf("WriteAsset() error = %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42", "assets", "abc-123.png")); err != nil {
-		t.Fatalf("expected file at issues/hello-world/42/assets/abc-123.png, stat error = %v", err)
+	if _, err := os.Stat(filepath.Join(baseDir, "hello-world", "42", "assets", "abc-123.png")); err != nil {
+		t.Fatalf("expected file at hello-world/42/assets/abc-123.png, stat error = %v", err)
 	}
 }
 
@@ -48,12 +48,12 @@ func TestWriteAsset_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCancelle
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("WriteAsset() error = %v, want context.Canceled", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42", "assets", "abc-123.png")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42", "assets", "abc-123.png")); !os.IsNotExist(statErr) {
 		t.Fatalf("WriteAsset() wrote a file despite the cancelled context, stat error = %v", statErr)
 	}
 }
 
-func TestWriteFetchErrorLog_WritesLogVerbatimUnderIssuesRepoNumber(t *testing.T) {
+func TestWriteFetchErrorLog_WritesLogVerbatimUnderRepoNumber(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewAttachmentWriter(baseDir)
 	const log = "https://github.com/user-attachments/assets/abc: 404 not found\n"
@@ -63,7 +63,7 @@ func TestWriteFetchErrorLog_WritesLogVerbatimUnderIssuesRepoNumber(t *testing.T)
 		t.Fatalf("WriteFetchErrorLog() error = %v", err)
 	}
 
-	got := readFile(t, filepath.Join(baseDir, "issues", "hello-world", "42", "fetch-errors.log"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "fetch-errors.log"))
 	if got != log {
 		t.Fatalf("WriteFetchErrorLog() wrote %q, want %q", got, log)
 	}
@@ -81,7 +81,7 @@ func TestWriteFetchErrorLog_RemovesAnExistingLogWhenGivenAnEmptyLog(t *testing.T
 		t.Fatalf("WriteFetchErrorLog() error = %v, want a rerun with no failures to clear the stale log without error", err)
 	}
 
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42", "fetch-errors.log")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42", "fetch-errors.log")); !os.IsNotExist(statErr) {
 		t.Fatalf("fetch-errors.log still exists after WriteFetchErrorLog was given an empty log, stat error = %v", statErr)
 	}
 }
@@ -113,7 +113,7 @@ func TestWriteFetchErrorLog_DoesNothingWhenGivenAnEmptyLogAndNoExistingLogExists
 		t.Fatalf("WriteFetchErrorLog() error = %v, want no error when there was never a log to clear", err)
 	}
 
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42", "fetch-errors.log")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42", "fetch-errors.log")); !os.IsNotExist(statErr) {
 		t.Fatalf("WriteFetchErrorLog() created a file for an empty log, stat error = %v", statErr)
 	}
 }
@@ -128,7 +128,7 @@ func TestWriteFetchErrorLog_ReturnsContextErrorAndSkipsWriteWhenContextIsAlready
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("WriteFetchErrorLog() error = %v, want context.Canceled", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "issues", "hello-world", "42", "fetch-errors.log")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42", "fetch-errors.log")); !os.IsNotExist(statErr) {
 		t.Fatalf("WriteFetchErrorLog() wrote a file despite the cancelled context, stat error = %v", statErr)
 	}
 }

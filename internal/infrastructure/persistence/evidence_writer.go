@@ -21,8 +21,8 @@ type evidenceWriter struct {
 }
 
 // NewEvidenceWriter builds a repositories.EvidenceWriter that persists raw
-// evidence under baseDir, at issues/{repo}/{number}... (owner is
-// deliberately not part of the path).
+// evidence under baseDir, at {repo}/{number}... (owner is deliberately not
+// part of the path).
 func NewEvidenceWriter(baseDir string) repositories.EvidenceWriter {
 	return &evidenceWriter{baseDir: baseDir}
 }
@@ -71,7 +71,7 @@ func (w *evidenceWriter) WriteReviewComments(ctx context.Context, ref valueobjec
 // suffix, shared by evidenceWriter and documentWriter (owner is
 // deliberately not part of the path).
 func issuePath(baseDir string, ref valueobjects.IssueRef, suffix string) string {
-	return filepath.Join(baseDir, "issues", ref.Repo(), fmt.Sprintf("%d.%s", ref.Number(), suffix))
+	return filepath.Join(baseDir, ref.Repo(), fmt.Sprintf("%d.%s", ref.Number(), suffix))
 }
 
 // joinRawArray concatenates items into a JSON array by splicing their raw

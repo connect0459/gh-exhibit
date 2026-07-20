@@ -24,8 +24,8 @@ type attachmentWriter struct {
 
 // NewAttachmentWriter builds a repositories.AttachmentWriter that persists
 // fetched attachments and this run's failure log under baseDir, at
-// issues/{repo}/{number}/assets/{filename} and
-// issues/{repo}/{number}/fetch-errors.log respectively.
+// {repo}/{number}/assets/{filename} and {repo}/{number}/fetch-errors.log
+// respectively.
 func NewAttachmentWriter(baseDir string) repositories.AttachmentWriter {
 	return &attachmentWriter{baseDir: baseDir}
 }
@@ -61,5 +61,5 @@ func (w *attachmentWriter) WriteFetchErrorLog(ctx context.Context, ref valueobje
 // artifacts (owner is deliberately not part of the path, matching
 // issuePath's own precedent).
 func issueDir(baseDir string, ref valueobjects.IssueRef) string {
-	return filepath.Join(baseDir, "issues", ref.Repo(), strconv.Itoa(ref.Number()))
+	return filepath.Join(baseDir, ref.Repo(), strconv.Itoa(ref.Number()))
 }
