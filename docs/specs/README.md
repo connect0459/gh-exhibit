@@ -239,12 +239,14 @@ the attachment-fetch-failure path described above.
 
 Paginated timeline/review-comment fetches follow the `Link` response
 header's `rel="next"` relation, but only when its origin (scheme and host
-together) matches the origin the current page was actually fetched from; a
-`next` URL naming a different host, or the same host under a different
-scheme (an `https`-to-`http` downgrade), is refused with an error instead
-of followed. This guards against a compromised, misconfigured, or
-proxy-broken host (including a GitHub Enterprise Server host) redirecting
-gh-exhibit's next request somewhere else, or downgrading it to an
+together, compared case-insensitively — both are themselves
+case-insensitive) matches the origin the current page was actually fetched
+from; a `next` URL naming a different host, or the same host under a
+different scheme (an `https`-to-`http` downgrade), is refused with an
+error instead of followed. This guards against a compromised,
+misconfigured, or proxy-broken host (including a GitHub Enterprise Server
+host) redirecting gh-exhibit's next request somewhere else, or downgrading
+it to an
 unencrypted connection.
 
 ## Concurrency
