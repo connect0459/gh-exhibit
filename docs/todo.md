@@ -2469,3 +2469,66 @@ entry above:
   `CONTRIBUTING.md` only; verified via `go build ./...`, `go vet ./...`,
   `go test ./... -race -cover` (coverage figures unchanged), `gofmt -l .`,
   and `pre-commit run --all-files`.
+
+### Meta line hidden behind an HTML comment (2026-07-20)
+
+The user proposed changing the visible `meta:{...}` line to
+`{"meta":{...}}` (nesting it under its own key so the line is
+independently parseable JSON) and wrapping its `url` field in `<...>` so
+GitHub's Markdown preview would autolink it, then separately raised
+whether the whole line should instead be hidden as an HTML comment.
+Discussed and confirmed with the user on `feat/hidden-meta-line`:
+
+- **The three changes bundled into one proposal are independent axes,
+  separated before deciding**: (1) nesting the object under a `"meta"` key
+  for standalone JSON-parseability, (2) decorating `url` for Markdown
+  autolinking, (3) hiding the whole line as an HTML comment. Axis 2 was
+  rejected regardless of the other two: `url` is a `valueobjects.Url`,
+  validated once at construction so every downstream consumer can trust it
+  is a plain URI without re-parsing; embedding `<`/`>` in its JSON value
+  would break that guarantee and make `url` the only meta field carrying
+  rendering markup, inconsistent with `author`/`created`/`closed`/`merged`.
+  It is also moot once axis 3 hides the line from any preview.
+- **A collision risk initially raised against axis 3 (HTML comment) turned
+  out to rest on an incorrect recollection of the comment-termination
+  rule, corrected after the user tested it directly.** The claim was that
+  a repository name containing consecutive hyphens (`repoPattern` in
+  `issue_ref.go` allows this; `ownerPattern` does not) would prematurely
+  close an HTML comment via its URL, mirroring the previously-fixed
+  `diffFence` backtick-collision bug. The user tested a real double-hyphen
+  repository name directly and found the comment stayed intact. The actual
+  termination condition (both the HTML5 tokenizer and every renderer that
+  matters here) is the literal 3-character sequence `-->`, not any bare
+  `--`. None of `meta`'s current fields (GitHub-username-shaped `author`,
+  RFC 3339 timestamps, an enum `state`, or a validated `Url`) can contain a
+  literal `>`, so no meta value can produce that sequence — the collision
+  risk is effectively nil for this field set, and the objection was
+  withdrawn once corrected.
+- **Decided**: axis 1 (nest under `"meta"`) and axis 3 (hide as an HTML
+  comment) are both adopted; axis 2 (URL decoration) is dropped. The line
+  becomes `<!-- {"meta":{...}} -->`, anchored to the start of a line like
+  the token it replaces.
+- `internal/domain/valueobjects/render.go`'s `writeMetaLine` wraps its
+  `meta any` parameter in an anonymous `struct{ Meta any }` before
+  marshaling, then formats the result as `<!-- %s -->` instead of
+  `meta:%s`. This is the only production code change — every Tier 1 type's
+  own `Render()` method is unchanged, since the wrapping/formatting was
+  already centralized in this one shared helper.
+- Every existing byte-exact `Render()` test across all four Tier 1 types,
+  plus `Document`'s own multi-entry rendering tests, was updated to the new
+  expected line; no new test case was needed; the existing suite's field
+  and error-branch combinations already exercised every path this change
+  touches, confirmed by reading each updated assertion against
+  `writeMetaLine`'s new implementation before treating the suite as
+  sufficient. `TestWriteMetaLine_WrapsAMetaMarshalFailure` needed no change
+  — wrapping `meta` in an outer struct does not change the marshal-failure
+  branch, since the outer struct fails to marshal for the same reason its
+  formerly-bare `meta` value did.
+- `docs/specs/README.md`'s Markdown dialect section and its `Attribution`
+  description were updated to the new token and to state the `-->`
+  termination reasoning above, so the risk analysis isn't only preserved
+  in this file's own history.
+
+No coverage regression: `internal/domain/valueobjects` 95.9% unchanged.
+`go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
+`gofmt -l .`, and `pre-commit run` all pass.
