@@ -2632,3 +2632,58 @@ exception was made). `internal/application/services` 97.2% and
 `internal/presentation/cli` 98.8% unchanged. `go build ./...`,
 `go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
 `pre-commit run` all pass.
+
+### Local review: the `-->` safety argument was resting on the wrong invariant (2026-07-20)
+
+A local review of `feat/hidden-meta-line` before opening its PR found the
+`-->`-collision reasoning the two entries above (and `docs/specs/README.md`)
+had settled on was itself imprecise, addressed on the same branch:
+
+- **The claim "none of these lines' fields can contain a literal `>`" is
+  false for `InlineReviewComment`'s `path`.** `NewInlineContext` (in
+  `internal/domain/valueobjects/inline_context.go`) only rejects an empty
+  `path`; it has no character-set constraint at all. `path` is sourced
+  from a real git file path (via `internal/domain/services/classify.go`),
+  and git permits almost any byte in a path other than `NUL` and `/`, so a
+  contributor's PR could in principle introduce a path like
+  `src/foo-->bar.go`.
+- **What actually prevents the collision is `encoding/json.Marshal`'s own
+  default behavior, not any field's content**: verified directly —
+  `json.Marshal` of a struct containing a `>`-bearing string field never
+  emits a literal `>` in its output; it is escaped as part of
+  `encoding/json`'s documented default HTML-safety behavior (escaping
+  `<`, `>`, and `&`, disabled only via an explicit `json.Encoder` with that
+  behavior turned off — neither `writeMetaLine` nor `writeProvenanceLine`
+  does this, both using plain `json.Marshal`). The two entries above
+  attributed safety to the wrong layer: the previous, corrected claim about
+  `--` was already right that the termination condition is the literal
+  sequence `-->`, but its follow-up reasoning for why no field can produce
+  that sequence was itself unverified and, for `path`, false as stated —
+  it happened to still be safe, but for a different reason than written.
+- **`docs/specs/README.md`'s Markdown dialect section was rewritten** to
+  attribute the guarantee to `encoding/json.Marshal`'s escaping behavior,
+  name `path`'s lack of a character-set constraint explicitly as the
+  counterexample that makes the distinction matter (rather than asserting
+  the false premise it doesn't), and note the guarantee's actual
+  dependency: it holds only as long as `writeMetaLine`/`writeProvenanceLine`
+  keep going through `encoding/json.Marshal` with its default escaping.
+- **A new regression test locks in the real invariant**:
+  `TestInlineReviewComment_Render_EscapesAPathThatWouldOtherwiseCloseTheSurroundingHTMLComment`
+  renders an `InlineReviewComment` whose `path` contains a literal `-->`
+  and asserts the rendered output has it json-escaped, not left intact —
+  a test that would catch a future regression (e.g. switching to
+  `SetEscapeHTML(false)`, or hand-building the line via string
+  concatenation instead of `json.Marshal`) that the previous, imprecise
+  documentation would not have.
+- **Secondary finding, also fixed**: `writeProvenanceLine` (in
+  `document.go`) read `provenance.tool`/`.version`/`.commit` directly
+  instead of through `Provenance`'s own `Tool()`/`Version()`/`Commit()`
+  accessors — legal (same package) but inconsistent with this package's
+  own sibling convention (`render.go`'s `newAttributionMeta` goes through
+  `Attribution`'s accessors, not its fields, despite being in the same
+  package too). No behavior change; fixed to match.
+
+C0 unchanged: `internal/domain/valueobjects` 95.2% (the new test exercises
+an already-reachable path, adding no new branch). `go build ./...`,
+`go vet ./...`, `go test ./... -race -cover`, `gofmt -l .`, and
+`pre-commit run` all pass.
