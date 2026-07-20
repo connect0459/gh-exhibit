@@ -31,11 +31,11 @@ func NewAttachmentWriter(baseDir string) repositories.AttachmentWriter {
 }
 
 // WriteAsset implements repositories.AttachmentWriter.
-func (w *attachmentWriter) WriteAsset(ctx context.Context, ref valueobjects.IssueRef, filename string, data []byte) error {
+func (w *attachmentWriter) WriteAsset(ctx context.Context, ref valueobjects.IssueRef, filename valueobjects.AssetFilename, data []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return writeFile(filepath.Join(issueDir(w.baseDir, ref), "assets", filename), data)
+	return writeFile(filepath.Join(issueDir(w.baseDir, ref), "assets", filename.String()), data)
 }
 
 // WriteFetchErrorLog persists log verbatim, except an empty log removes any

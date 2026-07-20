@@ -6,14 +6,26 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
+
+func testAssetFilename(t *testing.T, filename string) valueobjects.AssetFilename {
+	t.Helper()
+
+	f, err := valueobjects.NewAssetFilename(filename)
+	if err != nil {
+		t.Fatalf("NewAssetFilename(%q) error = %v", filename, err)
+	}
+	return f
+}
 
 func TestWriteAsset_WritesDataVerbatimUnderRepoNumberAssets(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewAttachmentWriter(baseDir)
 	const data = "binary-ish content"
 
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), "abc-123.png", []byte(data))
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), testAssetFilename(t, "abc-123.png"), []byte(data))
 	if err != nil {
 		t.Fatalf("WriteAsset() error = %v", err)
 	}
@@ -28,7 +40,7 @@ func TestWriteAsset_OmitsOwnerFromThePath(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewAttachmentWriter(baseDir)
 
-	err := writer.WriteAsset(context.Background(), testIssueRef(t), "abc-123.png", []byte("data"))
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), testAssetFilename(t, "abc-123.png"), []byte("data"))
 	if err != nil {
 		t.Fatalf("WriteAsset() error = %v", err)
 	}
@@ -44,7 +56,7 @@ func TestWriteAsset_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCancelle
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := writer.WriteAsset(ctx, testIssueRef(t), "abc-123.png", []byte("data"))
+	err := writer.WriteAsset(ctx, testIssueRef(t), testAssetFilename(t, "abc-123.png"), []byte("data"))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("WriteAsset() error = %v, want context.Canceled", err)
 	}

@@ -120,14 +120,14 @@ type fakeAttachmentWriter struct {
 	logWriteCalled bool
 }
 
-func (f *fakeAttachmentWriter) WriteAsset(_ context.Context, _ valueobjects.IssueRef, filename string, data []byte) error {
+func (f *fakeAttachmentWriter) WriteAsset(_ context.Context, _ valueobjects.IssueRef, filename valueobjects.AssetFilename, data []byte) error {
 	if f.assetErr != nil {
 		return f.assetErr
 	}
 	if f.wroteAssets == nil {
 		f.wroteAssets = make(map[string][]byte)
 	}
-	f.wroteAssets[filename] = data
+	f.wroteAssets[filename.String()] = data
 	return nil
 }
 
