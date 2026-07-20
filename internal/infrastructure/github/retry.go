@@ -15,6 +15,9 @@ import (
 const (
 	maxRetryAttempts = 3
 	fixedBackoffBase = 1 * time.Second
+	// maxRetryAfterSeconds is the largest Retry-After value (in seconds) that
+	// converts to nanoseconds without overflowing time.Duration.
+	maxRetryAfterSeconds = int64(math.MaxInt64) / int64(time.Second)
 )
 
 // requester is the subset of *api.RESTClient's interface doWithRetry needs;
@@ -87,10 +90,6 @@ func retryDelay(err error, attempt int) (time.Duration, bool) {
 func isRateLimitResponse(h http.Header) bool {
 	return h.Get("Retry-After") != "" || h.Get("X-RateLimit-Remaining") == "0"
 }
-
-// maxRetryAfterSeconds is the largest Retry-After value (in seconds) that
-// converts to nanoseconds without overflowing time.Duration.
-const maxRetryAfterSeconds = int64(math.MaxInt64) / int64(time.Second)
 
 func retryAfterDelay(h http.Header) (time.Duration, bool) {
 	raw := h.Get("Retry-After")
