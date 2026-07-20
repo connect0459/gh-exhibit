@@ -213,6 +213,18 @@ func TestParseArgs_RejectsARepoFlagImmediatelyFollowedByAnAttachedFlag(t *testin
 	}
 }
 
+// A value flag immediately followed by "--" is rejected the same as one
+// followed by any other flag-shaped token: "--" conventionally means "no
+// more flags follow", so treating it as a flag's literal value would be
+// the same silent-adjacency misparse this issue targets, just with the
+// flag terminator instead of another named flag.
+func TestParseArgs_RejectsARepoFlagImmediatelyFollowedByTheFlagTerminator(t *testing.T) {
+	_, err := ParseArgs([]string{"--repo", "--", "123"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since --repo has no value before the flag terminator")
+	}
+}
+
 func TestParseArgs_AcceptsTheVersionFlagWithoutAPositionalArgument(t *testing.T) {
 	got, err := ParseArgs([]string{"--version"})
 	if err != nil {
