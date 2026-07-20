@@ -43,7 +43,10 @@ func ParseArgs(args []string) (Args, error) {
 	fs.StringVar(output, "o", ".", "shorthand for --output")
 	version := fs.Bool("version", false, "print the version and exit")
 
-	flagArgs, positional := splitFlagsAndPositional(args)
+	flagArgs, positional, err := splitFlagsAndPositional(args)
+	if err != nil {
+		return Args{}, fmt.Errorf("parse flags: %w", err)
+	}
 
 	if err := fs.Parse(flagArgs); err != nil {
 		return Args{}, fmt.Errorf("parse flags: %w", err)
@@ -78,7 +81,14 @@ var valueFlags = map[string]bool{"repo": true, "output": true, "o": true}
 // (e.g. "-1") is treated as positional rather than an unrecognized flag,
 // since gh-exhibit's own numbers are the only thing that would ever look
 // like that on the command line.
-func splitFlagsAndPositional(args []string) (flagArgs, positional []string) {
+//
+// It returns an error, rather than deferring to flag.FlagSet.Parse, when a
+// value-taking flag (-o/--output/--repo) is not immediately followed by a
+// usable value: flag.FlagSet.Parse would otherwise unconditionally consume
+// whatever token comes next — including one shaped like another flag — and
+// silently misassign it as the value instead of reporting a missing
+// argument.
+func splitFlagsAndPositional(args []string) (flagArgs, positional []string, err error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 
@@ -87,12 +97,12 @@ func splitFlagsAndPositional(args []string) (flagArgs, positional []string) {
 			break
 		}
 
-		if !strings.HasPrefix(a, "-") || a == "-" || looksLikeANegativeNumberList(a) {
+		if !isFlagShaped(a) {
 			positional = append(positional, a)
 			continue
 		}
 
-		name, _, hasInlineValue := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		name, hasInlineValue := flagNameAndInlineValue(a)
 		if hasInlineValue || !valueFlags[name] {
 			// Either the value is already attached ("--repo=x"), or this is
 			// an unrecognized flag (including -h/--help) whose arity we
@@ -102,14 +112,34 @@ func splitFlagsAndPositional(args []string) (flagArgs, positional []string) {
 			continue
 		}
 
-		flagArgs = append(flagArgs, a)
-		if i+1 < len(args) {
-			i++
-			flagArgs = append(flagArgs, args[i])
+		if i+1 >= len(args) || isFlagShaped(args[i+1]) {
+			return nil, nil, fmt.Errorf("flag needs an argument: -%s", name)
 		}
+
+		i++
+		flagArgs = append(flagArgs, a, args[i])
 	}
 
-	return flagArgs, positional
+	return flagArgs, positional, nil
+}
+
+// isFlagShaped reports whether s should be scanned as a flag token rather
+// than gh-exhibit's positional argument.
+func isFlagShaped(s string) bool {
+	return strings.HasPrefix(s, "-") && s != "-" && !looksLikeANegativeNumberList(s)
+}
+
+// flagNameAndInlineValue extracts a flag token's name and reports whether it
+// carries an attached "=value". It strips at most two leading dashes, so a
+// token with three or more (e.g. "---repo") does not collapse onto a
+// recognized flag name and is left for flag.Parse's own rejection.
+func flagNameAndInlineValue(a string) (name string, hasInlineValue bool) {
+	trimmed := strings.TrimPrefix(a, "--")
+	if trimmed == a {
+		trimmed = strings.TrimPrefix(a, "-")
+	}
+	name, _, hasInlineValue = strings.Cut(trimmed, "=")
+	return name, hasInlineValue
 }
 
 // looksLikeANegativeNumberList reports whether s is shaped like gh-exhibit's

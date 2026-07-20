@@ -199,6 +199,20 @@ func TestParseArgs_ReturnsAnErrorWhenAValueFlagIsTheLastToken(t *testing.T) {
 	}
 }
 
+func TestParseArgs_RejectsAShorthandOutputFlagImmediatelyFollowedByAnAttachedFlag(t *testing.T) {
+	_, err := ParseArgs([]string{"-o", "--repo=x", "123"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since -o has no value before the next flag")
+	}
+}
+
+func TestParseArgs_RejectsARepoFlagImmediatelyFollowedByAnAttachedFlag(t *testing.T) {
+	_, err := ParseArgs([]string{"--repo", "--output=custom", "123"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since --repo has no value before the next flag")
+	}
+}
+
 func TestParseArgs_AcceptsTheVersionFlagWithoutAPositionalArgument(t *testing.T) {
 	got, err := ParseArgs([]string{"--version"})
 	if err != nil {
