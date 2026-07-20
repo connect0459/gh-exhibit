@@ -88,7 +88,7 @@ func writeProvenanceLine(w io.Writer, provenance Provenance) error {
 		Tool    string `json:"tool"`
 		Version string `json:"version"`
 		Commit  string `json:"commit"`
-	}{Tool: provenance.tool, Version: provenance.version, Commit: provenance.commit})
+	}{Tool: provenance.Tool(), Version: provenance.Version(), Commit: provenance.Commit()})
 	if err != nil {
 		return fmt.Errorf("marshal provenance: %w", err)
 	}
