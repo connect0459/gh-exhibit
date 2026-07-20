@@ -50,7 +50,7 @@ func run() int {
 		return 2
 	}
 
-	exporter, err := registry.NewExportService(registry.Config{Host: repo.Host, OutputDir: args.OutputDir})
+	exporter, err := registry.NewExportService(registry.Config{Host: repo.Host, OutputDir: args.OutputDir, Version: version, Commit: commit})
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		return 2

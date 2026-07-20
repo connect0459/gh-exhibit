@@ -10,9 +10,14 @@ import (
 	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/connect0459/gh-exhibit/internal/application/services"
+	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 	"github.com/connect0459/gh-exhibit/internal/infrastructure/github"
 	"github.com/connect0459/gh-exhibit/internal/infrastructure/persistence"
 )
+
+// toolName identifies gh-exhibit itself in every Document's provenance
+// line, distinguishing its own output from a similar tool's.
+const toolName = "connect0459/gh-exhibit"
 
 // Config holds NewExportService's parameters. A struct rather than two
 // positional strings, deliberately: Host and OutputDir are both plain
@@ -32,6 +37,11 @@ type Config struct {
 	// writers persist raw evidence, rendered Markdown, and downloaded
 	// attachments under.
 	OutputDir string
+
+	// Version and Commit identify the running gh-exhibit build, recorded
+	// in every Document's provenance line alongside toolName.
+	Version string
+	Commit  string
 }
 
 // NewExportService builds an ExportService backed by a go-gh REST/HTTP
@@ -48,9 +58,14 @@ func NewExportService(cfg Config) (*services.ExportService, error) {
 		return nil, fmt.Errorf("could not create the GitHub attachment client: %w", err)
 	}
 
+	provenance, err := valueobjects.NewProvenance(toolName, cfg.Version, cfg.Commit)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the export provenance: %w", err)
+	}
+
 	writer := persistence.NewEvidenceWriter(cfg.OutputDir)
 	docs := persistence.NewDocumentWriter(cfg.OutputDir)
 	assets := persistence.NewAttachmentWriter(cfg.OutputDir)
 
-	return services.NewExportService(fetcher, writer, docs, attachments, assets, cfg.Host), nil
+	return services.NewExportService(fetcher, writer, docs, attachments, assets, cfg.Host, provenance), nil
 }

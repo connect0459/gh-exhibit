@@ -146,6 +146,15 @@ func testRef(t *testing.T) valueobjects.IssueRef {
 	return ref
 }
 
+func testProvenance(t *testing.T) valueobjects.Provenance {
+	t.Helper()
+	p, err := valueobjects.NewProvenance("connect0459/gh-exhibit", "v0.1.0", "abc123")
+	if err != nil {
+		t.Fatalf("NewProvenance() error = %v", err)
+	}
+	return p
+}
+
 const plainIssueJSON = `{
 	"title": "Something is broken",
 	"body": "Steps to reproduce...",
@@ -181,7 +190,7 @@ func TestExportService_Export_WritesRawEvidenceAndRenderedDocumentForAPlainIssue
 	}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	skipped, err := svc.Export(context.Background(), testRef(t))
 	if err != nil {
@@ -234,7 +243,7 @@ func TestExportService_Export_AlsoFetchesAndPersistsPullRequestEvidence(t *testi
 	}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if err != nil {
@@ -298,7 +307,7 @@ func TestExportService_Export_FetchesThePullRequestChainAndTheTimelineConcurrent
 	}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(fetcher, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(fetcher, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 	ref := testRef(t)
 
 	done := make(chan error, 1)
@@ -350,7 +359,7 @@ func TestExportService_Export_ReturnsPromptlyWhenThePullRequestChainFailsWhileTi
 	}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(fetcher, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(fetcher, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	done := make(chan error, 1)
 	go func() {
@@ -373,7 +382,7 @@ func TestExportService_Export_PropagatesAnErrorWhenFetchIssueFails(t *testing.T)
 	repo := &fakeEvidenceFetcher{issueErr: wantErr}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -399,7 +408,7 @@ func TestExportService_Export_WritesNothingWhenBuildBodyFailsAfterAllFetchesSucc
 	repo := &fakeEvidenceFetcher{issue: raw}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if err == nil {
@@ -415,7 +424,7 @@ func TestExportService_Export_PropagatesAnErrorWhenWriteIssueFails(t *testing.T)
 	repo := &fakeEvidenceFetcher{issue: json.RawMessage(plainIssueJSON)}
 	writer := &fakeEvidenceWriter{issueErr: wantErr}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -431,7 +440,7 @@ func TestExportService_Export_PropagatesAnErrorWhenFetchPullRequestFails(t *test
 	}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -450,7 +459,7 @@ func TestExportService_Export_PropagatesAnErrorWhenWritePullRequestFails(t *test
 	}
 	writer := &fakeEvidenceWriter{pullRequestErr: wantErr}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -473,7 +482,7 @@ func TestExportService_Export_PropagatesAnErrorWhenFetchReviewCommentsFails(t *t
 	}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -489,7 +498,7 @@ func TestExportService_Export_PropagatesAnErrorWhenWriteReviewCommentsFails(t *t
 	}
 	writer := &fakeEvidenceWriter{reviewCommentsErr: wantErr}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -502,7 +511,7 @@ func TestExportService_Export_PropagatesAnErrorWhenWriteTimelineFails(t *testing
 	repo := &fakeEvidenceFetcher{issue: json.RawMessage(plainIssueJSON)}
 	writer := &fakeEvidenceWriter{timelineErr: wantErr}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -521,7 +530,7 @@ func TestExportService_Export_PropagatesAnErrorWhenFetchTimelineFails(t *testing
 	}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -537,7 +546,7 @@ func TestExportService_Export_PropagatesAnErrorWhenWriteDocumentFails(t *testing
 	repo := &fakeEvidenceFetcher{issue: json.RawMessage(plainIssueJSON)}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{err: wantErr}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -555,7 +564,7 @@ func TestExportService_Export_ReturnsSkipNotesFromClassificationWithoutFailingTh
 	}
 	writer := &fakeEvidenceWriter{}
 	docs := &fakeDocumentWriter{}
-	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com")
+	svc := NewExportService(repo, writer, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
 
 	skipped, err := svc.Export(context.Background(), testRef(t))
 	if err != nil {
@@ -586,7 +595,7 @@ func TestExportService_Export_DownloadsAnAttachmentReferencedInTheRenderedDocume
 	docs := &fakeDocumentWriter{}
 	attachments := &fakeAttachmentFetcher{data: []byte("png-bytes"), contentType: "image/png"}
 	assets := &fakeAttachmentWriter{}
-	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com")
+	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if err != nil {
@@ -631,7 +640,7 @@ func TestExportService_Export_DownloadsAnAttachmentOnAGitHubEnterpriseServerHost
 	docs := &fakeDocumentWriter{}
 	attachments := &fakeAttachmentFetcher{data: []byte("png-bytes"), contentType: "image/png"}
 	assets := &fakeAttachmentWriter{}
-	svc := NewExportService(repo, writer, docs, attachments, assets, "github.example.com")
+	svc := NewExportService(repo, writer, docs, attachments, assets, "github.example.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if err != nil {
@@ -652,7 +661,7 @@ func TestExportService_Export_ReplacesAFailedAttachmentFetchWithAPlaceholderAndP
 	docs := &fakeDocumentWriter{}
 	attachments := &fakeAttachmentFetcher{err: errors.New("404 not found")}
 	assets := &fakeAttachmentWriter{}
-	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com")
+	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if err != nil {
@@ -685,7 +694,7 @@ func TestExportService_Export_PropagatesAnErrorWhenWriteAssetFails(t *testing.T)
 	docs := &fakeDocumentWriter{}
 	attachments := &fakeAttachmentFetcher{data: []byte("png-bytes"), contentType: "image/png"}
 	assets := &fakeAttachmentWriter{assetErr: wantErr}
-	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com")
+	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -706,7 +715,7 @@ func TestExportService_Export_PropagatesAnErrorWhenWriteFetchErrorLogFails(t *te
 	docs := &fakeDocumentWriter{}
 	attachments := &fakeAttachmentFetcher{err: errors.New("404 not found")}
 	assets := &fakeAttachmentWriter{logErr: wantErr}
-	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com")
+	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, wantErr) {
@@ -723,7 +732,7 @@ func TestExportService_Export_DoesNotFetchAnyAttachmentWhenTheRenderedDocumentRe
 	docs := &fakeDocumentWriter{}
 	attachments := &fakeAttachmentFetcher{}
 	assets := &fakeAttachmentWriter{}
-	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com")
+	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if err != nil {
@@ -755,7 +764,7 @@ func TestExportService_Export_DownloadsEveryAttachmentWhenTheRenderedDocumentRef
 	docs := &fakeDocumentWriter{}
 	attachments := &fakeAttachmentFetcher{data: []byte("bytes"), contentType: "image/png"}
 	assets := &fakeAttachmentWriter{}
-	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com")
+	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if err != nil {
@@ -782,7 +791,7 @@ func TestExportService_Export_AbortsWhenAnAttachmentFetchIsCancelled(t *testing.
 	docs := &fakeDocumentWriter{}
 	attachments := &fakeAttachmentFetcher{err: context.Canceled}
 	assets := &fakeAttachmentWriter{}
-	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com")
+	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, context.Canceled) {
@@ -808,7 +817,7 @@ func TestExportService_Export_AbortsWhenAnAttachmentFetchExceedsItsDeadline(t *t
 	docs := &fakeDocumentWriter{}
 	attachments := &fakeAttachmentFetcher{err: context.DeadlineExceeded}
 	assets := &fakeAttachmentWriter{}
-	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com")
+	svc := NewExportService(repo, writer, docs, attachments, assets, "github.com", testProvenance(t))
 
 	_, err := svc.Export(context.Background(), testRef(t))
 	if !errors.Is(err, context.DeadlineExceeded) {
