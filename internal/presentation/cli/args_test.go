@@ -240,6 +240,41 @@ func TestParseArgs_WrapsFlagErrHelpForTheHelpFlag(t *testing.T) {
 	}
 }
 
+// This targets splitFlagsAndPositional directly rather than ParseArgs
+// because a triple-dash token is always rejected by flag.FlagSet.Parse's
+// own "bad flag syntax" check before it would ever try to consume a value
+// for it — so ParseArgs's returned error is identical whether or not the
+// pre-scanner over-consumes the next token. The over-consumption is only
+// observable in what the pre-scanner itself classifies as positional.
+func TestSplitFlagsAndPositional_DoesNotConsumeTheNextTokenForAThreeDashFlag(t *testing.T) {
+	flagArgs, positional, err := splitFlagsAndPositional([]string{"123", "---repo", "456"})
+	if err != nil {
+		t.Fatalf("splitFlagsAndPositional() error = %v", err)
+	}
+
+	wantPositional := []string{"123", "456"}
+	if !equalStrings(positional, wantPositional) {
+		t.Errorf("positional = %v, want %v", positional, wantPositional)
+	}
+
+	wantFlagArgs := []string{"---repo"}
+	if !equalStrings(flagArgs, wantFlagArgs) {
+		t.Errorf("flagArgs = %v, want %v", flagArgs, wantFlagArgs)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func equalInts(a, b []int) bool {
 	if len(a) != len(b) {
 		return false
