@@ -46,7 +46,7 @@ func (r PullRequestReview) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta
 		State string `json:"state"`
-		URL   string `json:"url"`
+		URL   Url    `json:"url"`
 	}{
 		attributionMeta: newAttributionMeta(r.attribution),
 		State:           r.state.String(),

@@ -1,6 +1,10 @@
 package services
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
+)
 
 // Resolution is the outcome of attempting to fetch a single attachment URL:
 // either the local path it was downloaded to, or a failure reason. Success
@@ -10,9 +14,11 @@ import "fmt"
 // treat a failed fetch as a successful one, dropping the attachment
 // reference instead of emitting ADR-002's placeholder. A zero Resolution is
 // never constructed directly by a caller outside this package — use
-// Downloaded or FetchFailed.
+// Downloaded or FetchFailed. url is a valueobjects.Url, not a bare string:
+// every caller already holds one (an already-fetched Attachment's own URL),
+// so Resolution carries that proof forward instead of re-validating it.
 type Resolution struct {
-	url       string
+	url       valueobjects.Url
 	localPath string
 	reason    string
 	succeeded bool
@@ -21,14 +27,14 @@ type Resolution struct {
 // Downloaded builds a Resolution for a successfully fetched attachment at
 // url, identified by the path (relative to the rendered Markdown file, per
 // ADR-002's assets/ layout) it was written to.
-func Downloaded(url, localPath string) Resolution {
+func Downloaded(url valueobjects.Url, localPath string) Resolution {
 	return Resolution{url: url, localPath: localPath, succeeded: true}
 }
 
 // FetchFailed builds a Resolution for an attachment at url that could not
 // be fetched, carrying reason for the placeholder Rewrite substitutes in
 // its place (ADR-002: skip, continue, note the original URL and why).
-func FetchFailed(url, reason string) Resolution {
+func FetchFailed(url valueobjects.Url, reason string) Resolution {
 	return Resolution{url: url, reason: reason}
 }
 

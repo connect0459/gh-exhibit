@@ -15,7 +15,7 @@ func Rewrite(markdown []byte, resolutions []Resolution) []byte {
 
 	pairs := make([]string, 0, len(resolutions)*2)
 	for _, res := range resolutions {
-		pairs = append(pairs, res.url, res.Substitute())
+		pairs = append(pairs, res.url.String(), res.Substitute())
 	}
 
 	return []byte(strings.NewReplacer(pairs...).Replace(string(markdown)))

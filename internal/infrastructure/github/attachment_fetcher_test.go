@@ -12,6 +12,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/connect0459/gh-exhibit/internal/domain/repositories"
+	"github.com/connect0459/gh-exhibit/internal/domain/services"
 )
 
 func newTestAttachmentFetcher(t *testing.T, server *httptest.Server) repositories.AttachmentFetcher {
@@ -33,6 +34,16 @@ func newTestAttachmentFetcher(t *testing.T, server *httptest.Server) repositorie
 	return fetcher
 }
 
+func newTestAttachment(t *testing.T, url string) services.Attachment {
+	t.Helper()
+
+	attachment, err := services.NewAttachment(url)
+	if err != nil {
+		t.Fatalf("NewAttachment(%q) error = %v", url, err)
+	}
+	return attachment
+}
+
 func TestFetch_ReturnsResponseBodyAndContentTypeVerbatim(t *testing.T) {
 	const body = "not-actually-a-png"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +56,8 @@ func TestFetch_ReturnsResponseBodyAndContentTypeVerbatim(t *testing.T) {
 	defer server.Close()
 
 	fetcher := newTestAttachmentFetcher(t, server)
-	data, contentType, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
+	attachment := newTestAttachment(t, "http://github.localhost/user-attachments/assets/abc-123")
+	data, contentType, err := fetcher.Fetch(context.Background(), attachment)
 	if err != nil {
 		t.Fatalf("Fetch() error = %v", err)
 	}
@@ -66,7 +78,8 @@ func TestFetch_SendsAuthorizationHeaderFromTheConfiguredToken(t *testing.T) {
 	defer server.Close()
 
 	fetcher := newTestAttachmentFetcher(t, server)
-	if _, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123"); err != nil {
+	attachment := newTestAttachment(t, "http://github.localhost/user-attachments/assets/abc-123")
+	if _, _, err := fetcher.Fetch(context.Background(), attachment); err != nil {
 		t.Fatalf("Fetch() error = %v", err)
 	}
 
@@ -82,7 +95,8 @@ func TestFetch_ReturnsAnErrorForANonSuccessStatusCode(t *testing.T) {
 	defer server.Close()
 
 	fetcher := newTestAttachmentFetcher(t, server)
-	_, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/missing")
+	attachment := newTestAttachment(t, "http://github.localhost/user-attachments/assets/missing")
+	_, _, err := fetcher.Fetch(context.Background(), attachment)
 	if err == nil {
 		t.Fatal("Fetch() error = nil, want an error for a 404 response")
 	}
@@ -97,7 +111,8 @@ func TestFetch_ReturnsAnErrorWhenTheResponseBodyExceedsTheSizeLimit(t *testing.T
 	fetcher := newTestAttachmentFetcher(t, server).(*attachmentFetcher)
 	fetcher.maxBytes = 5
 
-	_, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
+	attachment := newTestAttachment(t, "http://github.localhost/user-attachments/assets/abc-123")
+	_, _, err := fetcher.Fetch(context.Background(), attachment)
 	if err == nil {
 		t.Fatal("Fetch() error = nil, want an error for a response body exceeding the size limit")
 	}
@@ -115,7 +130,8 @@ func TestFetch_AcceptsAResponseBodyExactlyAtTheSizeLimit(t *testing.T) {
 	fetcher := newTestAttachmentFetcher(t, server).(*attachmentFetcher)
 	fetcher.maxBytes = 5
 
-	data, _, err := fetcher.Fetch(context.Background(), "http://github.localhost/user-attachments/assets/abc-123")
+	attachment := newTestAttachment(t, "http://github.localhost/user-attachments/assets/abc-123")
+	data, _, err := fetcher.Fetch(context.Background(), attachment)
 	if err != nil {
 		t.Fatalf("Fetch() error = %v, want nil for a response body exactly at the size limit", err)
 	}
@@ -134,7 +150,8 @@ func TestFetch_ReturnsContextErrorWhenContextIsAlreadyCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, err := fetcher.Fetch(ctx, "http://github.localhost/user-attachments/assets/abc-123")
+	attachment := newTestAttachment(t, "http://github.localhost/user-attachments/assets/abc-123")
+	_, _, err := fetcher.Fetch(ctx, attachment)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Fetch() error = %v, want context.Canceled", err)
 	}

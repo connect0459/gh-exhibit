@@ -10,7 +10,7 @@ func TestRewrite_SubstitutesADownloadedURLWithItsLocalPath(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte("![alt](" + url + ")")
 	resolutions := []services.Resolution{
-		services.Downloaded(url, "./5/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f.png"),
+		mustDownloaded(t, url, "./5/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f.png"),
 	}
 
 	got := services.Rewrite(markdown, resolutions)
@@ -25,7 +25,7 @@ func TestRewrite_SubstitutesAFailedURLWithAPlaceholderNotingTheReason(t *testing
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte("![alt](" + url + ")")
 	resolutions := []services.Resolution{
-		services.FetchFailed(url, "404 Not Found"),
+		mustFetchFailed(t, url, "404 Not Found"),
 	}
 
 	got := services.Rewrite(markdown, resolutions)
@@ -51,7 +51,7 @@ func TestRewrite_ReplacesEveryOccurrenceOfARepeatedURL(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte(url + " " + url)
 	resolutions := []services.Resolution{
-		services.Downloaded(url, "./5/assets/x.png"),
+		mustDownloaded(t, url, "./5/assets/x.png"),
 	}
 
 	got := services.Rewrite(markdown, resolutions)
@@ -66,7 +66,7 @@ func TestRewrite_DistinguishesAFailedFetchWithAnEmptyReasonFromASuccess(t *testi
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	markdown := []byte("![alt](" + url + ")")
 	resolutions := []services.Resolution{
-		services.FetchFailed(url, ""),
+		mustFetchFailed(t, url, ""),
 	}
 
 	got := services.Rewrite(markdown, resolutions)
@@ -82,8 +82,8 @@ func TestRewrite_ResolvesMultipleDistinctURLsInASinglePass(t *testing.T) {
 	second := "https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000002"
 	markdown := []byte(first + " " + second)
 	resolutions := []services.Resolution{
-		services.Downloaded(first, "./5/assets/a.png"),
-		services.FetchFailed(second, "timeout"),
+		mustDownloaded(t, first, "./5/assets/a.png"),
+		mustFetchFailed(t, second, "timeout"),
 	}
 
 	got := services.Rewrite(markdown, resolutions)

@@ -2185,3 +2185,157 @@ this entry itself was not part of that PR, see below):
 C0 unchanged: `internal/domain/services` 99.3%, `internal/application/
 services` 97.2%. `go build ./...`, `go vet ./...`, `go test ./... -race
 -cover`, and `gofmt -l .` all pass.
+
+### Attachment URL as a value object, not a primitive string (2026-07-20)
+
+With every checklist item above (including the `Resolution`-owns-its-url
+follow-up) merged, the user asked whether any remaining `url string` (or
+similar primitive) crossing the domain/application/infrastructure layers
+could become a Value Object for stronger type-level guarantees. A survey
+of `internal/domain/{valueobjects,services,repositories}`,
+`internal/application/services`, and `internal/infrastructure/{github,
+persistence}` found several bare-`string` domain concepts (attachment URL
+at the `AttachmentFetcher` port, `NewAttachment`/`Resolution`'s own
+un-validated `url`, `Attribution.url`, `filename`, `contentType`,
+`InlineContext.path`, `ExportService.host`), ranked by how concrete the
+invariant gap actually was rather than by how many places a `string` could
+theoretically become a type. Three were confirmed with the user and fixed
+on `refactor/attachment-url-invariants`; the rest were judged either
+already covered or not worth their own type given no invariant a new type
+would actually enforce:
+
+- **`repositories.AttachmentFetcher.Fetch` took a bare `url string` even
+  though `resolveAttachments` already held a validated `services.Attachment`
+  for every URL it fetched** — the call site unwrapped it via `a.URL()`
+  just to cross the port boundary, then the infra implementation never used
+  it as anything but a string again. `Fetch` now takes `services.Attachment`
+  directly, removing that round trip; `internal/infrastructure/github`'s
+  implementation extracts `.URL()` internally instead.
+- **`NewAttachment(url string)` had no validation**, unlike
+  `NewAttribution`/`NewIssueRef`/`NewInlineContext`, which all reject empty
+  input at construction. Now returns `(Attachment, error)`. `Detect`'s own
+  regex match can never actually be empty, so the new error branch is
+  unreachable through that path specifically — kept anyway as the same
+  defensive skip-and-continue this project already applies to other
+  value-object invariants (e.g. the sixth review round's `subject_type:
+  "file"` fix), rather than leaving a public constructor with no invariant
+  for some future caller that doesn't go through `Detect`.
+- **`Resolution`'s `Downloaded`/`FetchFailed` accepted an empty `url`**
+  with no check at all, the one gap left after the `Resolution`-owns-its-
+  url follow-up above. Both now return `(Resolution, error)`;
+  `export_service.go`'s `resolveAttachments` propagates a construction
+  failure like its other defensive fetch-loop errors (unreachable in
+  practice for the same reason as `NewAttachment`'s: every caller already
+  passes an `Attachment`-derived, non-empty URL). **Superseded by the next
+  entry below**: a later round in this same PR replaced this non-empty
+  check with `valueobjects.Url` itself, and `Downloaded`/`FetchFailed` no
+  longer return an error at all — this bullet describes this round's own
+  point-in-time design, not the PR's final state.
+- **Checked and found already covered**: `Attribution.url` was initially
+  flagged by the same survey, but `NewAttribution` already rejects an empty
+  `url` (present since the domain layer's original implementation) — no
+  change needed there; the survey's premise was stale on this one point.
+  **Reversed by the next entry below**: a later round in this same PR
+  found this conclusion itself premature and changed `Attribution.url` to
+  `valueobjects.Url` after all — this bullet describes this round's own
+  point-in-time conclusion, not the PR's final state.
+- **Considered and not pursued**: `filename`/`contentType` staying as bare
+  strings through `Attachment.Filename`/`AttachmentFetcher`'s return value;
+  `InlineContext.path`'s shape (only used for rendering, never filesystem
+  access); `ExportService.host`. None of these has a concrete invariant a
+  new type would enforce beyond what already holds today, unlike the three
+  fixed above, each of which either removed an actual round-trip or closed
+  a real (if currently unreached) validation gap shared with this
+  package's other value objects.
+- Red/Green TDD per concern, one commit each: test files were updated to
+  the new signatures first (confirmed failing to compile), then each
+  production change followed. `newTestAttachment`/`mustDownloaded`/
+  `mustFetchFailed` test helpers replace direct constructor calls now that
+  each can fail, mirroring `newAttribution`'s own precedent.
+
+C0 after this round: `internal/domain/services` 98.7% (down slightly from
+99.3% — the new defensive, structurally-unreachable error branches in
+`Detect`/`resolveAttachments` are the only new gaps, the same
+"defensive, not meaningfully testable" shape as this project's other
+accepted gaps, not a new kind of one). `internal/application/services`
+95.7% (down from 97.2%, same reason). No behavior change and no on-disk
+output layout change. `go build ./...`, `go vet ./...`, `go test ./...
+-race -cover`, and `gofmt -l .` all pass.
+
+### valueobjects.Url introduced, closing the previous round's own admitted gap (2026-07-20)
+
+A local review of the round above pushed back on two points, both
+addressed on the same `refactor/attachment-url-invariants` branch:
+
+- **Object-selection critique from an even earlier round no longer
+  applies.** That critique held that a `Url` type driven only by "reject
+  an empty string" was arbitrarily scoped, since `title`/`author`/`path`/
+  `owner`/`repo` have the same duplication. This round's actual proposal
+  shares "is this string a parseable URL" — a semantics closed to
+  url-shaped fields only — so the objection's premise no longer holds.
+- **"Parse responsibility" was still hollow as stated.** `net/url.Parse`
+  is permissive enough that `url.Parse("not-a-url")` and
+  `url.Parse("just some text")` both return a nil error — verified
+  directly, not assumed. A constructor that only checks `Parse`'s error
+  rejects almost nothing beyond what a bare non-empty check already
+  rejects; asserting "this is a URL" requires the constructor to also
+  check `IsAbs()`, an allowed scheme (`http`/`https`), and a non-empty
+  host.
+- **The reviewer's sharpest point**: introducing `Url` mainly to
+  strengthen `Attachment`'s own validation is weak, since `Detect`'s
+  `urlPattern` regex already enforces scheme/host/path shape more tightly
+  than a generic `Url` type would — wrapping an already-regex-matched
+  string in `Url` is a redundant second check there. The real payoff is
+  `Resolution`: it received `r.attachment.URL()` — an already-validated
+  URL — as a bare string, so the previous round's non-empty check on
+  `Downloaded`/`FetchFailed` was structurally unreachable and had no
+  better option available as long as `url` stayed a plain `string`. Once
+  `Attachment.URL()` returns `Url`, `Resolution` can carry that same
+  already-checked value forward and drop its own validation and error
+  return entirely (Parse, don't validate — validate once, carry proof in
+  the type, never re-check).
+- Confirmed with the user to apply `Url` uniformly to `Attribution.url`
+  too, not only `Attachment`/`Resolution`: `Attribution.URL()` returning a
+  bare `string` while `Attachment.URL()` returns `Url` would leave the
+  same "already validated, then thrown away" gap at a different boundary
+  (rendering, not domain-to-domain handoff) — any future caller wanting
+  the structured value would have to reparse a string this package had
+  already validated once. Verified this carries no behavioral
+  incompatibility first: every `NewAttribution` call site in production
+  and tests already passes an absolute `https://github.com/...` URL, so
+  the stronger check rejects nothing that previously succeeded.
+- `internal/domain/valueobjects.Url` (new): `NewUrl(raw string) (Url,
+  error)` validates via `url.Parse` plus the `IsAbs`/scheme/host checks
+  above. `String()`/`Scheme()`/`Host()`/`Path()`/`Equals()`.
+  `MarshalText()` renders the original raw string, so a `Url`-typed
+  struct field marshals to JSON identically to a plain `string` field —
+  verified directly against `json.Marshal` on an equivalent string, not
+  assumed, since ADR-001's `meta:{...}` line requires byte-exact output.
+- `Attachment.url`/`Attribution.url`/`Resolution.url` all changed from
+  `string` to `Url`. `Attachment.Filename` now derives its id from the
+  `Url`'s own `Path()` rather than treating the whole raw string as a
+  path (same result, more precise about which component is meant).
+  `Downloaded`/`FetchFailed` no longer return an error at all — an
+  invalid `Resolution.url` is no longer representable. The four Tier 1
+  types' meta structs (`Body`/`IssueComment`/`InlineReviewComment`/
+  `PullRequestReview`) change their `URL` field type from `string` to
+  `Url`; every existing byte-exact rendering test passed unchanged,
+  serving as this change's own regression check.
+- Red/Green TDD, one commit per type (`Url` itself, then `Attachment`,
+  then `Resolution`, then `Attribution`), each left the tree building and
+  green before the next commit — `Attachment`'s commit temporarily added
+  an explicit `.String()` at its downstream call sites as a compatibility
+  bridge, removed once `Resolution`'s own commit accepted `Url` directly,
+  since Go's whole-module compilation left no smaller commit boundary
+  available for a change this coupled.
+
+C0 after this round: `internal/domain/services` 98.7% (`Detect`'s
+regex-guaranteed-unreachable skip branch is the only remaining gap;
+`Resolution`'s previously-added unreachable branches are gone along with
+its error return, so this package's dip from the prior round partially
+reverses). `internal/application/services` recovers fully to 97.2% (its
+own unreachable branches are gone with them). `internal/domain/
+valueobjects` 95.9% (up slightly — `Attribution`'s stronger check adds
+covered branches). No behavior change and no on-disk output layout
+change. `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
+and `gofmt -l .` all pass.

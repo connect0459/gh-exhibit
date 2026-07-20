@@ -53,7 +53,7 @@ func (c InlineReviewComment) Render(w io.Writer) error {
 		Path     string `json:"path"`
 		Line     *int   `json:"line,omitempty"`
 		Outdated bool   `json:"outdated,omitempty"`
-		URL      string `json:"url"`
+		URL      Url    `json:"url"`
 	}{
 		attributionMeta: newAttributionMeta(c.attribution),
 		Path:            c.context.Path(),

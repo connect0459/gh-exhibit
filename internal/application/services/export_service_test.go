@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/connect0459/gh-exhibit/internal/domain/services"
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
@@ -103,9 +104,9 @@ type fakeAttachmentFetcher struct {
 	fetchedURLs []string
 }
 
-func (f *fakeAttachmentFetcher) Fetch(_ context.Context, url string) ([]byte, string, error) {
+func (f *fakeAttachmentFetcher) Fetch(_ context.Context, attachment services.Attachment) ([]byte, string, error) {
 	f.mu.Lock()
-	f.fetchedURLs = append(f.fetchedURLs, url)
+	f.fetchedURLs = append(f.fetchedURLs, attachment.URL().String())
 	f.mu.Unlock()
 	return f.data, f.contentType, f.err
 }

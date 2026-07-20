@@ -28,7 +28,7 @@ var extensionsByContentType = map[string]string{
 // does not reliably encode one. An unrecognized content type yields no
 // extension rather than a guessed one.
 func (a Attachment) Filename(contentType string) string {
-	id := path.Base(a.url)
+	id := path.Base(a.url.Path())
 
 	mediaType, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
