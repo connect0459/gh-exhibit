@@ -275,14 +275,22 @@ func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects
 			if errors.Is(r.err, context.Canceled) || errors.Is(r.err, context.DeadlineExceeded) {
 				return nil, nil, nil, fmt.Errorf("could not download the attachment at %s: %w", r.attachment.URL(), r.err)
 			}
-			resolutions = append(resolutions, services.FetchFailed(r.attachment.URL(), r.err.Error()))
+			failed, err := services.FetchFailed(r.attachment.URL(), r.err.Error())
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("could not record the failed attachment fetch at %s: %w", r.attachment.URL(), err)
+			}
+			resolutions = append(resolutions, failed)
 			fmt.Fprintf(&failureLog, "%s: %s\n", r.attachment.URL(), r.err)
 			continue
 		}
 
 		filename := r.attachment.Filename(r.contentType)
 		downloads = append(downloads, downloadedAsset{filename: filename, data: r.data})
-		resolutions = append(resolutions, services.Downloaded(r.attachment.URL(), ref.AssetPath(filename)))
+		downloaded, err := services.Downloaded(r.attachment.URL(), ref.AssetPath(filename))
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("could not record the downloaded attachment at %s: %w", r.attachment.URL(), err)
+		}
+		resolutions = append(resolutions, downloaded)
 	}
 
 	return services.Rewrite(rendered, resolutions), downloads, failureLog.Bytes(), nil

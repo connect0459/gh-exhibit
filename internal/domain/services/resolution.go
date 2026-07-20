@@ -1,6 +1,9 @@
 package services
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // Resolution is the outcome of attempting to fetch a single attachment URL:
 // either the local path it was downloaded to, or a failure reason. Success
@@ -20,16 +23,24 @@ type Resolution struct {
 
 // Downloaded builds a Resolution for a successfully fetched attachment at
 // url, identified by the path (relative to the rendered Markdown file, per
-// ADR-002's assets/ layout) it was written to.
-func Downloaded(url, localPath string) Resolution {
-	return Resolution{url: url, localPath: localPath, succeeded: true}
+// ADR-002's assets/ layout) it was written to. It returns an error if url
+// is empty.
+func Downloaded(url, localPath string) (Resolution, error) {
+	if url == "" {
+		return Resolution{}, errors.New("resolution url must not be empty")
+	}
+	return Resolution{url: url, localPath: localPath, succeeded: true}, nil
 }
 
 // FetchFailed builds a Resolution for an attachment at url that could not
 // be fetched, carrying reason for the placeholder Rewrite substitutes in
-// its place (ADR-002: skip, continue, note the original URL and why).
-func FetchFailed(url, reason string) Resolution {
-	return Resolution{url: url, reason: reason}
+// its place (ADR-002: skip, continue, note the original URL and why). It
+// returns an error if url is empty.
+func FetchFailed(url, reason string) (Resolution, error) {
+	if url == "" {
+		return Resolution{}, errors.New("resolution url must not be empty")
+	}
+	return Resolution{url: url, reason: reason}, nil
 }
 
 // Substitute returns r's Markdown replacement text: on a successful fetch,
