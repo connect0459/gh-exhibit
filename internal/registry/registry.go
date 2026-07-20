@@ -19,14 +19,14 @@ import (
 // line, distinguishing its own output from a similar tool's.
 const toolName = "connect0459/gh-exhibit"
 
-// Config holds NewExportService's parameters. A struct rather than two
-// positional strings, deliberately: Host and OutputDir are both plain
-// strings with no compiler-visible distinction between them, so a
-// positional signature would let a caller swap them silently; naming the
-// fields at every call site removes that risk instead of relying on a test
-// that couldn't meaningfully catch it either (both constructions still
-// "succeed" — reaching the wrong host or the wrong directory only shows up
-// at runtime).
+// Config holds NewExportService's parameters. A struct rather than several
+// positional strings, deliberately: Host, OutputDir, Version, and Commit
+// are all plain strings with no compiler-visible distinction between them,
+// so a positional signature would let a caller transpose them silently;
+// naming the fields at every call site removes that risk instead of
+// relying on a test that couldn't meaningfully catch it either (every
+// construction still "succeeds" — reaching the wrong host, directory,
+// version, or commit only shows up at runtime).
 type Config struct {
 	// Host is the target repository's host (e.g. "github.com"), scoping
 	// both the GitHub REST and attachment-download clients this
