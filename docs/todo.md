@@ -2416,3 +2416,56 @@ superseding ADR). Discussed with the user and resolved on
   Markdown changed); verified via `go build ./...`, `go vet ./...`,
   `go test ./... -race -cover`, and `gofmt -l .` (no behavior change, so no
   coverage figure moved), plus `pre-commit run --all-files`.
+
+### docs/SPEC.md moved to docs/specs/README.md, then emptied out of source comments entirely (2026-07-20)
+
+Two follow-up rounds on the same branch, both raised by the user after the
+entry above:
+
+- **Moved to `docs/specs/README.md`**, anticipating a future split of the
+  specification into multiple topic files under `docs/specs/`; `README.md`
+  acts as that directory's landing page in the meantime (mirroring how
+  `docs/adrs/` was itself organized as a directory). Every reference this
+  entry's own commits had just added (`docs/SPEC.md`, in ~15 Go comments,
+  the three `.github` templates, `CONTRIBUTING.md`, and this file) was
+  swept to the new path in the same pass — the exact kind of churn a
+  literal path reference in source code creates, immediately demonstrated
+  by having to do it twice within one branch.
+- **That demonstration prompted the sharper question**: should a source
+  comment cite a `docs/specs/` path at all, even once per package? Two
+  categories existed among the ~15-16 sites: a handful of package-level
+  "per docs/specs/README.md's on-disk layout" mentions, and many more
+  per-method repetitions of the same phrase. The per-method repetitions
+  were uncontroversially redundant — once a package doc states the
+  pointer, restating it on every constructor's Godoc added nothing. The
+  package-level case was genuinely debated, then resolved against it too:
+  this project has exactly one specification document covering the whole
+  project, not one per package or layer, so there is no case where a
+  specific source location should point a reader at a *different* section
+  than any other — a single link from `README.md`'s own new
+  "## Documentation" section (mirroring `connect0459/starlark-mbt`'s own
+  README structure) already gives a reader that one entry point, and nothing
+  in-source needs to repeat it. If `docs/specs/` is later split into topic
+  files, the same reasoning still holds: README.md's Documentation section
+  is where the mapping from topic to file lives, not scattered
+  per-package source comments that would need to track a topic's file
+  each time it moves.
+- Every `docs/specs/README.md` citation added by the entry above (~15-16
+  sites across 10 Go files, both package- and method-level) was removed.
+  Where a genuine, non-obvious WHY remained once the citation was
+  stripped (e.g. `issuePath`'s "owner is deliberately not part of the
+  path"), the comment was kept minus the path clause; where nothing but
+  the citation was left, the comment shrank to a plain, path-free
+  restatement of the method's own return shape (e.g. "at
+  issues/{repo}/{number}.md" instead of "following docs/specs/README.md's
+  issues/{repo}/{number}.md layout").
+- `CONTRIBUTING.md`'s Code style section gains a bullet codifying this:
+  code comments must not cite `docs/specs/` paths, since
+  `docs/specs/README.md` (linked once from `README.md`) is already the
+  single always-current reference, and a repeated in-source pointer both
+  adds nothing beyond what that link already provides and breaks the
+  moment a path inside `docs/specs/` moves.
+- No test file for any of this — comments, `README.md`, and
+  `CONTRIBUTING.md` only; verified via `go build ./...`, `go vet ./...`,
+  `go test ./... -race -cover` (coverage figures unchanged), `gofmt -l .`,
+  and `pre-commit run --all-files`.
