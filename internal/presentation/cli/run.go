@@ -23,8 +23,8 @@ type Exporter interface {
 // on failure. A failing ref does not stop the remaining ones from being
 // attempted (this project's existing skip-and-continue precedent). Returns
 // 0 if every ref succeeded, 1 if any failed. outputDir is only used to
-// report the actual write location (issues/{repo}/{number}.md) —
-// RunExports itself never touches the filesystem; exporter does.
+// report the actual write location ({repo}/{number}.md) — RunExports
+// itself never touches the filesystem; exporter does.
 func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir string, numbers []int, stdout, stderr io.Writer) int {
 	exitCode := 0
 
@@ -43,7 +43,7 @@ func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir s
 			continue
 		}
 
-		documentPath := filepath.Join(outputDir, "issues", repo, fmt.Sprintf("%d.md", number))
+		documentPath := filepath.Join(outputDir, repo, fmt.Sprintf("%d.md", number))
 		message := fmt.Sprintf("exported #%d -> %s", number, documentPath)
 		if len(skips) > 0 {
 			message += fmt.Sprintf(" (skipped %d entries)", len(skips))
