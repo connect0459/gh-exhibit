@@ -36,6 +36,32 @@ This looks off.
 	}
 }
 
+// TestInlineReviewComment_Render_EscapesAPathThatWouldOtherwiseCloseTheSurroundingHTMLComment
+// guards the actual invariant the hidden meta-line comment's safety
+// depends on: encoding/json's default HTML escaping of "<", ">", and "&"
+// (not any constraint on which characters InlineContext's path may
+// contain, since NewInlineContext only rejects an empty one — a git path
+// may contain almost any byte). A path containing a literal "-->" must
+// never reach the rendered output unescaped, or it would close the
+// surrounding <!-- ... --> comment early.
+func TestInlineReviewComment_Render_EscapesAPathThatWouldOtherwiseCloseTheSurroundingHTMLComment(t *testing.T) {
+	ctx, err := valueobjects.NewInlineContext("src/foo-->bar.go", intPtr(1), "", false)
+	if err != nil {
+		t.Fatalf("unexpected error building inline context: %v", err)
+	}
+	comment := valueobjects.NewInlineReviewComment(newInlineCommentAttribution(t), ctx, "This looks off.")
+
+	var buf strings.Builder
+	if err := comment.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering inline review comment: %v", err)
+	}
+
+	want := "<!-- {\"meta\":{\"author\":\"Copilot\",\"created\":\"2026-07-02T14:19:39Z\",\"path\":\"src/foo--\\u003ebar.go\",\"line\":1,\"url\":\"https://github.com/example/repo/pull/1#discussion_r1\"}} -->\n\nThis looks off.\n"
+	if buf.String() != want {
+		t.Fatalf("Render() =\n%q\nwant\n%q (the path's \"-->\" must be json-escaped, not left literal, or it would close the surrounding HTML comment early)", buf.String(), want)
+	}
+}
+
 func TestInlineReviewComment_Render_LabelsTheDiffHunkSeparatelyFromTheCommentBody(t *testing.T) {
 	ctx, err := valueobjects.NewInlineContext("docs/example.md", intPtr(195), "@@ -169,7 +191,7 @@ There is no signing", false)
 	if err != nil {
