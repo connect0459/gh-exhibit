@@ -5,7 +5,11 @@
 // abstractions, never on a concrete GitHub or filesystem implementation.
 package repositories
 
-import "context"
+import (
+	"context"
+
+	"github.com/connect0459/gh-exhibit/internal/domain/services"
+)
 
 // AttachmentFetcher is the abstract port the application layer depends on
 // to download a single attachment referenced by a rendered Document
@@ -15,6 +19,6 @@ import "context"
 // only reliable source of the attachment's file extension — the
 // user-attachments URL path does not encode one.
 type AttachmentFetcher interface {
-	// Fetch downloads url and returns its body and Content-Type.
-	Fetch(ctx context.Context, url string) (data []byte, contentType string, err error)
+	// Fetch downloads attachment's URL and returns its body and Content-Type.
+	Fetch(ctx context.Context, attachment services.Attachment) (data []byte, contentType string, err error)
 }

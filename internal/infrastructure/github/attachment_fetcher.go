@@ -9,6 +9,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/connect0459/gh-exhibit/internal/domain/repositories"
+	"github.com/connect0459/gh-exhibit/internal/domain/services"
 )
 
 // doer is the subset of *http.Client's interface attachmentFetcher needs;
@@ -51,7 +52,8 @@ func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetche
 }
 
 // Fetch implements repositories.AttachmentFetcher.
-func (f *attachmentFetcher) Fetch(ctx context.Context, url string) ([]byte, string, error) {
+func (f *attachmentFetcher) Fetch(ctx context.Context, attachment services.Attachment) ([]byte, string, error) {
+	url := attachment.URL()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("build request for %s: %w", url, err)

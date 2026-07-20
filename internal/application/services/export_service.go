@@ -261,7 +261,7 @@ func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects
 		go func(i int, a services.Attachment) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			data, contentType, err := s.attachments.Fetch(ctx, a.URL())
+			data, contentType, err := s.attachments.Fetch(ctx, a)
 			results[i] = attachmentFetchResult{attachment: a, data: data, contentType: contentType, err: err}
 		}(i, a)
 	}
