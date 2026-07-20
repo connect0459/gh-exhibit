@@ -379,6 +379,7 @@ func (r *alwaysNextRequester) RequestWithContext(_ context.Context, _, _ string,
 	return &http.Response{
 		StatusCode: http.StatusOK,
 		Header:     header,
+		Request:    &http.Request{URL: &url.URL{Scheme: "http", Host: "example.invalid", Path: "/next"}},
 		Body:       io.NopCloser(strings.NewReader(`[]`)),
 	}, nil
 }
@@ -527,5 +528,27 @@ func TestFetchTimeline_StopsFollowingAnUnboundedLinkHeaderChain(t *testing.T) {
 	}
 	if req.calls != maxPaginationPages {
 		t.Fatalf("requester called %d times, want %d (the pagination page cap)", req.calls, maxPaginationPages)
+	}
+}
+
+func TestFetchTimeline_RefusesToFollowANextPageURLPointingToADifferentHost(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			w.Header().Set("Link", `<http://attacker.invalid/repos/octocat/hello-world/issues/42/timeline?page=2>; rel="next"`)
+		}
+		_, _ = w.Write([]byte(`[{"id":1}]`))
+	}))
+	defer server.Close()
+
+	fetcher := newTestFetcher(t, server)
+	_, err := fetcher.FetchTimeline(context.Background(), testIssueRef(t))
+
+	if err == nil {
+		t.Fatal("FetchTimeline() error = nil, want a host-mismatch error")
+	}
+	if calls != 1 {
+		t.Fatalf("server received %d calls, want 1 (a next-page URL naming a different host must not be followed)", calls)
 	}
 }
