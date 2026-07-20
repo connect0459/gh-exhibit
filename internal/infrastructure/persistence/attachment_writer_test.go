@@ -71,6 +71,26 @@ func TestWriteAsset_RejectsAnAbsolutePathFilename(t *testing.T) {
 	}
 }
 
+func TestWriteAsset_RejectsAFilenameEqualToASingleSlash(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), "/", []byte("data"))
+	if err == nil {
+		t.Fatal("WriteAsset() error = nil, want an error for a filename equal to \"/\" (filepath.Base(\"/\") == \"/\", a fixed point the base-comparison check alone does not catch)")
+	}
+}
+
+func TestWriteAsset_RejectsAFilenameContainingABackslash(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+
+	err := writer.WriteAsset(context.Background(), testIssueRef(t), `sub\evil.png`, []byte("data"))
+	if err == nil {
+		t.Fatal("WriteAsset() error = nil, want an error for a filename containing a backslash, regardless of the host OS's own path separator")
+	}
+}
+
 func TestWriteAsset_RejectsAFilenameEqualToDot(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewAttachmentWriter(baseDir)

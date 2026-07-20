@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/connect0459/gh-exhibit/internal/domain/repositories"
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
@@ -42,11 +43,18 @@ func (w *attachmentWriter) WriteAsset(ctx context.Context, ref valueobjects.Issu
 }
 
 // validateAssetFilename rejects a filename that isn't a single, path-safe
-// segment — empty, "." or "..", containing a path separator, or an absolute
-// path — any of which could otherwise escape the intended
-// {repo}/{number}/assets/ directory once joined into a filesystem path.
-// This defends the boundary directly rather than relying solely on
-// whatever shape a caller's filename derivation happens to produce.
+// segment — empty, "." or "..", or containing a path separator — any of
+// which could otherwise escape the intended {repo}/{number}/assets/
+// directory once joined into a filesystem path. This defends the boundary
+// directly rather than relying solely on whatever shape a caller's
+// filename derivation happens to produce.
+//
+// The separator check is a direct scan for '/' and '\', not a comparison
+// against filepath.Base(filename): Base has a fixed point at "/" itself
+// (filepath.Base("/") == "/"), which a "did Base change it" comparison
+// would miss entirely, and checking only the host OS's own
+// filepath.Separator would miss a backslash on a non-Windows build even
+// though gh-exhibit is distributed for Windows too.
 func validateAssetFilename(filename string) error {
 	if filename == "" {
 		return fmt.Errorf("attachment filename must not be empty")
@@ -54,8 +62,8 @@ func validateAssetFilename(filename string) error {
 	if filename == "." || filename == ".." {
 		return fmt.Errorf("attachment filename must not be %q", filename)
 	}
-	if filepath.Base(filename) != filename {
-		return fmt.Errorf("attachment filename %q must be a single path segment", filename)
+	if strings.ContainsAny(filename, `/\`) {
+		return fmt.Errorf("attachment filename %q must not contain a path separator", filename)
 	}
 	return nil
 }
