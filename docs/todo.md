@@ -2,8 +2,14 @@
 
 ## Design (open decisions)
 
-All items below are formally recorded in
-`docs/adrs/adr-002-language-and-domain-design.md`.
+All items below were originally recorded in this project's now-removed ADR
+documents (`docs/adrs/adr-001-initial-plan.md`,
+`docs/adrs/adr-002-language-and-domain-design.md`); their still-valid
+conclusions live in `docs/SPEC.md` now, and their full original reasoning
+remains readable via `git log --follow -- docs/adrs/` or
+`git show <commit>:docs/adrs/adr-002-language-and-domain-design.md` on a
+commit before their removal. See "ADRs replaced by docs/SPEC.md" below for
+why.
 
 - [x] Decide the implementation language/stack — Go, with `go-gh` as the
       full-native acquisition layer (no `gh api` shellout). Driven by
@@ -2339,3 +2345,74 @@ valueobjects` 95.9% (up slightly — `Attribution`'s stronger check adds
 covered branches). No behavior change and no on-disk output layout
 change. `go build ./...`, `go vet ./...`, `go test ./... -race -cover`,
 and `gofmt -l .` all pass.
+
+### ADRs replaced by docs/SPEC.md (2026-07-20)
+
+With every implementation slice long closed, the user raised whether the
+two ADRs (`docs/adrs/adr-001-initial-plan.md`,
+`docs/adrs/adr-002-language-and-domain-design.md`) and the ~40 Go comments
+citing them across ~20 files should be discontinued. Both were already
+Accepted, never Deprecated, and both had been revised in place with dated
+addenda (e.g. "Timeline API correction", "Naming addendum") rather than
+superseded by a new ADR — the template (`docs/adrs/adr-000-template.md`)
+itself invited this via its own "Revision" section, unlike the classical
+Nygard ADR convention (immutable once Accepted; changed only by a new,
+superseding ADR). Discussed with the user and resolved on
+`docs/deprecate-adrs-in-favor-of-spec`:
+
+- **The two premises behind full removal were checked, not just accepted.**
+  (1) "`docs/todo.md` already records everything" does not fully hold: this
+  file's own Design section only summarizes each ADR's conclusion in 1-3
+  sentences and explicitly deferred to the ADR body for detail: several
+  investigation findings existed only there (the `gh-dossier`/
+  `gh-paper-trail`/`gh-attest` naming-candidate rejections; the GraphQL
+  timeline-union member-count findings; `gh api rate_limit --include`'s
+  actual output shape and the confirmation that neither `gh api` nor
+  `go-gh` retries rate limits; the MoonBit-disqualification reasoning; the
+  Entity-vs-Value-Object argument tied to this project's git-diff-based
+  YAGNI stance). (2) "Decision records don't matter at this project's
+  scale" was accepted as scoped to this project specifically (a
+  single-maintainer OSS tool, no regulatory or financial stakes), not
+  generalized.
+  - This is resolved by the same reasoning this project already applies to
+    other historical information: nothing is destroyed by deleting a
+    committed file — `git log --follow -- docs/adrs/` and
+    `git show <commit>:docs/adrs/adr-002-language-and-domain-design.md`
+    (on a commit prior to their removal) still surface it. Discoverability
+    moves from "always-visible doc" to "deliberately searched git
+    history," which matches this project's own "commit messages = why,
+    tests = what, code = how" convention more closely than a permanently
+    live, separately-maintained decision-record document does.
+- **A grep-verified survey preceded any comment deletion**, not an
+  assumption: every one of the ~40 `ADR-00X`-citing Go comments across ~20
+  files was inspected before removal. All were restatements of *current*
+  behavior ("per ADR-002's on-disk layout", "ADR-001's Markdown dialect")
+  rather than references to rejected-alternative reasoning — i.e., already
+  a violation of this project's own "code = How, comments only for
+  non-obvious WHY" policy, independent of the ADR-removal question. None
+  needed migrating; each was either deleted outright or reworded to point
+  at `docs/SPEC.md` where a live pointer was still useful (on-disk layout,
+  Markdown dialect, coverage targets).
+- **`docs/SPEC.md` (new)**: a single, always-in-place-edited specification
+  of gh-exhibit's *current* behavior — distribution/stack, CLI shape,
+  domain model, timeline classification, on-disk layout, Markdown dialect,
+  attachment policy, rate-limit/retry policy, concurrency, package layout,
+  coverage targets, and error-message conventions. Written from the current
+  code and this file's own history, not transcribed from the ADRs' text as
+  originally accepted — several details had already drifted since
+  acceptance (e.g. `entry`/`timeline`/`attachment` renamed to
+  `valueobjects`/`services`; `EvidenceRepository` renamed to
+  `EvidenceFetcher`; distribution migrated from
+  `cli/gh-extension-precompile` to GoReleaser). Explicitly states its own
+  maintenance convention up front (edited in place to match current
+  behavior; no dated addenda; rationale belongs in commit messages and
+  this file, not here) so it does not silently drift into the same
+  live-history/current-truth conflation this entry is resolving.
+- `docs/adrs/` deleted in full (all three files, including the template).
+  `.github/ISSUE_TEMPLATE/BUG_REPORT.md`, `FEATURE_REQUEST.md`,
+  `PULL_REQUEST_TEMPLATE.md`, and `CONTRIBUTING.md`'s ADR references
+  repointed to `docs/SPEC.md`.
+- No test file for any of this — none of it is Go logic (only comments and
+  Markdown changed); verified via `go build ./...`, `go vet ./...`,
+  `go test ./... -race -cover`, and `gofmt -l .` (no behavior change, so no
+  coverage figure moved), plus `pre-commit run --all-files`.
