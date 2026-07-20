@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -87,13 +88,17 @@ func isRateLimitResponse(h http.Header) bool {
 	return h.Get("Retry-After") != "" || h.Get("X-RateLimit-Remaining") == "0"
 }
 
+// maxRetryAfterSeconds is the largest Retry-After value (in seconds) that
+// converts to nanoseconds without overflowing time.Duration.
+const maxRetryAfterSeconds = int64(math.MaxInt64) / int64(time.Second)
+
 func retryAfterDelay(h http.Header) (time.Duration, bool) {
 	raw := h.Get("Retry-After")
 	if raw == "" {
 		return 0, false
 	}
-	seconds, err := strconv.Atoi(raw)
-	if err != nil {
+	seconds, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || seconds < 0 || seconds > maxRetryAfterSeconds {
 		return 0, false
 	}
 	return time.Duration(seconds) * time.Second, true
