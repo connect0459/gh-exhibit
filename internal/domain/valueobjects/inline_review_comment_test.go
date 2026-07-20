@@ -36,6 +36,27 @@ This looks off.
 	}
 }
 
+func TestInlineReviewComment_Render_IncludesStartLineInTheMetaLineForARangeComment(t *testing.T) {
+	ctx, err := valueobjects.NewInlineContext("docs/example.md", intPtr(15), intPtr(10), "", false)
+	if err != nil {
+		t.Fatalf("unexpected error building inline context: %v", err)
+	}
+	comment := valueobjects.NewInlineReviewComment(newInlineCommentAttribution(t), ctx, "This whole block needs a rework.")
+
+	var buf strings.Builder
+	if err := comment.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering inline review comment: %v", err)
+	}
+
+	want := `<!-- {"meta":{"author":"Copilot","created":"2026-07-02T14:19:39Z","path":"docs/example.md","start_line":10,"line":15,"url":"https://github.com/example/repo/pull/1#discussion_r1"}} -->
+
+This whole block needs a rework.
+`
+	if buf.String() != want {
+		t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
+	}
+}
+
 // TestInlineReviewComment_Render_EscapesAPathThatWouldOtherwiseCloseTheSurroundingHTMLComment
 // guards the actual invariant the hidden meta-line comment's safety
 // depends on: encoding/json's default HTML escaping of "<", ">", and "&"
