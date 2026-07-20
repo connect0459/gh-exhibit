@@ -9,9 +9,31 @@ import (
 func TestNewAttachment_URLReturnsTheURLItWasConstructedFrom(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 
-	got := services.NewAttachment(url).URL()
+	attachment, err := services.NewAttachment(url)
+	if err != nil {
+		t.Fatalf("NewAttachment(%q) error = %v", url, err)
+	}
 
-	if got != url {
+	if got := attachment.URL(); got != url {
 		t.Fatalf("URL() = %q, want %q", got, url)
 	}
+}
+
+func TestNewAttachment_RejectsAnEmptyURL(t *testing.T) {
+	if _, err := services.NewAttachment(""); err == nil {
+		t.Fatal("NewAttachment(\"\") error = nil, want an error for an empty url")
+	}
+}
+
+// newTestAttachment builds an Attachment from url, failing t immediately if
+// construction errors — for tests exercising some other behavior of
+// Attachment, not NewAttachment's own construction.
+func newTestAttachment(t *testing.T, url string) services.Attachment {
+	t.Helper()
+
+	attachment, err := services.NewAttachment(url)
+	if err != nil {
+		t.Fatalf("NewAttachment(%q) error = %v", url, err)
+	}
+	return attachment
 }

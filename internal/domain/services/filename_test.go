@@ -2,8 +2,6 @@ package services_test
 
 import (
 	"testing"
-
-	"github.com/connect0459/gh-exhibit/internal/domain/services"
 )
 
 func TestFilename_DerivesTheExtensionFromContentType(t *testing.T) {
@@ -18,7 +16,7 @@ func TestFilename_DerivesTheExtensionFromContentType(t *testing.T) {
 		{"application/pdf", "9492692e-41a2-484f-8d3b-e149d5f2c20f.pdf"},
 	}
 
-	attachment := services.NewAttachment(url)
+	attachment := newTestAttachment(t, url)
 	for _, c := range cases {
 		got := attachment.Filename(c.contentType)
 		if got != c.want {
@@ -30,7 +28,7 @@ func TestFilename_DerivesTheExtensionFromContentType(t *testing.T) {
 func TestFilename_IgnoresContentTypeParameters(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 
-	got := services.NewAttachment(url).Filename("image/png; charset=binary")
+	got := newTestAttachment(t, url).Filename("image/png; charset=binary")
 
 	want := "9492692e-41a2-484f-8d3b-e149d5f2c20f.png"
 	if got != want {
@@ -41,7 +39,7 @@ func TestFilename_IgnoresContentTypeParameters(t *testing.T) {
 func TestFilename_OmitsTheExtensionForAnUnrecognizedContentType(t *testing.T) {
 	url := "https://github.com/user-attachments/assets/9492692e-41a2-484f-8d3b-e149d5f2c20f"
 
-	got := services.NewAttachment(url).Filename("application/octet-stream")
+	got := newTestAttachment(t, url).Filename("application/octet-stream")
 
 	want := "9492692e-41a2-484f-8d3b-e149d5f2c20f"
 	if got != want {
