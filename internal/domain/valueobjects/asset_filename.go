@@ -43,11 +43,13 @@ func NewAssetFilename(filename string) (AssetFilename, error) {
 // isAllDotsWithOptionalTrailingSpaces reports whether s, once any trailing
 // spaces are stripped, consists entirely of '.' characters — generalizing
 // the exact "."/".." rejection to the same "resolves to a traversal-like
-// segment" property this type's constructor already claims to guarantee.
-// Trailing dots and spaces in a path component are documented as
-// significant on some Win32 file-handling code paths, which gh-exhibit's
-// Windows distribution target makes relevant here even though "." and
-// ".." are the only two segments POSIX itself treats specially.
+// segment" property both NewAssetFilename and IssueRef's repo validation
+// already claim to guarantee, kept as one shared check so the two never
+// drift back out of sync with each other. Trailing dots and spaces in a
+// path component are documented as significant on some Win32
+// file-handling code paths, which gh-exhibit's Windows distribution
+// target makes relevant here even though "." and ".." are the only two
+// segments POSIX itself treats specially.
 func isAllDotsWithOptionalTrailingSpaces(s string) bool {
 	trimmed := strings.TrimRight(s, " ")
 	if trimmed == "" {

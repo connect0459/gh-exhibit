@@ -59,7 +59,7 @@ func validateRepoName(repo string) error {
 	if repo == "" {
 		return errors.New("issue ref repo must not be empty")
 	}
-	if isAllDots(repo) {
+	if isAllDotsWithOptionalTrailingSpaces(repo) {
 		return fmt.Errorf("issue ref repo must not be %q", repo)
 	}
 	if len(repo) > maxRepoLength {
@@ -69,15 +69,6 @@ func validateRepoName(repo string) error {
 		return fmt.Errorf("issue ref repo %q is not a valid GitHub repository name", repo)
 	}
 	return nil
-}
-
-// isAllDots reports whether repo consists entirely of '.' characters (e.g.
-// ".", "..", "..."), generalizing the exact "."/".." rejection to the same
-// "resolves to a traversal-like segment" property this validation already
-// claims to guarantee. repoPattern's character class permits "." freely,
-// so a longer dot run would otherwise pass every other check unchanged.
-func isAllDots(repo string) bool {
-	return repo != "" && strings.Trim(repo, ".") == ""
 }
 
 // Owner returns the repository's owner (user or organization login).
