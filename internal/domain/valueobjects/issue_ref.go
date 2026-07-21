@@ -59,7 +59,7 @@ func validateRepoName(repo string) error {
 	if repo == "" {
 		return errors.New("issue ref repo must not be empty")
 	}
-	if repo == "." || repo == ".." {
+	if isAllDotsWithOptionalTrailingSpaces(repo) {
 		return fmt.Errorf("issue ref repo must not be %q", repo)
 	}
 	if len(repo) > maxRepoLength {

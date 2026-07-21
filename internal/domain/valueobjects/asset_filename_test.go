@@ -42,6 +42,18 @@ func TestNewAssetFilename_RejectsDotDot(t *testing.T) {
 	}
 }
 
+func TestNewAssetFilename_RejectsAFilenameThatIsAllDots(t *testing.T) {
+	if _, err := valueobjects.NewAssetFilename("..."); err == nil {
+		t.Fatal(`NewAssetFilename("...") error = nil, want an error for a filename that is entirely dots`)
+	}
+}
+
+func TestNewAssetFilename_RejectsAFilenameThatIsDotsWithTrailingSpaces(t *testing.T) {
+	if _, err := valueobjects.NewAssetFilename(".. "); err == nil {
+		t.Fatal(`NewAssetFilename(".. ") error = nil, want an error for a filename that is dots followed by trailing spaces`)
+	}
+}
+
 func TestNewAssetFilename_RejectsAFilenameContainingADotDotSegment(t *testing.T) {
 	if _, err := valueobjects.NewAssetFilename("../../../../tmp/evil"); err == nil {
 		t.Fatal("NewAssetFilename() error = nil, want an error for a filename containing a \"..\" segment")
