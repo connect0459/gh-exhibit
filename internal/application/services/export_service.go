@@ -47,14 +47,8 @@ func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.
 // Export fetches, classifies, and renders the evidence for ref, returning
 // any services.SkipNote recorded while classifying it (an individual
 // unparsable item does not fail the whole export; see
-// services.BuildEntries). Every fetch and build/validation step — including
-// downloading every referenced attachment — runs before any write, so a
-// failure anywhere in that phase leaves nothing on disk at all. The write
-// phase itself has no rollback: a failure partway through it (e.g.
-// WriteTimeline succeeding but WriteDocument failing) can still leave a
-// partial evidence directory behind, since this project has no
-// transactional/staged-write mechanism for local files. Any failure aborts
-// the export and returns a wrapped error.
+// services.BuildEntries). Any failure aborts the export and returns a
+// wrapped error.
 func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) ([]services.SkipNote, error) {
 	rawIssue, err := s.fetcher.FetchIssue(ctx, ref)
 	if err != nil {
@@ -94,6 +88,13 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		return nil, fmt.Errorf("could not resolve one or more attachments: %w", err)
 	}
 
+	// Every fetch/build/validation step above — including downloading every
+	// attachment — completes before any write below, so a failure anywhere
+	// above leaves nothing on disk. The write phase itself has no rollback:
+	// a failure partway through (e.g. WriteTimeline succeeding but
+	// WriteDocument failing) can still leave a partial evidence directory
+	// behind, since this project has no transactional/staged-write
+	// mechanism for local files.
 	if err := s.writer.WriteIssue(ctx, ref, rawIssue); err != nil {
 		return nil, fmt.Errorf("could not persist the raw issue/PR resource: %w", err)
 	}
@@ -141,22 +142,8 @@ type fetchedPullRequestAndTimeline struct {
 
 // fetchPullRequestChainAndTimeline runs the pull-request chain
 // (FetchPullRequest, then FetchReviewComments when issue is a pull request)
-// concurrently with FetchTimeline: neither depends on the other's result,
-// only on ref, so overlapping their round trips shortens Export's overall
-// latency. The pull-request chain itself keeps its existing sequential
-// short-circuit — FetchReviewComments is not called when FetchPullRequest
-// fails — since only its result, not its invocation, is independent of
-// FetchPullRequest's outcome.
-//
-// Both branches share a cancellable context derived from ctx: whichever
-// branch fails first cancels it, so the sibling branch's in-flight fetch
-// (which may otherwise be blocked in a rate-limit backoff wait up to an
-// hour long, per internal/infrastructure/github/retry.go) is interrupted
-// instead of being waited out to completion. The first genuine failure to
-// occur (not the cancellation this triggers in the sibling branch) is the
-// one returned — a fixed check-order priority would risk one branch's
-// real error being masked by the other branch's collateral
-// context.Canceled once cancellation is in play.
+// concurrently with FetchTimeline, since neither depends on the other's
+// result — overlapping their round trips shortens Export's overall latency.
 func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, ref valueobjects.IssueRef, issue services.IssueResource) (fetchedPullRequestAndTimeline, error) {
 	fetchCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -164,6 +151,12 @@ func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, re
 	var result fetchedPullRequestAndTimeline
 	var mu sync.Mutex
 	var firstErr error
+	// The first branch to fail cancels fetchCtx, interrupting the sibling
+	// branch's in-flight fetch instead of waiting out its rate-limit
+	// backoff (up to an hour, per internal/infrastructure/github/retry.go).
+	// firstErr — not the cancellation this triggers in the sibling branch —
+	// is what's returned, so one branch's collateral context.Canceled never
+	// masks the other's real error.
 	fail := func(err error) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -186,6 +179,10 @@ func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, re
 	}()
 
 	if issue.IsPullRequest() {
+		// FetchReviewComments is not called when FetchPullRequest fails:
+		// only its result, not its invocation, is independent of
+		// FetchPullRequest's outcome, so the existing sequential
+		// short-circuit is kept even inside this concurrent branch.
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -241,14 +238,7 @@ type attachmentFetchResult struct {
 // up to maxConcurrentAttachmentFetches at a time, returning the rewritten
 // Markdown (local paths substituted for successful downloads, an inline
 // placeholder for failed ones), the downloaded assets still awaiting a
-// write, and this run's failure log (nil when nothing failed). An ordinary
-// fetch failure (broken link, access denied) is recorded here, not
-// propagated — a single broken attachment link must not abort the whole
-// export. A context cancellation/deadline is different: it means the
-// caller gave up on this Export call entirely, not that one attachment is
-// unavailable, so it is returned as an error instead of a placeholder —
-// matching how FetchIssue/FetchTimeline and the other fetch steps treat
-// the same error.
+// write, and this run's failure log (nil when nothing failed).
 func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects.IssueRef, rendered []byte) ([]byte, []downloadedAsset, []byte, error) {
 	attachments := services.Detect(rendered, s.host)
 	if len(attachments) == 0 {
@@ -275,6 +265,13 @@ func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects
 	var failureLog bytes.Buffer
 	for _, r := range results {
 		if r.err != nil {
+			// An ordinary fetch failure (broken link, access denied) is
+			// recorded here, not propagated — a single broken attachment
+			// link must not abort the whole export. A context
+			// cancellation/deadline means the caller gave up on this
+			// Export call entirely, not that one attachment is
+			// unavailable, so it is returned as an error instead —
+			// matching FetchIssue/FetchTimeline and the other fetch steps.
 			if errors.Is(r.err, context.Canceled) || errors.Is(r.err, context.DeadlineExceeded) {
 				return nil, nil, nil, fmt.Errorf("could not download the attachment at %s: %w", r.attachment.URL(), r.err)
 			}
