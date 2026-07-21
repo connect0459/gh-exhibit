@@ -63,7 +63,7 @@ gh exhibit --version
 
 ### Tier 1 entries
 
-The rendered Markdown's content is drawn from four entry types, all Value
+The rendered Markdown's content is drawn from five entry types, all Value
 Objects (no identity-based tracking — re-fetch diffing is git's job in the
 separate repository the evidence is copied into, not gh-exhibit's):
 
@@ -74,8 +74,11 @@ separate repository the evidence is copied into, not gh-exhibit's):
 - `InlineReviewComment` — a comment anchored to a diff position, carrying an
   `InlineContext` (`path`, optional `line`, optional `start_line`,
   `diff_hunk`, `outdated`).
+- `LabelEvent` — a label added to or removed from the issue/PR, sourced from
+  the timeline's `labeled`/`unlabeled` events, carrying a `LabelAction`
+  (`labeled` / `unlabeled`) plus the affected label's name and color.
 
-All four implement the sealed `valueobjects.Entry` interface
+All five implement the sealed `valueobjects.Entry` interface
 (`Render(io.Writer) error` plus an unexported marker method) — the closest
 Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 (author, created, url — the common `<!-- {"meta":...} -->` fields), `Url`
@@ -93,8 +96,8 @@ guaranteed by its constructor to be a single path-safe segment — see
 
 ### Timeline classification
 
-Three of the four Tier 1 types (`IssueComment`, `PullRequestReview`, and the
-timeline's other member kinds) are classified from
+Three of the five Tier 1 types (`IssueComment`, `PullRequestReview`,
+`LabelEvent`, and the timeline's other member kinds) are classified from
 `GET .../issues/{number}/timeline`'s heterogeneous array via a two-pass
 unmarshal (discriminator peek, then dispatch), checked for exhaustiveness by
 the `exhaustive` golangci-lint rule against `eventKind`.
@@ -124,6 +127,26 @@ additionally rejects any non-ASCII byte, since Unicode case folding can
 conflate a non-ASCII character with an ASCII one (e.g. U+212A KELVIN SIGN
 folds to `"k"`); this does not apply to `IssueRef.owner`/`repo`, which are
 already constrained to GitHub's ASCII username/repository-name pattern.
+
+### Label rendering
+
+A label added to or removed from the issue/PR is rendered as a `LabelEvent`
+interleaved chronologically with the rest of the timeline (a `labeled` or
+`unlabeled` event, classified the same way as `commented`/`reviewed`),
+rather than as a static snapshot of the current label set placed near the
+document's top. This was a deliberate choice over the static-list
+alternative: it stays consistent with how every other entry in the document
+already presents content in the order it happened, at the cost of needing to
+recognize the corresponding timeline event kind rather than only reading the
+issue/PR resource's own `labels` field.
+
+Unlike `commented`/`reviewed` events, GitHub's `labeled`/`unlabeled`
+timeline payload carries no per-event `html_url` — only an API URL
+(`.../issues/events/{id}`) that doesn't resolve to a human-readable page.
+`LabelEvent`'s attribution therefore falls back to the issue/PR's own
+`html_url` (already available from the issue/PR resource fetched
+alongside the timeline) rather than a link to the specific historical
+event.
 
 ## On-disk layout
 
