@@ -110,7 +110,7 @@ func rateLimitResetDelay(h http.Header) (time.Duration, bool) {
 		return 0, false
 	}
 	epoch, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || epoch > maxRetryAfterSeconds {
+	if err != nil || epoch < 0 || epoch > maxRetryAfterSeconds {
 		return 0, false
 	}
 	wait := time.Until(time.Unix(epoch, 0))
