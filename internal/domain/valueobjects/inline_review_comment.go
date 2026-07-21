@@ -50,13 +50,15 @@ func (c InlineReviewComment) Equals(other InlineReviewComment) bool {
 func (c InlineReviewComment) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta
-		Path     string `json:"path"`
-		Line     *int   `json:"line,omitempty"`
-		Outdated bool   `json:"outdated,omitempty"`
-		URL      Url    `json:"url"`
+		Path      string `json:"path"`
+		StartLine *int   `json:"start_line,omitempty"`
+		Line      *int   `json:"line,omitempty"`
+		Outdated  bool   `json:"outdated,omitempty"`
+		URL       Url    `json:"url"`
 	}{
 		attributionMeta: newAttributionMeta(c.attribution),
 		Path:            c.context.Path(),
+		StartLine:       c.context.StartLine(),
 		Line:            c.context.Line(),
 		Outdated:        c.context.Outdated(),
 		URL:             c.attribution.URL(),
