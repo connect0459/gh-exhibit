@@ -27,6 +27,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-21
+
+### Changed
+
+- Internal: `internal/registry`'s `Config` gains optional
+  `AuthToken`/`Transport` fields, unused by every production caller, so
+  an integration test can wire `NewExportService` against a fake server
+  the same way `github.NewEvidenceFetcher`/`NewAttachmentFetcher`'s own
+  tests already do one layer down. No behavior change for any existing
+  caller.
+
+### Fixed
+
+- GitHub client: attachment fetches (`github.com/user-attachments/...`)
+  now follow a redirect to a different origin (e.g. a signed S3 URL)
+  again, restoring the `v0.1.0`-era download behavior that the
+  redirect-origin guard added in `v0.3.0` had regressed for essentially
+  every real issue/PR with a pasted image. The guard stays in place for
+  `evidenceFetcher`'s REST API requests, where its original assumption
+  still holds; `net/http` already strips the `Authorization`/`Cookie`
+  headers on a cross-host redirect, so removing the guard here does not
+  reintroduce a credential leak.
+
 ## [0.3.0] - 2026-07-21
 
 ### Changed
@@ -164,7 +187,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.0...HEAD>
+[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.1...HEAD>
+[0.3.1]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.0...v0.3.1>
 [0.3.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.2.0...v0.3.0>
 [0.2.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.2...v0.2.0>
 [0.1.2]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.1...v0.1.2>
