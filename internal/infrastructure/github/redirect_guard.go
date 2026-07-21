@@ -12,13 +12,13 @@ import (
 type redirectOriginPinContextKey struct{}
 
 // redirectOriginPin holds the origin (scheme + host) of the first request
-// issued for one logical call (one evidenceFetcher.fetchSingle call, one
-// page of evidenceFetcher.fetchPaginated, or one attachmentFetcher.Fetch
-// call), so every later request sharing the same pin — an HTTP redirect
-// hop within that same *http.Client.Do call — can be checked against it.
-// A pin is only ever read and written sequentially within the single
-// logical call it was created for (Go's own redirect-following happens one
-// hop at a time), so no synchronization is needed here.
+// issued for one logical call (one evidenceFetcher.fetchSingle call, or one
+// page of evidenceFetcher.fetchPaginated), so every later request sharing
+// the same pin — an HTTP redirect hop within that same *http.Client.Do
+// call — can be checked against it. A pin is only ever read and written
+// sequentially within the single logical call it was created for (Go's own
+// redirect-following happens one hop at a time), so no synchronization is
+// needed here.
 type redirectOriginPin struct {
 	origin string
 }
@@ -34,16 +34,16 @@ func pinRedirectOrigin(ctx context.Context) context.Context {
 }
 
 // newRedirectGuardTransport wraps next with an origin-pinning redirect
-// guard, defaulting to http.DefaultTransport when next is nil.
+// guard, defaulting to http.DefaultTransport when next is nil. Only
+// NewEvidenceFetcher installs this — NewAttachmentFetcher deliberately does
+// not, since a real attachment URL legitimately redirects cross-origin to
+// serve its bytes (see attachment_fetcher.go's Godoc).
 //
-// This exists because neither api.RESTClient (used by evidenceFetcher) nor
-// the *http.Client returned by api.NewHTTPClient (used by
-// attachmentFetcher) exposes a way to set http.Client.CheckRedirect, the
-// usual mechanism for rejecting a cross-origin redirect — api.RESTClient
-// keeps its underlying *http.Client unexported, and setting CheckRedirect
-// directly on attachmentFetcher's client alone would leave evidenceFetcher
-// unprotected. Installing this as the ClientOptions.Transport both
-// constructors configure protects both uniformly instead.
+// This exists because api.RESTClient (used by evidenceFetcher) does not
+// expose a way to set http.Client.CheckRedirect, the usual mechanism for
+// rejecting a cross-origin redirect — its underlying *http.Client is
+// unexported. Installing this as ClientOptions.Transport instead reaches
+// the same effect from one layer below.
 //
 // A request's Context is preserved by net/http across every hop of a
 // redirect chain within one Do call (confirmed directly: the same *http.Request
