@@ -27,6 +27,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-21
+
+### Added
+
+- Rendered Markdown now carries a document-level provenance line
+  (`<!-- {"tool":...,"version":...,"commit":...} -->`) right after the H1
+  title, identifying the tool, version, and build commit that produced
+  it — a self-reported identifier, not a tamper-resistant guarantee.
+
+### Changed
+
+- **Breaking**: the on-disk output layout dropped its fixed `issues/`
+  segment; exported evidence and rendered Markdown now write directly
+  under `{output}/{repo}/{number}...` instead of
+  `{output}/issues/{repo}/{number}...`. `-o`/`--output` now owns all of
+  "how to group this run's output on disk"; a caller who wants the old
+  `issues/`-grouped shape gets it back by passing `-o .../issues`
+  themselves.
+- **Breaking**: each entry's `meta:{...}` line is now nested under a
+  `"meta"` key and wrapped in an HTML comment
+  (`<!-- {"meta":{...}} -->`), hiding it from a rendered Markdown preview
+  while keeping it greppable as raw text. The `url` field stays
+  undecorated.
+
+### Fixed
+
+- CLI: a value flag immediately adjacent to another flag token is now
+  rejected instead of being silently swallowed as that other flag's
+  value.
+- GitHub client: a `Retry-After` header value that is negative or
+  overflows is now rejected instead of driving an invalid wait.
+- Persistence: `writeFile`'s rewrite of an existing file is now atomic
+  (temp file + rename) instead of truncate-then-write, avoiding a
+  corrupted file if the process is interrupted mid-write.
+- Review comments: range-anchored inline review comments now resolve
+  `start_line`/`original_start_line`, instead of only ever rendering the
+  single-line end of the range.
+- Services: an explicit `"pull_request": null` on the issue resource is
+  now treated as "not a pull request," instead of being misread as
+  present.
+
+### Security
+
+- Persistence: attachment filenames are now guaranteed path-safe via a
+  dedicated `AssetFilename` value object, rejecting path-traversal-
+  adjacent input at the boundary instead of trusting a derived filename.
+- GitHub client: a paginated response's next-page URL is now rejected
+  when its origin (scheme + host) differs from the current one, instead
+  of being followed unconditionally.
+
 ## [0.1.2] - 2026-07-20
 
 ### Changed
@@ -75,7 +125,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.2...HEAD>
+[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.2.0...HEAD>
+[0.2.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.2...v0.2.0>
 [0.1.2]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.1...v0.1.2>
 [0.1.1]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.0...v0.1.1>
 [0.1.0]: <https://github.com/connect0459/gh-exhibit/releases/tag/v0.1.0>
