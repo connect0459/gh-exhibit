@@ -144,17 +144,25 @@ func flagNameAndInlineValue(a string) (name string, hasInlineValue bool) {
 
 // looksLikeANegativeNumberList reports whether s is shaped like gh-exhibit's
 // own number-or-comma-list positional argument gone negative (e.g. "-1",
-// "-1,2"), as opposed to a flag.
+// "-1,2", "-1,-2"), as opposed to a flag. A "-"-only token (e.g. "--", the
+// flag terminator) is deliberately excluded by requiring at least one
+// digit somewhere in s, since a dash alone never carries a number.
 func looksLikeANegativeNumberList(s string) bool {
 	if len(s) < 2 || s[0] != '-' {
 		return false
 	}
+	sawDigit := false
 	for _, r := range s[1:] {
-		if r != ',' && r != ' ' && (r < '0' || r > '9') {
+		switch {
+		case r == ',' || r == ' ' || r == '-':
+			continue
+		case r >= '0' && r <= '9':
+			sawDigit = true
+		default:
 			return false
 		}
 	}
-	return true
+	return sawDigit
 }
 
 // parseNumbers splits raw on "," and parses each trimmed part as a positive

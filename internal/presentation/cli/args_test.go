@@ -79,6 +79,16 @@ func TestParseArgs_RejectsABareNegativeNumberForTheRightReason(t *testing.T) {
 	}
 }
 
+func TestParseArgs_RejectsACommaSeparatedListOfNegativeNumbersForTheRightReason(t *testing.T) {
+	_, err := ParseArgs([]string{"-1,-2"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for a non-positive number")
+	}
+	if strings.Contains(err.Error(), "flag provided but not defined") {
+		t.Errorf("ParseArgs() error = %v, want the positive-number validation error, not a flag-parsing error", err)
+	}
+}
+
 func TestParseArgs_RejectsAnEmptyListEntry(t *testing.T) {
 	if _, err := ParseArgs([]string{"123,,124"}); err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an empty list entry")
