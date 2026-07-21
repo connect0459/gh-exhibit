@@ -27,6 +27,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-21
+
+### Changed
+
+- **Breaking**: gh-exhibit's own provenance (tool, version, commit) no
+  longer renders as a `<!-- {"tool":...} -->` line in `index.md`; it now
+  lives in a new `evidence/provenance.json` file per issue/PR, written by
+  a dedicated `ProvenanceWriter` rather than mixed into the rendered
+  document. Anything relying on the old rendered line must read
+  `evidence/provenance.json` instead, which carries the identical
+  `{"tool":...,"version":...,"commit":...}` shape. GitHub's own per-entry
+  `<!-- {"meta":...} -->` line is unaffected and stays in `index.md`.
+
+### Fixed
+
+- GitHub client: an `X-RateLimit-Reset` value that is negative or
+  overflows `time.Duration`/`time.Unix`'s arithmetic is now rejected and
+  falls back to fixed exponential backoff, instead of wrapping to a bogus
+  wait duration that skipped the backoff entirely — matching the bound
+  already enforced on `Retry-After`.
+- CLI: a missing-value flag error now names the flag exactly as typed
+  (e.g. `--repo`), instead of collapsing a long-form flag's error message
+  to a single dash (`-repo`).
+
+### Security
+
+- Valueobjects: `IssueRef.repo` and `AssetFilename` now reject any
+  all-dots segment (e.g. `...`, optionally trailing-spaced), not just the
+  exact literals `.` and `..`, closing a narrower-than-intended
+  path-safety guarantee. Defense-in-depth: no working escape was
+  demonstrated through either type's actual production callers.
+
 ## [0.3.1] - 2026-07-21
 
 ### Changed
@@ -187,7 +219,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.1...HEAD>
+[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.4.0...HEAD>
+[0.4.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.1...v0.4.0>
 [0.3.1]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.0...v0.3.1>
 [0.3.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.2.0...v0.3.0>
 [0.2.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.2...v0.2.0>
