@@ -27,7 +27,16 @@ type evidenceFetcher struct {
 // GitHub's REST API. Passing api.ClientOptions{} resolves host and auth
 // token from the gh environment, matching api.DefaultRESTClient's behavior;
 // tests override Host and Transport to point at a local fake server instead.
+//
+// opts.Transport is wrapped with a redirect-origin guard (see
+// redirect_guard.go) before api.NewRESTClient sees it, so it takes
+// precedence over the gh environment's http_unix_socket routing the same
+// way any caller-supplied Transport does (api.ClientOptions.Transport's own
+// documented behavior) — a limitation gh-exhibit does not otherwise use,
+// since it never sets UnixDomainSocket itself.
 func NewEvidenceFetcher(opts api.ClientOptions) (repositories.EvidenceFetcher, error) {
+	opts.Transport = newRedirectGuardTransport(opts.Transport)
+
 	client, err := api.NewRESTClient(opts)
 	if err != nil {
 		return nil, fmt.Errorf("create the GitHub REST client: %w", err)
@@ -77,7 +86,7 @@ func pullPath(ref valueobjects.IssueRef) string {
 }
 
 func (r *evidenceFetcher) fetchSingle(ctx context.Context, path string) (json.RawMessage, error) {
-	resp, err := doWithRetry(ctx, r.client, r.sleep, http.MethodGet, path)
+	resp, err := doWithRetry(pinRedirectOrigin(ctx), r.client, r.sleep, http.MethodGet, path)
 	if err != nil {
 		return nil, fmt.Errorf("fetch GitHub resource %s: %w", path, err)
 	}
@@ -110,7 +119,7 @@ func (r *evidenceFetcher) fetchPaginated(ctx context.Context, path string) ([]js
 			return nil, fmt.Errorf("aborting GitHub pagination for %s after %d pages, Link header may be looping", path, maxPaginationPages)
 		}
 
-		resp, err := doWithRetry(ctx, r.client, r.sleep, http.MethodGet, path)
+		resp, err := doWithRetry(pinRedirectOrigin(ctx), r.client, r.sleep, http.MethodGet, path)
 		if err != nil {
 			return nil, fmt.Errorf("fetch GitHub resource %s: %w", path, err)
 		}
