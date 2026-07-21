@@ -81,7 +81,10 @@ Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 (author, created, url — the common `<!-- {"meta":...} -->` fields), `Url`
 (an absolute http/https URL, parsed and validated once at construction),
 `IssueRef` (owner, repo, number — validated against GitHub's own username/
-repository-name character-set and length rules), `Provenance` (tool,
+repository-name character-set and length rules; `repo` additionally
+rejects an all-dots segment such as `.`, `..`, or `...`, optionally
+followed by trailing spaces, via the same check `AssetFilename` uses —
+see "Attachment policy" below), `Provenance` (tool,
 version, commit — which gh-exhibit build produced an export, persisted to
 `evidence/provenance.json` by `ProvenanceWriter` rather than rendered into
 `Document`), `AssetFilename` (a downloaded attachment's on-disk filename,
@@ -252,7 +255,10 @@ comments) retry on a 429, or a 403 whose headers identify it as rate
 limiting (`Retry-After` present, or `X-RateLimit-Remaining: 0` — a 403
 without either is a permission error and is not retried). Wait duration
 honors `Retry-After` (seconds) or `X-RateLimit-Reset` (epoch seconds) when
-present, falling back to fixed exponential backoff otherwise. Retry ceiling:
+present and parseable as a non-negative value that does not overflow
+`time.Duration`/`time.Unix`'s arithmetic; an absent, negative, or
+implausibly large value for either header falls back to fixed exponential
+backoff instead of erroring. Retry ceiling:
 3 attempts total, then the error surfaces to the caller. There is no
 proactive `GET /rate_limit` check before a run.
 
