@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"path/filepath"
 
 	"github.com/connect0459/gh-exhibit/internal/domain/repositories"
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
@@ -16,7 +17,7 @@ type documentWriter struct {
 }
 
 // NewDocumentWriter builds a repositories.DocumentWriter that persists
-// rendered Markdown under baseDir, at {repo}/{number}.md.
+// rendered Markdown under baseDir, at {repo}/{number}/index.md.
 func NewDocumentWriter(baseDir string) repositories.DocumentWriter {
 	return &documentWriter{baseDir: baseDir}
 }
@@ -26,5 +27,5 @@ func (w *documentWriter) WriteDocument(ctx context.Context, ref valueobjects.Iss
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return writeFile(issuePath(w.baseDir, ref, "md"), rendered)
+	return writeFile(filepath.Join(issueDir(w.baseDir, ref), "index.md"), rendered)
 }
