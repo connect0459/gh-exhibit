@@ -57,9 +57,10 @@ func (w *attachmentWriter) WriteFetchErrorLog(ctx context.Context, ref valueobje
 	return writeFile(path, log)
 }
 
-// issueDir builds the on-disk directory for ref's per-issue attachment
-// artifacts (owner is deliberately not part of the path, matching
-// issuePath's own precedent).
+// issueDir builds the on-disk directory for ref's per-issue artifacts
+// (owner is deliberately not part of the path), shared by every writer in
+// this package: attachmentWriter uses it directly, evidenceWriter builds
+// on it via evidencePath, and documentWriter joins it with index.md.
 func issueDir(baseDir string, ref valueobjects.IssueRef) string {
 	return filepath.Join(baseDir, ref.Repo(), strconv.Itoa(ref.Number()))
 }
