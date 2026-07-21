@@ -133,7 +133,7 @@ func TestRunExports_ReflectsTheOutputDirInTheSuccessMessage(t *testing.T) {
 
 	RunExports(context.Background(), exporter, "octocat", "hello-world", "/tmp/gh-exhibit-out", []int{42}, &stdout, &stderr)
 
-	want := filepath.Join("/tmp/gh-exhibit-out", "hello-world", "42.md")
+	want := filepath.Join("/tmp/gh-exhibit-out", "hello-world", "42", "index.md")
 	if !strings.Contains(stdout.String(), want) {
 		t.Errorf("stdout = %q, want it to mention the actual write path %q", stdout.String(), want)
 	}
