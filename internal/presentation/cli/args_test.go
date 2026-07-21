@@ -203,12 +203,6 @@ func TestParseArgs_TreatsTokensAfterADoubleDashAsLiteralPositionalText(t *testin
 	}
 }
 
-func TestParseArgs_ReturnsAnErrorWhenAValueFlagIsTheLastToken(t *testing.T) {
-	if _, err := ParseArgs([]string{"123", "--repo"}); err == nil {
-		t.Fatal("ParseArgs() error = nil, want an error since --repo has no following value")
-	}
-}
-
 func TestParseArgs_MissingValueErrorNamesALongFormFlagWithBothDashes(t *testing.T) {
 	_, err := ParseArgs([]string{"123", "--repo"})
 	if err == nil {
