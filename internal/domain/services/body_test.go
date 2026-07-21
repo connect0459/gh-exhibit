@@ -45,6 +45,14 @@ func TestIssueResource_IsPullRequest_FalseForAPlainIssueResource(t *testing.T) {
 	}
 }
 
+func TestIssueResource_IsPullRequest_FalseWhenThePullRequestKeyIsExplicitlyNull(t *testing.T) {
+	raw := json.RawMessage(`{"title": "Something is broken", "pull_request": null}`)
+
+	if mustParseIssueResource(t, raw).IsPullRequest() {
+		t.Fatalf("IsPullRequest() = true, want false for a resource with an explicit null pull_request")
+	}
+}
+
 func TestBuildBody_BuildsTitleAndBodyFromAPlainIssueResource(t *testing.T) {
 	raw := json.RawMessage(`{
 		"title": "Something is broken",
