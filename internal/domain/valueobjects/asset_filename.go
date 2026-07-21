@@ -15,8 +15,9 @@ type AssetFilename struct {
 }
 
 // NewAssetFilename validates filename and returns an AssetFilename. It
-// rejects anything that isn't a single path-safe segment: empty, "." or
-// "..", or containing a path separator — any of which could otherwise
+// rejects anything that isn't a single path-safe segment: empty, an
+// all-dots value (e.g. ".", "..", "...", optionally followed by trailing
+// spaces), or containing a path separator — any of which could otherwise
 // escape the intended assets directory once joined into a filesystem
 // path.
 //
