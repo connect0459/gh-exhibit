@@ -231,9 +231,10 @@ is mandatory, to keep the exported directory offline-verifiable. After a
    host's own mime database) — the URL path itself does not reliably
    encode one. An unrecognized content type yields no extension.
    `AssetFilename`'s constructor guarantees the result is always a single,
-   path-safe segment (rejecting empty, `.`/`..`, a path separator, or an
-   absolute path), so `AttachmentWriter.WriteAsset` can trust any value of
-   this type without re-validating it itself.
+   path-safe segment (rejecting empty, any all-dots value such as `.`,
+   `..`, or `...` — optionally followed by trailing spaces — a path
+   separator, or an absolute path), so `AttachmentWriter.WriteAsset` can
+   trust any value of this type without re-validating it itself.
 4. A failed fetch (broken link, access denied, network error) does not fail
    the export: the reference is rewritten to an inline placeholder noting
    the original URL and failure reason, and the run's failures are
