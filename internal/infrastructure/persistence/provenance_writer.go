@@ -10,9 +10,7 @@ import (
 )
 
 // provenanceWriter implements repositories.ProvenanceWriter against the
-// local filesystem. Unexported so callers depend only on the
-// repositories.ProvenanceWriter interface, not this infrastructure-layer
-// type.
+// local filesystem.
 type provenanceWriter struct {
 	baseDir string
 }

@@ -13,9 +13,7 @@ import (
 )
 
 // evidenceWriter implements repositories.EvidenceWriter against the local
-// filesystem. Unexported so callers depend only on the
-// repositories.EvidenceWriter interface, not this infrastructure-layer
-// type.
+// filesystem.
 type evidenceWriter struct {
 	baseDir string
 }

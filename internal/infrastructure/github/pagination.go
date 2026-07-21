@@ -1,5 +1,8 @@
-// Package github implements repositories.EvidenceFetcher (internal/domain/
-// repositories) against GitHub's REST API via go-gh.
+// Package github implements repositories.EvidenceFetcher and
+// repositories.AttachmentFetcher (internal/domain/repositories) against
+// GitHub's REST API via go-gh. Every implementation type here is
+// unexported, so callers depend only on the repositories interfaces
+// (dependency inversion), never on these concrete types.
 package github
 
 import (

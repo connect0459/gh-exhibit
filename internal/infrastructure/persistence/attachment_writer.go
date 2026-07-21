@@ -1,6 +1,8 @@
 // Package persistence implements gh-exhibit's domain-layer repository
-// ports (EvidenceWriter, DocumentWriter, AttachmentWriter) against the
-// local filesystem.
+// ports (EvidenceWriter, DocumentWriter, AttachmentWriter, ProvenanceWriter)
+// against the local filesystem. Every implementation type here is
+// unexported, so callers depend only on the repositories interfaces
+// (dependency inversion), never on these concrete types.
 package persistence
 
 import (
@@ -15,9 +17,7 @@ import (
 )
 
 // attachmentWriter implements repositories.AttachmentWriter against the
-// local filesystem. Unexported so callers depend only on the
-// repositories.AttachmentWriter interface, not this infrastructure-layer
-// type.
+// local filesystem.
 type attachmentWriter struct {
 	baseDir string
 }
@@ -38,10 +38,7 @@ func (w *attachmentWriter) WriteAsset(ctx context.Context, ref valueobjects.Issu
 	return writeFile(filepath.Join(issueDir(w.baseDir, ref), "assets", filename.String()), data)
 }
 
-// WriteFetchErrorLog persists log verbatim, except an empty log removes any
-// existing fetch-errors.log instead of writing one: the evidence directory
-// is a regenerable view, so a rerun where every attachment now resolves
-// successfully must not leave a prior run's failure log behind.
+// WriteFetchErrorLog implements repositories.AttachmentWriter.
 func (w *attachmentWriter) WriteFetchErrorLog(ctx context.Context, ref valueobjects.IssueRef, log []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err

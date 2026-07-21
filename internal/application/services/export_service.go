@@ -116,10 +116,8 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 			return nil, fmt.Errorf("could not persist the downloaded attachment %s: %w", d.filename, err)
 		}
 	}
-	// Always called, even when failureLog is empty: WriteFetchErrorLog
-	// treats an empty log as "clear any existing one", so a stale log
-	// from a prior run with failures doesn't survive a rerun where every
-	// attachment (or none at all) now resolves successfully.
+	// Always called, even when failureLog is empty — see
+	// repositories.AttachmentWriter.WriteFetchErrorLog.
 	if err := s.assets.WriteFetchErrorLog(ctx, ref, failureLog); err != nil {
 		return nil, fmt.Errorf("could not persist the attachment fetch error log: %w", err)
 	}

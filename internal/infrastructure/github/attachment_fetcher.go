@@ -23,9 +23,7 @@ type doer interface {
 // is unrelated to the REST API host evidenceFetcher targets — so this type
 // wraps a plain *http.Client (via api.NewHTTPClient) rather than
 // evidenceFetcher's *api.RESTClient, which only knows how to build requests
-// relative to its configured Host. Unexported so callers depend only on the
-// repositories.AttachmentFetcher interface, not this infrastructure-layer
-// type.
+// relative to its configured Host.
 type attachmentFetcher struct {
 	client   doer
 	maxBytes int64
