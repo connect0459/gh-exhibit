@@ -102,7 +102,7 @@ func splitFlagsAndPositional(args []string) (flagArgs, positional []string, err 
 			continue
 		}
 
-		name, hasInlineValue := flagNameAndInlineValue(a)
+		name, dashes, hasInlineValue := flagNameAndInlineValue(a)
 		if hasInlineValue || !valueFlags[name] {
 			// Either the value is already attached ("--repo=x"), or this is
 			// an unrecognized flag (including -h/--help) whose arity we
@@ -113,7 +113,7 @@ func splitFlagsAndPositional(args []string) (flagArgs, positional []string, err 
 		}
 
 		if i+1 >= len(args) || isFlagShaped(args[i+1]) {
-			return nil, nil, fmt.Errorf("flag needs an argument: -%s", name)
+			return nil, nil, fmt.Errorf("flag needs an argument: %s%s", dashes, name)
 		}
 
 		i++
@@ -129,17 +129,20 @@ func isFlagShaped(s string) bool {
 	return strings.HasPrefix(s, "-") && s != "-" && !looksLikeANegativeNumberList(s)
 }
 
-// flagNameAndInlineValue extracts a flag token's name and reports whether it
-// carries an attached "=value". It strips at most two leading dashes, so a
-// token with three or more (e.g. "---repo") does not collapse onto a
-// recognized flag name and is left for flag.Parse's own rejection.
-func flagNameAndInlineValue(a string) (name string, hasInlineValue bool) {
+// flagNameAndInlineValue extracts a flag token's name, the dash prefix it was
+// given with ("-" or "--"), and whether it carries an attached "=value". It
+// strips at most two leading dashes, so a token with three or more (e.g.
+// "---repo") does not collapse onto a recognized flag name and is left for
+// flag.Parse's own rejection.
+func flagNameAndInlineValue(a string) (name, dashes string, hasInlineValue bool) {
 	trimmed := strings.TrimPrefix(a, "--")
+	dashes = "--"
 	if trimmed == a {
 		trimmed = strings.TrimPrefix(a, "-")
+		dashes = "-"
 	}
 	name, _, hasInlineValue = strings.Cut(trimmed, "=")
-	return name, hasInlineValue
+	return name, dashes, hasInlineValue
 }
 
 // looksLikeANegativeNumberList reports whether s is shaped like gh-exhibit's

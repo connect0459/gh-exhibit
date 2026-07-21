@@ -203,9 +203,23 @@ func TestParseArgs_TreatsTokensAfterADoubleDashAsLiteralPositionalText(t *testin
 	}
 }
 
-func TestParseArgs_ReturnsAnErrorWhenAValueFlagIsTheLastToken(t *testing.T) {
-	if _, err := ParseArgs([]string{"123", "--repo"}); err == nil {
+func TestParseArgs_MissingValueErrorNamesALongFormFlagWithBothDashes(t *testing.T) {
+	_, err := ParseArgs([]string{"123", "--repo"})
+	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error since --repo has no following value")
+	}
+	if !strings.Contains(err.Error(), "--repo") {
+		t.Errorf("ParseArgs() error = %v, want it to name the flag as %q", err, "--repo")
+	}
+}
+
+func TestParseArgs_MissingValueErrorNamesAShorthandFlagWithASingleDash(t *testing.T) {
+	_, err := ParseArgs([]string{"123", "-o"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since -o has no following value")
+	}
+	if !strings.Contains(err.Error(), "-o") || strings.Contains(err.Error(), "--o") {
+		t.Errorf("ParseArgs() error = %v, want it to name the flag as %q", err, "-o")
 	}
 }
 
