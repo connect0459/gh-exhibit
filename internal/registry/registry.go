@@ -6,6 +6,7 @@ package registry
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 
@@ -42,18 +43,28 @@ type Config struct {
 	// in every Document's provenance line alongside toolName.
 	Version string
 	Commit  string
+
+	// AuthToken and Transport are passed through to both go-gh clients
+	// this constructor builds. Production callers leave both unset, so
+	// AuthToken resolves from the gh environment as usual and Transport
+	// defaults to http.DefaultTransport; a test supplies both to point
+	// NewExportService's real fetchers at a fake server instead of the
+	// gh environment or the real GitHub host, the same seam
+	// NewEvidenceFetcher/NewAttachmentFetcher's own tests already use.
+	AuthToken string
+	Transport http.RoundTripper
 }
 
 // NewExportService builds an ExportService backed by a go-gh REST/HTTP
 // client scoped to cfg.Host and local filesystem storage rooted at
 // cfg.OutputDir.
 func NewExportService(cfg Config) (*services.ExportService, error) {
-	fetcher, err := github.NewEvidenceFetcher(api.ClientOptions{Host: cfg.Host})
+	fetcher, err := github.NewEvidenceFetcher(api.ClientOptions{Host: cfg.Host, AuthToken: cfg.AuthToken, Transport: cfg.Transport})
 	if err != nil {
 		return nil, fmt.Errorf("could not create the GitHub evidence client: %w", err)
 	}
 
-	attachments, err := github.NewAttachmentFetcher(api.ClientOptions{Host: cfg.Host})
+	attachments, err := github.NewAttachmentFetcher(api.ClientOptions{Host: cfg.Host, AuthToken: cfg.AuthToken, Transport: cfg.Transport})
 	if err != nil {
 		return nil, fmt.Errorf("could not create the GitHub attachment client: %w", err)
 	}
