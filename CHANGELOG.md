@@ -27,6 +27,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-21
+
+### Changed
+
+- **Breaking**: each issue/PR's output now nests under a single
+  `{number}/` page-bundle directory instead of scattering a rendered
+  `{number}.md` file and flat, number-prefixed raw evidence files
+  alongside a same-named `{number}/assets/` directory. The new layout:
+
+  ```text
+  {output}/{repo}/{number}/
+  ├── index.md
+  ├── assets/{filename}
+  └── evidence/
+      ├── issue.json
+      ├── timeline.json
+      ├── pull.json
+      ├── review-comments.json
+      └── fetch-errors.log
+  ```
+
+  A rendered document's link to its own attachments changes from
+  `{number}/assets/{filename}` to `assets/{filename}`.
+
+### Fixed
+
+- CLI: a comma-separated list containing more than one negative number
+  (e.g. `-1,-2`) is now recognized as a negative-number list and reaches
+  the intended domain-validation error, instead of falling through to a
+  generic "flag provided but not defined" error.
+
+### Security
+
+- GitHub client: a redirect whose target origin differs from the
+  request's own origin is now rejected before the request is sent,
+  closing a gap that could otherwise have let a redirected first page
+  poison the already-shipped pagination-origin check's trusted
+  reference.
+
 ## [0.2.0] - 2026-07-21
 
 ### Added
@@ -125,7 +164,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.2.0...HEAD>
+[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.0...HEAD>
+[0.3.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.2.0...v0.3.0>
 [0.2.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.2...v0.2.0>
 [0.1.2]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.1...v0.1.2>
 [0.1.1]: <https://github.com/connect0459/gh-exhibit/compare/v0.1.0...v0.1.1>
