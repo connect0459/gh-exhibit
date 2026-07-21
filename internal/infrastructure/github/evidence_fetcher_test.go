@@ -571,6 +571,61 @@ func TestFetchTimeline_StopsFollowingAnUnboundedLinkHeaderChain(t *testing.T) {
 	}
 }
 
+func TestFetchIssue_RefusesToFollowARedirectToADifferentOrigin(t *testing.T) {
+	attackerCalls := 0
+	attacker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attackerCalls++
+		_, _ = w.Write([]byte(`{"number":42,"title":"attacker-controlled"}`))
+	}))
+	defer attacker.Close()
+
+	legit := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, attacker.URL+"/attacker-path", http.StatusFound)
+	}))
+	defer legit.Close()
+
+	fetcher := newTestFetcher(t, legit)
+	_, err := fetcher.FetchIssue(context.Background(), testIssueRef(t))
+
+	if err == nil {
+		t.Fatal("FetchIssue() error = nil, want an error for a response redirecting to a different origin")
+	}
+	if attackerCalls != 0 {
+		t.Fatalf("attacker server received %d calls, want 0 (the redirect must never be followed)", attackerCalls)
+	}
+}
+
+func TestFetchTimeline_RefusesToFollowARedirectOnTheFirstPageToADifferentOrigin(t *testing.T) {
+	attackerCalls := 0
+	attacker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attackerCalls++
+		// A misbehaving/attacker-controlled page 1 that both serves content
+		// and claims a self-referential next page, matching the report's
+		// "first hop redirected poisons expectedOrigin" scenario: if the
+		// redirect guard didn't exist, this Link header alone would have
+		// been enough to make fetchPaginated treat the attacker's own
+		// origin as trusted for the rest of the pagination chain.
+		w.Header().Set("Link", fmt.Sprintf(`<http://%s/attacker-path?page=2>; rel="next"`, r.Host))
+		_, _ = w.Write([]byte(`[{"id":"attacker-page"}]`))
+	}))
+	defer attacker.Close()
+
+	legit := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, attacker.URL+"/attacker-path", http.StatusFound)
+	}))
+	defer legit.Close()
+
+	fetcher := newTestFetcher(t, legit)
+	_, err := fetcher.FetchTimeline(context.Background(), testIssueRef(t))
+
+	if err == nil {
+		t.Fatal("FetchTimeline() error = nil, want an error for the first page redirecting to a different origin")
+	}
+	if attackerCalls != 0 {
+		t.Fatalf("attacker server received %d calls, want 0 (the redirect must never be followed, and must not poison the expected origin for later pages)", attackerCalls)
+	}
+}
+
 func TestFetchTimeline_RefusesToFollowANextPageURLPointingToADifferentHost(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -42,7 +42,16 @@ const maxAttachmentBytes = 100 * 1024 * 1024
 // repositories. Passing api.ClientOptions{} resolves host and auth token
 // from the gh environment; tests override Host and Transport to point at a
 // local fake server instead.
+//
+// opts.Transport is wrapped with a redirect-origin guard (see
+// redirect_guard.go) before api.NewHTTPClient sees it, so it takes
+// precedence over the gh environment's http_unix_socket routing the same
+// way any caller-supplied Transport does (api.ClientOptions.Transport's own
+// documented behavior) — a limitation gh-exhibit does not otherwise use,
+// since it never sets UnixDomainSocket itself.
 func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetcher, error) {
+	opts.Transport = newRedirectGuardTransport(opts.Transport)
+
 	client, err := api.NewHTTPClient(opts)
 	if err != nil {
 		return nil, fmt.Errorf("create the GitHub-authenticated HTTP client: %w", err)
@@ -54,7 +63,7 @@ func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetche
 // Fetch implements repositories.AttachmentFetcher.
 func (f *attachmentFetcher) Fetch(ctx context.Context, attachment services.Attachment) ([]byte, string, error) {
 	url := attachment.URL().String()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(pinRedirectOrigin(ctx), http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("build request for %s: %w", url, err)
 	}

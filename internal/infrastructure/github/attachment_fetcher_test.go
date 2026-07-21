@@ -140,6 +140,31 @@ func TestFetch_AcceptsAResponseBodyExactlyAtTheSizeLimit(t *testing.T) {
 	}
 }
 
+func TestFetch_RefusesToFollowARedirectToADifferentOrigin(t *testing.T) {
+	attackerCalls := 0
+	attacker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attackerCalls++
+		_, _ = w.Write([]byte("attacker-controlled-content"))
+	}))
+	defer attacker.Close()
+
+	legit := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, attacker.URL+"/user-attachments/assets/attacker-served", http.StatusFound)
+	}))
+	defer legit.Close()
+
+	fetcher := newTestAttachmentFetcher(t, legit)
+	attachment := newTestAttachment(t, "http://github.localhost/user-attachments/assets/abc-123")
+	_, _, err := fetcher.Fetch(context.Background(), attachment)
+
+	if err == nil {
+		t.Fatal("Fetch() error = nil, want an error for a response redirecting to a different origin")
+	}
+	if attackerCalls != 0 {
+		t.Fatalf("attacker server received %d calls, want 0 (the redirect must never be followed)", attackerCalls)
+	}
+}
+
 func TestFetch_ReturnsContextErrorWhenContextIsAlreadyCancelled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("data"))
