@@ -140,28 +140,69 @@ func TestFetch_AcceptsAResponseBodyExactlyAtTheSizeLimit(t *testing.T) {
 	}
 }
 
-func TestFetch_RefusesToFollowARedirectToADifferentOrigin(t *testing.T) {
-	attackerCalls := 0
-	attacker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		attackerCalls++
-		_, _ = w.Write([]byte("attacker-controlled-content"))
-	}))
-	defer attacker.Close()
+// hostScopedRewriteTransport rewrites only a request whose Host matches
+// placeholderHost to target's real address. Unlike rewriteTransport (which
+// rewrites every request unconditionally), a later hop born from a redirect
+// Location that already names a second real test server's address passes
+// through unrewritten instead of being routed back to the first server —
+// letting a test genuinely reach two distinct origins.
+type hostScopedRewriteTransport struct {
+	placeholderHost string
+	target          string
+}
 
-	legit := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, attacker.URL+"/user-attachments/assets/attacker-served", http.StatusFound)
-	}))
-	defer legit.Close()
-
-	fetcher := newTestAttachmentFetcher(t, legit)
-	attachment := newTestAttachment(t, "http://github.localhost/user-attachments/assets/abc-123")
-	_, _, err := fetcher.Fetch(context.Background(), attachment)
-
-	if err == nil {
-		t.Fatal("Fetch() error = nil, want an error for a response redirecting to a different origin")
+func (t *hostScopedRewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	if req.URL.Host == t.placeholderHost {
+		req.URL.Host = t.target
+		req.Host = t.target
 	}
-	if attackerCalls != 0 {
-		t.Fatalf("attacker server received %d calls, want 0 (the redirect must never be followed)", attackerCalls)
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+func TestFetch_FollowsARedirectToADifferentOriginFromTheAttachmentHost(t *testing.T) {
+	var secondHopAuth string
+	secondHopCalls := 0
+	secondHop := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		secondHopCalls++
+		secondHopAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("cross-origin-content"))
+	}))
+	defer secondHop.Close()
+
+	firstHop := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, secondHop.URL+"/user-attachments/assets/redirected", http.StatusFound)
+	}))
+	defer firstHop.Close()
+
+	firstHopURL, err := url.Parse(firstHop.URL)
+	if err != nil {
+		t.Fatalf("url.Parse(%q) error = %v", firstHop.URL, err)
+	}
+
+	fetcher, err := NewAttachmentFetcher(api.ClientOptions{
+		Host:      "github.localhost",
+		AuthToken: "test-token",
+		Transport: &hostScopedRewriteTransport{placeholderHost: "github.localhost", target: firstHopURL.Host},
+	})
+	if err != nil {
+		t.Fatalf("NewAttachmentFetcher() error = %v", err)
+	}
+
+	attachment := newTestAttachment(t, "http://github.localhost/user-attachments/assets/abc-123")
+	data, contentType, err := fetcher.Fetch(context.Background(), attachment)
+	if err != nil {
+		t.Fatalf("Fetch() error = %v, want a redirect to a different origin to be followed, as real GitHub attachment URLs require", err)
+	}
+	if string(data) != "cross-origin-content" || contentType != "image/png" {
+		t.Fatalf("Fetch() = (%q, %q), want the cross-origin server's response", data, contentType)
+	}
+	if secondHopCalls != 1 {
+		t.Fatalf("cross-origin server received %d calls, want 1", secondHopCalls)
+	}
+	if secondHopAuth != "" {
+		t.Fatalf("Authorization header sent to the cross-origin server = %q, want empty", secondHopAuth)
 	}
 }
 

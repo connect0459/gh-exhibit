@@ -266,20 +266,30 @@ host) redirecting gh-exhibit's next request somewhere else, or downgrading
 it to an
 unencrypted connection.
 
-Independently of that check, every REST API request and every attachment
-fetch also refuses to follow an HTTP redirect (a `3xx` response) whose
-target origin differs from the origin the redirected request was itself
-sent to. This closes a gap the pagination-origin check above does not
-cover on its own: that check trusts the origin a response's own request
-actually reached, but an in-flight redirect on the very first page (or on
-a non-paginated fetch, or an attachment fetch, none of which the
-pagination check applies to at all) would otherwise let a compromised or
-misconfigured host redirect gh-exhibit to an attacker-controlled origin
-before any origin has been recorded to check against. The redirect guard
-is enforced one layer below the HTTP client's request/response handling
-(as the client's own transport), so a cross-origin redirect is refused
-before the redirected request is ever sent, not merely detected
-afterward.
+Independently of that check, every REST API request also refuses to follow
+an HTTP redirect (a `3xx` response) whose target origin differs from the
+origin the redirected request was itself sent to. This closes a gap the
+pagination-origin check above does not cover on its own: that check trusts
+the origin a response's own request actually reached, but an in-flight
+redirect on the very first page (or on a non-paginated fetch, neither of
+which the pagination check applies to at all) would otherwise let a
+compromised or misconfigured host redirect gh-exhibit to an
+attacker-controlled origin before any origin has been recorded to check
+against. The redirect guard is enforced one layer below the HTTP client's
+request/response handling (as the client's own transport), so a
+cross-origin redirect is refused before the redirected request is ever
+sent, not merely detected afterward.
+
+Attachment fetches are deliberately exempt from this redirect-origin
+guard: a real attachment URL (e.g. `github.com/user-attachments/assets/`)
+legitimately redirects cross-origin to serve its bytes (e.g. to a signed,
+time-limited S3 URL), so pinning the origin there would reject every such
+fetch rather than only a malicious one. This stays safe without the guard
+because `net/http` itself strips the `Authorization`/`Cookie` headers on a
+redirect whose host differs from the original request's, so the
+credential gh-exhibit's client attaches never reaches the redirect target;
+the existing response-size cap still bounds how much of whatever that
+target returns is read into memory.
 
 Both checks share a fail-closed default: an unknown or indeterminate
 expected origin is treated as a mismatch rather than trusted.
