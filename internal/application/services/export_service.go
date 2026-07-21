@@ -282,13 +282,10 @@ func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects
 
 		filename, err := r.attachment.Filename(r.contentType)
 		if err != nil {
-			// Defensive: r.attachment's URL is already validated by
-			// NewAttachment to match a GitHub user-attachments asset path,
-			// so its derived id can never actually fail
-			// valueobjects.NewAssetFilename. Treated as an ordinary
-			// per-attachment failure regardless, consistent with every
-			// other fetch-time failure in this loop — it must not abort
-			// the whole export.
+			// See services.Filename's own Godoc for why this can't
+			// actually happen; treated as an ordinary per-attachment
+			// failure regardless, consistent with every other fetch-time
+			// failure in this loop.
 			resolutions = append(resolutions, services.FetchFailed(r.attachment.URL(), err.Error()))
 			fmt.Fprintf(&failureLog, "%s: %s\n", r.attachment.URL(), err)
 			continue
