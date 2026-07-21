@@ -135,6 +135,14 @@ func TestNewIssueRef_RejectsRepoEqualToDot(t *testing.T) {
 	}
 }
 
+func TestNewIssueRef_RejectsRepoThatIsAllDots(t *testing.T) {
+	_, err := valueobjects.NewIssueRef("connect0459", "...", 1)
+
+	if err == nil {
+		t.Fatal(`expected an error for a repo that is entirely dots ("..."), got nil`)
+	}
+}
+
 func TestNewIssueRef_RejectsRepoContainingInvalidCharacter(t *testing.T) {
 	_, err := valueobjects.NewIssueRef("connect0459", "gh exhibit!", 1)
 

@@ -30,13 +30,29 @@ func NewAssetFilename(filename string) (AssetFilename, error) {
 	if filename == "" {
 		return AssetFilename{}, fmt.Errorf("attachment filename must not be empty")
 	}
-	if filename == "." || filename == ".." {
+	if isAllDotsWithOptionalTrailingSpaces(filename) {
 		return AssetFilename{}, fmt.Errorf("attachment filename must not be %q", filename)
 	}
 	if strings.ContainsAny(filename, `/\`) {
 		return AssetFilename{}, fmt.Errorf("attachment filename %q must not contain a path separator", filename)
 	}
 	return AssetFilename{value: filename}, nil
+}
+
+// isAllDotsWithOptionalTrailingSpaces reports whether s, once any trailing
+// spaces are stripped, consists entirely of '.' characters — generalizing
+// the exact "."/".." rejection to the same "resolves to a traversal-like
+// segment" property this type's constructor already claims to guarantee.
+// Trailing dots and spaces in a path component are documented as
+// significant on some Win32 file-handling code paths, which gh-exhibit's
+// Windows distribution target makes relevant here even though "." and
+// ".." are the only two segments POSIX itself treats specially.
+func isAllDotsWithOptionalTrailingSpaces(s string) bool {
+	trimmed := strings.TrimRight(s, " ")
+	if trimmed == "" {
+		return false
+	}
+	return strings.Trim(trimmed, ".") == ""
 }
 
 // String returns filename's raw value.
