@@ -9,9 +9,7 @@ import (
 )
 
 // documentWriter implements repositories.DocumentWriter against the local
-// filesystem. Unexported so callers depend only on the
-// repositories.DocumentWriter interface, not this infrastructure-layer
-// type.
+// filesystem.
 type documentWriter struct {
 	baseDir string
 }

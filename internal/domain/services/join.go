@@ -27,9 +27,8 @@ func BuildEntries(rawTimeline, rawReviewComments []json.RawMessage) ([]valueobje
 			skipped = append(skipped, SkipNote{Reason: err.Error(), Raw: raw})
 			continue
 		}
-		// A review comment id repeated across the page (e.g. overlapping
-		// pagination delivering the same comment twice) would otherwise
-		// render the same InlineReviewComment twice.
+		// See markSeen: without this, a duplicate id would render the same
+		// InlineReviewComment twice.
 		if markSeen(seenCommentIDs, id) {
 			skipped = append(skipped, SkipNote{
 				Reason: fmt.Sprintf("duplicate review comment id %d", id),

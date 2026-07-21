@@ -15,9 +15,7 @@ import (
 )
 
 // evidenceFetcher implements repositories.EvidenceFetcher against GitHub's
-// REST API via go-gh. Unexported so callers depend only on the
-// repositories.EvidenceFetcher interface, not this infrastructure-layer
-// type.
+// REST API via go-gh.
 type evidenceFetcher struct {
 	client requester
 	sleep  sleeper

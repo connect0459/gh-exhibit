@@ -24,9 +24,7 @@ type Attachment struct {
 // NewAttachment constructs an Attachment from its GitHub URL. It returns an
 // error if rawURL is not a well-formed absolute http(s) URL (see
 // valueobjects.NewUrl), or if its path does not match a GitHub
-// user-attachments asset path (see attachmentPathPattern) — otherwise a
-// URL like "https://github.com" would construct successfully and later
-// make Filename derive a nonsensical id from an empty path.
+// user-attachments asset path (see attachmentPathPattern).
 func NewAttachment(rawURL string) (Attachment, error) {
 	url, err := valueobjects.NewUrl(rawURL)
 	if err != nil {
@@ -83,13 +81,9 @@ func Detect(markdown []byte, host string) []Attachment {
 			continue
 		}
 		seen[url] = true
-		// urlPattern's own match shape guarantees a well-formed
-		// https?://host/... string for any host made of ordinary hostname
-		// characters (the only case this project's own host configuration
-		// produces), so this error is unreachable in practice; skipping
-		// rather than panicking still matches this project's defensive,
-		// skip-and-continue handling of every other value-object
-		// invariant.
+		// urlPattern reuses attachmentPathRawPattern (see its own comment),
+		// so this can't actually fail; skipped rather than panicking,
+		// matching this package's skip-and-continue handling elsewhere.
 		attachment, err := NewAttachment(url)
 		if err != nil {
 			continue

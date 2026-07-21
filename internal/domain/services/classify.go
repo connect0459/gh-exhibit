@@ -17,10 +17,12 @@ type classifiedItem struct {
 	review *reviewCandidate
 }
 
-// markSeen registers id in seen and reports whether it was already present.
-// id<=0 is never treated as a duplicate: it marks a missing or malformed id
-// rather than a genuine repeat, so registering it would let an unrelated
-// event with the same defaulted id be wrongly flagged as a duplicate.
+// markSeen registers id in seen and reports whether it was already present,
+// guarding a timeline event or review comment against being counted twice
+// when overlapping pagination delivers it on more than one page. id<=0 is
+// never treated as a duplicate: it marks a missing or malformed id rather
+// than a genuine repeat, so registering it would let an unrelated event
+// with the same defaulted id be wrongly flagged as a duplicate.
 func markSeen(seen map[int64]bool, id int64) (duplicate bool) {
 	if id <= 0 {
 		return false
@@ -60,9 +62,8 @@ func classify(rawTimeline []json.RawMessage) ([]classifiedItem, map[int64]bool, 
 				skipped = append(skipped, SkipNote{Reason: err.Error(), Raw: raw})
 				continue
 			}
-			// A comment id repeated across the timeline array (e.g.
-			// overlapping pagination delivering the same event twice)
-			// would otherwise render the same IssueComment twice.
+			// See markSeen: without this, a duplicate id would render
+			// the same IssueComment twice.
 			if markSeen(seenCommentedIDs, id) {
 				skipped = append(skipped, SkipNote{
 					Reason: fmt.Sprintf("duplicate commented event id %d", id),
@@ -78,10 +79,8 @@ func classify(rawTimeline []json.RawMessage) ([]classifiedItem, map[int64]bool, 
 				skipped = append(skipped, SkipNote{Reason: err.Error(), Raw: raw})
 				continue
 			}
-			// A review id repeated across the timeline array (e.g.
-			// overlapping pagination delivering the same event twice)
-			// would otherwise duplicate both the review and every inline
-			// comment bucketed under its id in the final render.
+			// See markSeen: without this, a duplicate id would duplicate
+			// both the review and every inline comment bucketed under it.
 			if id := item.review.id; markSeen(seenReviewIDs, id) {
 				skipped = append(skipped, SkipNote{
 					Reason: fmt.Sprintf("duplicate reviewed event id %d", id),

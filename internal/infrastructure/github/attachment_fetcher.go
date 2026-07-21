@@ -23,9 +23,7 @@ type doer interface {
 // is unrelated to the REST API host evidenceFetcher targets — so this type
 // wraps a plain *http.Client (via api.NewHTTPClient) rather than
 // evidenceFetcher's *api.RESTClient, which only knows how to build requests
-// relative to its configured Host. Unexported so callers depend only on the
-// repositories.AttachmentFetcher interface, not this infrastructure-layer
-// type.
+// relative to its configured Host.
 type attachmentFetcher struct {
 	client   doer
 	maxBytes int64
@@ -51,8 +49,7 @@ const maxAttachmentBytes = 100 * 1024 * 1024
 // stays safe without the guard because net/http itself strips the
 // Authorization/Cookie headers on a redirect whose host differs from the
 // original request's, so the credential this client attaches never
-// reaches the redirect target; maxAttachmentBytes still bounds how much of
-// whatever that target returns is read into memory.
+// reaches the redirect target.
 func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetcher, error) {
 	client, err := api.NewHTTPClient(opts)
 	if err != nil {

@@ -45,18 +45,13 @@ func pinRedirectOrigin(ctx context.Context) context.Context {
 // unexported. Installing this as ClientOptions.Transport instead reaches
 // the same effect from one layer below.
 //
-// A request's Context is preserved by net/http across every hop of a
-// redirect chain within one Do call (confirmed directly: the same *http.Request
-// context, and therefore the same pin, is visible to RoundTrip on every
-// hop) — but two independent Do calls sharing an ancestor context (e.g. a
-// caller's own ctx, wrapped separately by pinRedirectOrigin per call) get
-// independent pins, so this guard only ever compares origins within a
-// single logical request, never across separate ones. Cross-call
-// consistency (e.g. one paginated fetch's page 2 matching page 1's origin)
-// is a distinct concern handled at the application layer instead (see
-// validatePaginationOrigin in pagination.go), since a test harness or a
-// real caller may legitimately address separate calls through different
-// literal URLs that still resolve to the same real destination.
+// A request's Context is preserved across every hop of a redirect chain
+// within one Do call, so all hops of one logical request share the same
+// pin — but two independent Do calls get independent pins even when they
+// share an ancestor context. Cross-call origin consistency (e.g. one
+// paginated fetch's page 2 matching page 1's origin) is validated
+// separately, at the application layer (see validatePaginationOrigin in
+// pagination.go).
 func newRedirectGuardTransport(next http.RoundTripper) http.RoundTripper {
 	if next == nil {
 		next = http.DefaultTransport
