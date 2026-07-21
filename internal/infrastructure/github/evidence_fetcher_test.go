@@ -386,6 +386,46 @@ func TestFetchIssue_UsesFixedBackoffWhenRetryAfterOverflowsDuration(t *testing.T
 	}
 }
 
+func TestFetchIssue_UsesFixedBackoffWhenRateLimitResetOverflows(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("X-RateLimit-Reset", "9223372036854775807")
+	req := &fakeRequester{calls: []fakeCall{
+		{err: &api.HTTPError{StatusCode: http.StatusTooManyRequests, Headers: headers}},
+		{resp: okResponse()},
+	}}
+	spy := &sleepSpy{}
+	fetcher := &evidenceFetcher{client: req, sleep: spy.sleep}
+
+	_, err := fetcher.FetchIssue(context.Background(), testIssueRef(t))
+
+	if err != nil {
+		t.Fatalf("FetchIssue() error = %v, want nil", err)
+	}
+	if len(spy.waits) != 1 || spy.waits[0] != fixedBackoffBase {
+		t.Fatalf("waits = %v, want [%v] (an X-RateLimit-Reset that overflows time.Unix/time.Until must fall through to the fixed-backoff fallback)", spy.waits, fixedBackoffBase)
+	}
+}
+
+func TestFetchIssue_UsesFixedBackoffWhenRateLimitResetIsNegative(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("X-RateLimit-Reset", "-5")
+	req := &fakeRequester{calls: []fakeCall{
+		{err: &api.HTTPError{StatusCode: http.StatusTooManyRequests, Headers: headers}},
+		{resp: okResponse()},
+	}}
+	spy := &sleepSpy{}
+	fetcher := &evidenceFetcher{client: req, sleep: spy.sleep}
+
+	_, err := fetcher.FetchIssue(context.Background(), testIssueRef(t))
+
+	if err != nil {
+		t.Fatalf("FetchIssue() error = %v, want nil", err)
+	}
+	if len(spy.waits) != 1 || spy.waits[0] != fixedBackoffBase {
+		t.Fatalf("waits = %v, want [%v] (a negative X-RateLimit-Reset must fall through to the fixed-backoff fallback)", spy.waits, fixedBackoffBase)
+	}
+}
+
 func TestFetchIssue_DoesNotRetryANetworkLevelError(t *testing.T) {
 	wantErr := errors.New("connection refused")
 	req := &fakeRequester{calls: []fakeCall{{err: wantErr}}}

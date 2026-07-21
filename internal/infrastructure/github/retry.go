@@ -15,8 +15,9 @@ import (
 const (
 	maxRetryAttempts = 3
 	fixedBackoffBase = 1 * time.Second
-	// maxRetryAfterSeconds is the largest Retry-After value (in seconds) that
-	// converts to nanoseconds without overflowing time.Duration.
+	// maxRetryAfterSeconds is the largest Retry-After value, or
+	// X-RateLimit-Reset epoch, (in seconds) that converts to a wait duration
+	// without overflowing time.Duration or time.Unix's internal arithmetic.
 	maxRetryAfterSeconds = int64(math.MaxInt64) / int64(time.Second)
 )
 
@@ -109,7 +110,7 @@ func rateLimitResetDelay(h http.Header) (time.Duration, bool) {
 		return 0, false
 	}
 	epoch, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil {
+	if err != nil || epoch < 0 || epoch > maxRetryAfterSeconds {
 		return 0, false
 	}
 	wait := time.Until(time.Unix(epoch, 0))
