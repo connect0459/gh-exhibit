@@ -123,25 +123,38 @@ already constrained to GitHub's ASCII username/repository-name pattern.
 
 ## On-disk layout
 
-Raw JSON is split by source endpoint rather than consolidated into a
-self-authored wrapper, to keep each file's content a literal, verbatim REST
-response:
+Every artifact for a given issue/PR number lives under one self-contained
+directory (a page-bundle layout, the same shape as a Hugo/Zola leaf
+bundle), rather than a rendered file sitting as a same-stem sibling of a
+directory holding its own assets:
 
 ```text
-{output}/{repo}/{number}.json               issue or pull request resource
-{output}/{repo}/{number}.timeline.json       timeline (paginated responses concatenated into one array)
-{output}/{repo}/{number}.pull.json           pull request resource (PRs only)
-{output}/{repo}/{number}.review-comments.json inline review comments (PRs only)
-{output}/{repo}/{number}.md                  rendered Markdown
-{output}/{repo}/{number}/assets/{filename}   downloaded attachments
-{output}/{repo}/{number}/fetch-errors.log    this run's attachment fetch failures, if any
+{output}/{repo}/{number}/
+├── index.md                          rendered Markdown
+├── assets/{filename}                 downloaded attachments
+└── evidence/
+    ├── issue.json                    issue or pull request resource
+    ├── timeline.json                 timeline (paginated responses concatenated into one array)
+    ├── pull.json                     pull request resource (PRs only)
+    ├── review-comments.json          inline review comments (PRs only)
+    └── fetch-errors.log              this run's attachment fetch failures, if any
 ```
 
-`{repo}` only — the owner is deliberately not part of the path. Multi-page
-timeline/review-comment responses are spliced into one JSON array by
-concatenating each page's raw bytes directly (not `json.Marshal`-ing a
-`[]json.RawMessage` slice, which would compact each element's whitespace and
-break the verbatim guarantee).
+`{repo}` only — the owner is deliberately not part of the path. Raw JSON is
+split by source endpoint rather than consolidated into a self-authored
+wrapper, to keep each file's content a literal, verbatim REST response; the
+enclosing `evidence/` directory (rather than a `{number}` filename prefix)
+disambiguates it from the rendered document, since the number is already
+encoded by the parent directory. Multi-page timeline/review-comment
+responses are spliced into one JSON array by concatenating each page's raw
+bytes directly (not `json.Marshal`-ing a `[]json.RawMessage` slice, which
+would compact each element's whitespace and break the verbatim guarantee).
+
+`fetch-errors.log` lives under `evidence/` alongside the raw JSON rather
+than at the `{number}/` top level: the operative grouping is "final
+rendered exhibit" (`index.md` + `assets/`) vs. "everything else supporting
+it," so a gh-exhibit-generated log about a failed fetch belongs with the
+other non-presentation artifacts.
 
 `Export` runs every fetch, classify, and render step to completion before
 any file is written, so a failure during that phase leaves nothing on disk.
@@ -219,7 +232,7 @@ is mandatory, to keep the exported directory offline-verifiable. After a
 4. A failed fetch (broken link, access denied, network error) does not fail
    the export: the reference is rewritten to an inline placeholder noting
    the original URL and failure reason, and the run's failures are
-   persisted to `{number}/fetch-errors.log`. That log is written
+   persisted to `{number}/evidence/fetch-errors.log`. That log is written
    unconditionally (an all-succeeded or no-attachments run removes any
    stale log left by a prior failing run).
 5. A context cancellation/deadline during attachment fetching is not
