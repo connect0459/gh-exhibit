@@ -25,10 +25,7 @@ const toolName = "connect0459/gh-exhibit"
 // positional strings, deliberately: Host, OutputDir, Version, and Commit
 // are all plain strings with no compiler-visible distinction between them,
 // so a positional signature would let a caller transpose them silently;
-// naming the fields at every call site removes that risk instead of
-// relying on a test that couldn't meaningfully catch it either (every
-// construction still "succeeds" — reaching the wrong host, directory,
-// version, or commit only shows up at runtime).
+// naming the fields at every call site removes that risk.
 type Config struct {
 	// Host is the target repository's host (e.g. "github.com"), scoping
 	// both the GitHub REST and attachment-download clients this

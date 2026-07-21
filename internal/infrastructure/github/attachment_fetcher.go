@@ -49,8 +49,7 @@ const maxAttachmentBytes = 100 * 1024 * 1024
 // stays safe without the guard because net/http itself strips the
 // Authorization/Cookie headers on a redirect whose host differs from the
 // original request's, so the credential this client attaches never
-// reaches the redirect target; maxAttachmentBytes still bounds how much of
-// whatever that target returns is read into memory.
+// reaches the redirect target.
 func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetcher, error) {
 	client, err := api.NewHTTPClient(opts)
 	if err != nil {
