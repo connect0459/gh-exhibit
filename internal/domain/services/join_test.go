@@ -12,6 +12,8 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
+const testIssueURL = "https://github.com/example/repo/issues/1"
+
 func loadTestdata(t *testing.T, name string) json.RawMessage {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/" + name)
@@ -60,7 +62,7 @@ func TestBuildEntries_InsertsAnInlineCommentImmediatelyAfterItsParentReview(t *t
 	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
 	rawComments := []json.RawMessage{reviewCommentRaw(1001, "octocat", "Nit here.", "main.go", 10)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -83,7 +85,7 @@ func TestBuildEntries_PreservesOrderOfMultipleCommentsOnTheSameReview(t *testing
 		reviewCommentRaw(1001, "octocat", "Second nit.", "main.go", 20),
 	}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -104,7 +106,7 @@ func TestBuildEntries_PreservesOrderOfMultipleCommentsOnTheSameReview(t *testing
 func TestBuildEntries_StillRendersAReviewWithNoMatchingInlineComments(t *testing.T) {
 	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Approved, nothing to add.")}
 
-	entries, skipped := services.BuildEntries(rawTimeline, nil)
+	entries, skipped := services.BuildEntries(rawTimeline, nil, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -122,7 +124,7 @@ func TestBuildEntries_StillRendersAnOrphanedInlineCommentAtTheEnd(t *testing.T) 
 		reviewCommentRaw(9999, "octocat", "Comment on a review we never fetched.", "main.go", 5),
 	}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -146,7 +148,7 @@ func TestBuildEntries_RendersAReviewAndItsCommentsOnlyOnceWhenTheReviewedEventIs
 	}
 	rawComments := []json.RawMessage{reviewCommentRaw(1001, "octocat", "Nit here.", "main.go", 10)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 1 {
 		t.Fatalf("got %d skipped items, want 1 (the duplicate reviewed event)", len(skipped))
 	}
@@ -177,7 +179,7 @@ func TestBuildEntries_RendersAReviewCommentOnlyOnceWhenItsOwnIDIsDuplicated(t *t
 	}`)
 	rawComments := []json.RawMessage{comment, comment}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 1 {
 		t.Fatalf("got %d skipped items, want 1 (the duplicate review comment)", len(skipped))
 	}
@@ -202,7 +204,7 @@ func TestBuildEntries_DoesNotJoinACommentToAMalformedReviewWithIDZero(t *testing
 		reviewCommentRaw(0, "octocat", "Unrelated comment whose review id also defaulted to zero.", "main.go", 5),
 	}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -237,7 +239,7 @@ func TestBuildEntries_RendersAFileLevelReviewCommentWithoutALine(t *testing.T) {
 		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
 	}`)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -271,7 +273,7 @@ func TestBuildEntries_FallsBackToOriginalLineForAnOutdatedReviewComment(t *testi
 		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
 	}`)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -305,7 +307,7 @@ func TestBuildEntries_RecordsAStartLineForARangeAnchoredReviewComment(t *testing
 		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
 	}`)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -341,7 +343,7 @@ func TestBuildEntries_FallsBackToOriginalStartLineForAnOutdatedRangeReviewCommen
 		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
 	}`)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -376,7 +378,7 @@ func TestBuildEntries_AttributesAReviewCommentFromADeletedAccountToGhost(t *test
 		"html_url": "https://github.com/example/repo/pull/1#discussion_r10"
 	}`)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -397,7 +399,7 @@ func TestBuildEntries_SkipsAReviewCommentThatFailsToUnmarshal(t *testing.T) {
 	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
 	rawComments := []json.RawMessage{json.RawMessage(`{"pull_request_review_id": "not-a-number"}`)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 1 {
 		t.Fatalf("got %d skipped items, want 1", len(skipped))
 	}
@@ -409,7 +411,7 @@ func TestBuildEntries_SkipsAReviewCommentThatFailsToUnmarshal(t *testing.T) {
 func TestBuildEntries_SkipsACommentedEventWithNoHTMLURL(t *testing.T) {
 	raw := commentedEventRaw("octocat", "Looks good.", "")
 
-	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
 	if len(entries) != 0 {
 		t.Fatalf("got %d entries, want 0", len(entries))
 	}
@@ -432,7 +434,7 @@ func TestBuildEntries_SkipsAReviewedEventWithNoHTMLURL(t *testing.T) {
 		"html_url": ""
 	}`)
 
-	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
 	if len(entries) != 0 {
 		t.Fatalf("got %d entries, want 0", len(entries))
 	}
@@ -457,7 +459,7 @@ func TestBuildEntries_SkipsAReviewCommentWithNoHTMLURL(t *testing.T) {
 		"html_url": ""
 	}`)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 1 {
 		t.Fatalf("got %d skipped items, want 1", len(skipped))
 	}
@@ -473,7 +475,7 @@ func TestBuildEntries_SkipsAReviewCommentWithNoPath(t *testing.T) {
 	rawTimeline := []json.RawMessage{reviewedEventRaw(1001, "octocat", "Overall looks fine.")}
 	rawComments := []json.RawMessage{reviewCommentRaw(1001, "octocat", "Nit here.", "", 10)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 1 {
 		t.Fatalf("got %d skipped items, want 1", len(skipped))
 	}
@@ -490,7 +492,7 @@ func TestBuildEntries_PreservesOverallOrderWhenCommentsAndReviewsInterleave(t *t
 	}
 	rawComments := []json.RawMessage{reviewCommentRaw(1001, "octocat", "Nit here.", "main.go", 10)}
 
-	entries, skipped := services.BuildEntries(rawTimeline, rawComments)
+	entries, skipped := services.BuildEntries(rawTimeline, rawComments, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -515,7 +517,7 @@ func TestBuildEntries_PreservesOverallOrderWhenCommentsAndReviewsInterleave(t *t
 }
 
 func TestBuildEntries_ClassifiesACommentedEventIntoAnIssueComment(t *testing.T) {
-	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "commented_event.json")}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "commented_event.json")}, nil, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -544,7 +546,7 @@ func TestBuildEntries_ClassifiesACommentedEventIntoAnIssueComment(t *testing.T) 
 }
 
 func TestBuildEntries_ClassifiesAReviewedEventIntoAPullRequestReview(t *testing.T) {
-	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "reviewed_event.json")}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "reviewed_event.json")}, nil, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -585,7 +587,7 @@ func TestBuildEntries_AttributesACommentedEventFromADeletedAccountToGhost(t *tes
 		"html_url": "https://github.com/example/repo/issues/1#issuecomment-1"
 	}`)
 
-	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
@@ -608,7 +610,7 @@ func TestBuildEntries_SkipsAnUnparsableTimelineItemAndContinuesWithTheRest(t *te
 		loadTestdata(t, "commented_event.json"),
 	}
 
-	entries, skipped := services.BuildEntries(rawTimeline, nil)
+	entries, skipped := services.BuildEntries(rawTimeline, nil, testIssueURL)
 	if len(entries) != 1 {
 		t.Fatalf("got %d entries, want 1 (the still-valid one)", len(entries))
 	}
@@ -623,7 +625,7 @@ func TestBuildEntries_SkipsAnUnparsableTimelineItemAndContinuesWithTheRest(t *te
 func TestBuildEntries_SkipsACommentedEventThatFailsToUnmarshal(t *testing.T) {
 	raw := json.RawMessage(`{"event": "commented", "created_at": 12345}`)
 
-	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
 	if len(entries) != 0 {
 		t.Fatalf("got %d entries, want 0", len(entries))
 	}
@@ -645,7 +647,7 @@ func TestBuildEntries_SkipsAReviewedEventWithAnUnrecognizedState(t *testing.T) {
 		"html_url": "https://github.com/example/repo/pull/1#pullrequestreview-1"
 	}`)
 
-	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
 	if len(entries) != 0 {
 		t.Fatalf("got %d entries, want 0", len(entries))
 	}
@@ -657,7 +659,7 @@ func TestBuildEntries_SkipsAReviewedEventWithAnUnrecognizedState(t *testing.T) {
 func TestBuildEntries_SkipsAReviewedEventThatFailsToUnmarshal(t *testing.T) {
 	raw := json.RawMessage(`{"event": "reviewed", "submitted_at": 12345}`)
 
-	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
 	if len(entries) != 0 {
 		t.Fatalf("got %d entries, want 0", len(entries))
 	}
@@ -679,7 +681,7 @@ func TestBuildEntries_SkipsADuplicateCommentedEventSharingAnAlreadySeenID(t *tes
 		"html_url": "https://github.com/example/repo/issues/1#issuecomment-5001"
 	}`)
 
-	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil, testIssueURL)
 
 	if len(entries) != 1 {
 		t.Fatalf("got %d entries, want 1 (the duplicate should be skipped)", len(entries))
@@ -690,11 +692,189 @@ func TestBuildEntries_SkipsADuplicateCommentedEventSharingAnAlreadySeenID(t *tes
 }
 
 func TestBuildEntries_LeavesAnUnrecognizedEventKindUnclassifiedWithoutFailing(t *testing.T) {
-	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "review_requested_event.json")}, nil)
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "review_requested_event.json")}, nil, testIssueURL)
 	if len(entries) != 0 {
 		t.Fatalf("got %d entries for an unrecognized event, want 0", len(entries))
 	}
 	if len(skipped) != 0 {
 		t.Fatalf("got %d skipped items for an unrecognized-but-benign event, want 0: %#v", len(skipped), skipped)
+	}
+}
+
+func labelEventRaw(id int64, event, login, name, color string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{
+		"id": %d,
+		"event": %q,
+		"actor": {"login": %q},
+		"created_at": "2026-07-01T10:00:00Z",
+		"label": {"name": %q, "color": %q}
+	}`, id, event, login, name, color))
+}
+
+func TestBuildEntries_ClassifiesALabeledEventIntoALabelEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "labeled_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.LabelEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a LabelEvent: %#v", entries[0])
+	}
+
+	attribution, err := valueobjects.NewAttribution(
+		"tierninho",
+		time.Date(2020, 2, 4, 17, 57, 45, 0, time.UTC),
+		testIssueURL,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error building expected attribution: %v", err)
+	}
+	want, err := valueobjects.NewLabelEvent(attribution, valueobjects.LabelActionLabeled, "enhancement", "0dd8ac")
+	if err != nil {
+		t.Fatalf("unexpected error building expected label event: %v", err)
+	}
+
+	if !got.Equals(want) {
+		t.Fatalf("entries[0] = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildEntries_ClassifiesAnUnlabeledEventIntoALabelEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "unlabeled_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.LabelEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a LabelEvent: %#v", entries[0])
+	}
+	if got.Action() != valueobjects.LabelActionUnlabeled {
+		t.Fatalf("Action() = %v, want %v", got.Action(), valueobjects.LabelActionUnlabeled)
+	}
+	if got.Name() != "epic: repo" {
+		t.Fatalf("Name() = %q, want %q", got.Name(), "epic: repo")
+	}
+}
+
+func TestBuildEntries_AttributesALabelEventToTheIssuesOwnURLNotAPerEventURL(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{labelEventRaw(1, "labeled", "octocat", "bug", "d73a4a")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.LabelEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a LabelEvent: %#v", entries[0])
+	}
+	if got.Attribution().URL().String() != testIssueURL {
+		t.Fatalf("Attribution().URL() = %q, want the issue's own URL %q", got.Attribution().URL().String(), testIssueURL)
+	}
+}
+
+func TestBuildEntries_PreservesChronologicalOrderOfLabelEventsAmongOtherTimelineItems(t *testing.T) {
+	rawTimeline := []json.RawMessage{
+		commentedEventRaw("alice", "First comment.", "https://github.com/example/repo/issues/1#issuecomment-1"),
+		labelEventRaw(1, "labeled", "octocat", "bug", "d73a4a"),
+		labelEventRaw(2, "unlabeled", "octocat", "wontfix", "ffffff"),
+		commentedEventRaw("bob", "Second comment.", "https://github.com/example/repo/issues/1#issuecomment-2"),
+	}
+
+	entries, skipped := services.BuildEntries(rawTimeline, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 4 {
+		t.Fatalf("got %d entries, want 4", len(entries))
+	}
+
+	if _, ok := entries[0].(valueobjects.IssueComment); !ok {
+		t.Fatalf("entries[0] = %#v, want IssueComment", entries[0])
+	}
+	labeled, ok := entries[1].(valueobjects.LabelEvent)
+	if !ok || labeled.Action() != valueobjects.LabelActionLabeled {
+		t.Fatalf("entries[1] = %#v, want a labeled LabelEvent", entries[1])
+	}
+	unlabeled, ok := entries[2].(valueobjects.LabelEvent)
+	if !ok || unlabeled.Action() != valueobjects.LabelActionUnlabeled {
+		t.Fatalf("entries[2] = %#v, want an unlabeled LabelEvent", entries[2])
+	}
+	if _, ok := entries[3].(valueobjects.IssueComment); !ok {
+		t.Fatalf("entries[3] = %#v, want IssueComment", entries[3])
+	}
+}
+
+func TestBuildEntries_AttributesALabelEventFromADeletedActorToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1,
+		"event": "labeled",
+		"actor": null,
+		"created_at": "2026-07-01T00:00:00Z",
+		"label": {"name": "bug", "color": "d73a4a"}
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.LabelEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a LabelEvent: %#v", entries[0])
+	}
+	if got.Attribution().Author() != "ghost" {
+		t.Fatalf("Attribution().Author() = %q, want %q", got.Attribution().Author(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsALabelEventThatFailsToUnmarshal(t *testing.T) {
+	raw := json.RawMessage(`{"event": "labeled", "created_at": 12345}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "unmarshal") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the unmarshal failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsALabelEventWithAnEmptyLabelName(t *testing.T) {
+	raw := labelEventRaw(1, "labeled", "octocat", "", "d73a4a")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func TestBuildEntries_SkipsADuplicateLabeledEventSharingAnAlreadySeenID(t *testing.T) {
+	raw := labelEventRaw(1, "labeled", "octocat", "bug", "d73a4a")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil, testIssueURL)
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the duplicate should be skipped)", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
 	}
 }

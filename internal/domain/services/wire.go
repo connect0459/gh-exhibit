@@ -34,6 +34,20 @@ type reviewedEventWire struct {
 	HTMLURL     string    `json:"html_url"`
 }
 
+// labelEventWire is the shape of a "labeled"/"unlabeled" timeline event.
+// Unlike commentedEventWire/reviewedEventWire, its actor field is "actor"
+// (not "user"), and it carries no html_url of its own — GitHub gives it
+// only an API url (issues/events/{id}), not a page to link to.
+type labelEventWire struct {
+	ID        int64     `json:"id"`
+	Actor     actorWire `json:"actor"`
+	CreatedAt time.Time `json:"created_at"`
+	Label     struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	} `json:"label"`
+}
+
 type reviewCommentWire struct {
 	ID                  int64     `json:"id"`
 	PullRequestReviewID int64     `json:"pull_request_review_id"`

@@ -13,9 +13,10 @@ import (
 // its parent review. A comment whose review id matches nothing fetched is
 // appended at the end rather than dropped, so it isn't silently lost. A
 // timeline item or review comment that cannot be classified is recorded as
-// a SkipNote and skipped rather than aborting the whole call.
-func BuildEntries(rawTimeline, rawReviewComments []json.RawMessage) ([]valueobjects.Entry, []SkipNote) {
-	items, knownReviewIDs, skipped := classify(rawTimeline)
+// a SkipNote and skipped rather than aborting the whole call. issueURL is
+// the issue/PR's own html_url (see classifyLabelEvent).
+func BuildEntries(rawTimeline, rawReviewComments []json.RawMessage, issueURL string) ([]valueobjects.Entry, []SkipNote) {
+	items, knownReviewIDs, skipped := classify(rawTimeline, issueURL)
 
 	byReview := map[int64][]valueobjects.Entry{}
 	var orphaned []valueobjects.Entry

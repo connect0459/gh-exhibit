@@ -49,6 +49,13 @@ func (r IssueResource) IsPullRequest() bool {
 	return len(r.wire.PullRequest) > 0 && string(r.wire.PullRequest) != "null"
 }
 
+// HTMLURL returns the issue/PR resource's own html_url. Timeline events
+// with no per-event permalink of their own (e.g. "labeled"/"unlabeled")
+// fall back to this as their attribution's url.
+func (r IssueResource) HTMLURL() string {
+	return r.wire.HTMLURL
+}
+
 // BuildBody constructs the document title and the Body Tier 1 entry from
 // issue (already parsed via ParseIssueResource). rawPullRequest is the
 // pull resource (from EvidenceFetcher.FetchPullRequest) and should be

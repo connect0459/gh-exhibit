@@ -53,6 +53,17 @@ func TestIssueResource_IsPullRequest_FalseWhenThePullRequestKeyIsExplicitlyNull(
 	}
 }
 
+func TestIssueResource_HTMLURL_ReturnsTheIssueResourcesOwnHTMLURL(t *testing.T) {
+	raw := json.RawMessage(`{
+		"title": "Something is broken",
+		"html_url": "https://github.com/example/repo/issues/1"
+	}`)
+
+	if got := mustParseIssueResource(t, raw).HTMLURL(); got != "https://github.com/example/repo/issues/1" {
+		t.Fatalf("HTMLURL() = %q, want %q", got, "https://github.com/example/repo/issues/1")
+	}
+}
+
 func TestBuildBody_BuildsTitleAndBodyFromAPlainIssueResource(t *testing.T) {
 	raw := json.RawMessage(`{
 		"title": "Something is broken",

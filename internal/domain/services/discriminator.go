@@ -17,4 +17,6 @@ type eventKind string
 const (
 	eventKindCommented eventKind = "commented"
 	eventKindReviewed  eventKind = "reviewed"
+	eventKindLabeled   eventKind = "labeled"
+	eventKindUnlabeled eventKind = "unlabeled"
 )
