@@ -1,5 +1,9 @@
 # gh-exhibit
 
+[![CI](https://github.com/connect0459/gh-exhibit/actions/workflows/ci.yml/badge.svg)](https://github.com/connect0459/gh-exhibit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/connect0459/gh-exhibit/blob/main/LICENSE)
+[![GitHub CLI](https://img.shields.io/badge/gh-cli-blue.svg)](https://cli.github.com)
+
 A `gh` CLI extension that exports a GitHub issue or pull request's full
 discussion (body, comments, reviews, inline review comments, attachments)
 as offline-verifiable Markdown alongside the raw JSON evidence it was
