@@ -181,7 +181,7 @@ func TestIssueRef_Equals_TreatsDifferentlyCasedOwnerAndRepoAsEqual(t *testing.T)
 	}
 }
 
-func TestIssueRef_AssetPathJoinsTheIssueNumberAndFilenameUnderAssets(t *testing.T) {
+func TestIssueRef_AssetPathJoinsAssetsAndFilenameWithoutTheIssueNumber(t *testing.T) {
 	ref, err := valueobjects.NewIssueRef("connect0459", "gh-exhibit", 5)
 	if err != nil {
 		t.Fatalf("unexpected error building issue ref: %v", err)
@@ -189,7 +189,7 @@ func TestIssueRef_AssetPathJoinsTheIssueNumberAndFilenameUnderAssets(t *testing.
 
 	got := ref.AssetPath(newTestAssetFilename(t, "abc-123.png"))
 
-	want := "5/assets/abc-123.png"
+	want := "assets/abc-123.png"
 	if got != want {
 		t.Fatalf("AssetPath() = %q, want %q", got, want)
 	}
