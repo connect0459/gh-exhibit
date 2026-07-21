@@ -43,9 +43,10 @@ func ParseIssueResource(rawIssue json.RawMessage) (IssueResource, error) {
 // IsPullRequest reports whether the issue resource represents a pull
 // request, detected via presence of its own "pull_request" key — GitHub's
 // issues endpoint serves both issues and PRs, and only a PR's response
-// carries this key.
+// carries this key. An explicit JSON null is treated the same as an
+// absent key, since it carries no pull-request data either.
 func (r IssueResource) IsPullRequest() bool {
-	return len(r.wire.PullRequest) > 0
+	return len(r.wire.PullRequest) > 0 && string(r.wire.PullRequest) != "null"
 }
 
 // BuildBody constructs the document title and the Body Tier 1 entry from
