@@ -110,8 +110,12 @@ func TestRedirectGuardTransport_AllowsASubsequentOriginDifferingOnlyByCase(t *te
 func TestRedirectGuardTransport_DefaultsToHTTPDefaultTransportWhenGivenNoNext(t *testing.T) {
 	transport := newRedirectGuardTransport(nil)
 
-	if transport == nil {
-		t.Fatal("newRedirectGuardTransport(nil) = nil, want a usable RoundTripper")
+	guard, ok := transport.(*redirectGuardTransport)
+	if !ok {
+		t.Fatalf("newRedirectGuardTransport(nil) = %T, want *redirectGuardTransport", transport)
+	}
+	if guard.next != http.DefaultTransport {
+		t.Fatalf("newRedirectGuardTransport(nil).next = %v, want http.DefaultTransport", guard.next)
 	}
 }
 
