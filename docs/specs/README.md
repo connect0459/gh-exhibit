@@ -82,10 +82,11 @@ Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 (an absolute http/https URL, parsed and validated once at construction),
 `IssueRef` (owner, repo, number — validated against GitHub's own username/
 repository-name character-set and length rules), `Provenance` (tool,
-version, commit — the document-level `<!-- {"tool":...} -->` fields
-recording which gh-exhibit build produced a `Document`), `AssetFilename` (a
-downloaded attachment's on-disk filename, guaranteed by its constructor to
-be a single path-safe segment — see "Attachment policy" below).
+version, commit — which gh-exhibit build produced an export, persisted to
+`evidence/provenance.json` by `ProvenanceWriter` rather than rendered into
+`Document`), `AssetFilename` (a downloaded attachment's on-disk filename,
+guaranteed by its constructor to be a single path-safe segment — see
+"Attachment policy" below).
 
 ### Timeline classification
 
@@ -137,6 +138,7 @@ directory holding its own assets:
     ├── timeline.json                 timeline (paginated responses concatenated into one array)
     ├── pull.json                     pull request resource (PRs only)
     ├── review-comments.json          inline review comments (PRs only)
+    ├── provenance.json               which gh-exhibit tool/version/commit produced this export
     └── fetch-errors.log              this run's attachment fetch failures, if any
 ```
 
@@ -150,11 +152,17 @@ responses are spliced into one JSON array by concatenating each page's raw
 bytes directly (not `json.Marshal`-ing a `[]json.RawMessage` slice, which
 would compact each element's whitespace and break the verbatim guarantee).
 
-`fetch-errors.log` lives under `evidence/` alongside the raw JSON rather
-than at the `{number}/` top level: the operative grouping is "final
-rendered exhibit" (`index.md` + `assets/`) vs. "everything else supporting
-it," so a gh-exhibit-generated log about a failed fetch belongs with the
-other non-presentation artifacts.
+`fetch-errors.log` and `provenance.json` live under `evidence/` alongside
+the raw JSON rather than at the `{number}/` top level: the operative
+grouping is "final rendered exhibit" (`index.md` + `assets/`) vs.
+"everything else supporting it," so gh-exhibit-generated artifacts about
+the export itself — a failed fetch's log, or which tool/version/commit
+produced the export — belong with the other non-presentation artifacts.
+Unlike its four siblings, `provenance.json`'s content is not a verbatim
+external REST response — it is gh-exhibit's own self-reported
+`{"tool":...,"version":...,"commit":...}`, written by a distinct
+`ProvenanceWriter` port rather than `EvidenceWriter`, which is scoped to
+raw GitHub-origin data only.
 
 `Export` runs every fetch, classify, and render step to completion before
 any file is written, so a failure during that phase leaves nothing on disk.
@@ -167,13 +175,12 @@ itself (the raw JSON is).
 
 ## Markdown dialect
 
-One Markdown file per issue/PR: an H1 title line, then a document-level
-`<!-- {"tool":...,"version":...,"commit":...} -->` provenance line, then
-each entry's rendered output, separated by a `------` (6-hyphen) line. Each
-entry starts with a `<!-- {"meta":{...}} -->` line anchored to the start of
-a line — an HTML comment, hidden from a rendered Markdown preview but still
-greppable as raw text, wrapping a standalone-parseable JSON object (`meta`
-nested under its own key: `author`, `created` in RFC 3339 UTC, `url`, plus
+One Markdown file per issue/PR: an H1 title line, then each entry's
+rendered output, separated by a `------` (6-hyphen) line. Each entry starts
+with a `<!-- {"meta":{...}} -->` line anchored to the start of a line — an
+HTML comment, hidden from a rendered Markdown preview but still greppable
+as raw text, wrapping a standalone-parseable JSON object (`meta` nested
+under its own key: `author`, `created` in RFC 3339 UTC, `url`, plus
 type-specific fields — `PullRequestReview` includes `state`), optionally
 followed by a blank line and the entry's body content. `InlineReviewComment`
 renders its diff hunk under an explicit `**Diff:**` label in a fenced code
@@ -181,31 +188,29 @@ block, using a fence one backtick longer than the longest backtick run
 inside the hunk itself (minimum 3), so a hunk containing its own
 triple-backtick run cannot prematurely close the fence.
 
-The provenance line (`valueobjects.Provenance`) records which tool,
-version, and commit produced the file, once per document, so a copy taken
-out of its own repository/directory context still carries a record of its
-own origin. This is a self-reported identifier, not a tamper-resistant
-guarantee: nothing prevents a different tool (or a hand-written file) from
-claiming the same values.
+`index.md` deliberately mirrors GitHub's own content as closely as
+possible; which tool/version/commit produced the export is not GitHub
+content, so it is recorded separately as `evidence/provenance.json`
+(see "On-disk layout" above) rather than rendered into the Markdown
+itself.
 
-`<!-- {"meta":...} -->`, `<!-- {"tool":...} -->`, and `------` are
-deliberately non-standard tokens chosen to avoid collision with legitimate
-Markdown content (code blocks, YAML samples, `---` rules), on the condition
-that parsing stays anchored to the start of a line. An HTML comment's own
-terminator is the literal 3-character sequence `-->`; this is never
-produced from a field's own content, because both lines are built through
-plain `encoding/json.Marshal`, whose documented default behavior replaces
-every `<`, `>`, and `&` byte with its 6-character numeric escape instead of
+`<!-- {"meta":...} -->` and `------` are deliberately non-standard tokens
+chosen to avoid collision with legitimate Markdown content (code blocks,
+YAML samples, `---` rules), on the condition that parsing stays anchored
+to the start of a line. An HTML comment's own terminator is the literal
+3-character sequence `-->`; this is never produced from a field's own
+content, because the meta line is built through plain
+`encoding/json.Marshal`, whose documented default behavior replaces every
+`<`, `>`, and `&` byte with its 6-character numeric escape instead of
 emitting it raw (verified directly: marshaling a `>`-containing string
 never yields a literal `>` in the output). This holds regardless of what a
 field's own value contains — notably, `InlineReviewComment`'s `path` has
 no character-set constraint at all (`NewInlineContext` only rejects an
 empty one, since a git path may contain almost any byte), so it is this
 escaping behavior, not any field's content being inherently `>`-free, that
-keeps the comment from closing early. This does depend on
-`writeMetaLine`/`writeProvenanceLine` never switching to a `json.Encoder`
-with HTML escaping disabled, or to building the line by hand instead of
-through `encoding/json`.
+keeps the comment from closing early. This does depend on `writeMetaLine`
+never switching to a `json.Encoder` with HTML escaping disabled, or to
+building the line by hand instead of through `encoding/json`.
 
 ## Attachment policy
 
@@ -321,12 +326,12 @@ Onion architecture, following this project's own reference layout:
   attachment detection/rewriting (`attachment.go`, `resolution.go`,
   `filename.go`, `rewrite.go`). No I/O.
 - `internal/domain/repositories` — abstract ports the application layer
-  depends on: `EvidenceFetcher`, `EvidenceWriter`, `DocumentWriter`,
-  `AttachmentFetcher`, `AttachmentWriter`.
+  depends on: `EvidenceFetcher`, `EvidenceWriter`, `ProvenanceWriter`,
+  `DocumentWriter`, `AttachmentFetcher`, `AttachmentWriter`.
 - `internal/infrastructure/github` — `go-gh`-backed implementations of
   `EvidenceFetcher`/`AttachmentFetcher`, plus retry/pagination.
 - `internal/infrastructure/persistence` — local-filesystem implementations
-  of `EvidenceWriter`/`DocumentWriter`/`AttachmentWriter`.
+  of `EvidenceWriter`/`ProvenanceWriter`/`DocumentWriter`/`AttachmentWriter`.
 - `internal/application/services` — `ExportService`, orchestrating the
   ports above into one `Export` call. Distinct from
   `internal/domain/services` despite the shared base package name.
