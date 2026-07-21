@@ -156,4 +156,14 @@ func TestNewExportService_DownloadsAnAttachmentServedViaACrossOriginRedirect(t *
 	if _, err := os.Stat(errorLogPath); !os.IsNotExist(err) {
 		t.Fatalf("Stat(%q) error = %v, want the attachment fetch to have no failure to log", errorLogPath, err)
 	}
+
+	provenancePath := filepath.Join(outputDir, "hello-world", "42", "evidence", "provenance.json")
+	provenanceJSON, err := os.ReadFile(provenancePath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", provenancePath, err)
+	}
+	wantProvenance := `{"tool":"connect0459/gh-exhibit","version":"test-version","commit":"test-commit"}`
+	if string(provenanceJSON) != wantProvenance {
+		t.Fatalf("evidence/provenance.json = %s, want %s — Config.Version/Commit must reach the real request", provenanceJSON, wantProvenance)
+	}
 }

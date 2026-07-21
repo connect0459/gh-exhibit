@@ -16,8 +16,9 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/infrastructure/persistence"
 )
 
-// toolName identifies gh-exhibit itself in every Document's provenance
-// line, distinguishing its own output from a similar tool's.
+// toolName identifies gh-exhibit itself in every export's
+// evidence/provenance.json, distinguishing its own output from a similar
+// tool's.
 const toolName = "connect0459/gh-exhibit"
 
 // Config holds NewExportService's parameters. A struct rather than several
@@ -40,7 +41,7 @@ type Config struct {
 	OutputDir string
 
 	// Version and Commit identify the running gh-exhibit build, recorded
-	// in every Document's provenance line alongside toolName.
+	// in every export's evidence/provenance.json alongside toolName.
 	Version string
 	Commit  string
 
@@ -75,8 +76,9 @@ func NewExportService(cfg Config) (*services.ExportService, error) {
 	}
 
 	writer := persistence.NewEvidenceWriter(cfg.OutputDir)
+	provenanceWriter := persistence.NewProvenanceWriter(cfg.OutputDir)
 	docs := persistence.NewDocumentWriter(cfg.OutputDir)
 	assets := persistence.NewAttachmentWriter(cfg.OutputDir)
 
-	return services.NewExportService(fetcher, writer, docs, attachments, assets, cfg.Host, provenance), nil
+	return services.NewExportService(fetcher, writer, provenanceWriter, docs, attachments, assets, cfg.Host, provenance), nil
 }
