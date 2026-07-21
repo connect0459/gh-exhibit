@@ -616,7 +616,7 @@ func TestExportService_Export_DownloadsAnAttachmentReferencedInTheRenderedDocume
 	if strings.Contains(rendered, attachmentURL) {
 		t.Fatalf("rendered document = %q, want the attachment URL rewritten to its local path", rendered)
 	}
-	if !strings.Contains(rendered, "1/assets/abc-123.png") {
+	if !strings.Contains(rendered, "assets/abc-123.png") {
 		t.Fatalf("rendered document = %q, want it to reference the downloaded asset's local path", rendered)
 	}
 }

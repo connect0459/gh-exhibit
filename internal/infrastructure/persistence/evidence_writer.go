@@ -21,8 +21,8 @@ type evidenceWriter struct {
 }
 
 // NewEvidenceWriter builds a repositories.EvidenceWriter that persists raw
-// evidence under baseDir, at {repo}/{number}... (owner is deliberately not
-// part of the path).
+// evidence under baseDir, at {repo}/{number}/evidence/... (owner is
+// deliberately not part of the path).
 func NewEvidenceWriter(baseDir string) repositories.EvidenceWriter {
 	return &evidenceWriter{baseDir: baseDir}
 }
@@ -32,7 +32,7 @@ func (w *evidenceWriter) WriteIssue(ctx context.Context, ref valueobjects.IssueR
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return writeFile(issuePath(w.baseDir, ref, "json"), raw)
+	return writeFile(evidencePath(w.baseDir, ref, "issue.json"), raw)
 }
 
 // WriteTimeline implements repositories.EvidenceWriter.
@@ -44,7 +44,7 @@ func (w *evidenceWriter) WriteTimeline(ctx context.Context, ref valueobjects.Iss
 	if err != nil {
 		return fmt.Errorf("could not combine the timeline pages into one array for %s/%d: %w", ref.Repo(), ref.Number(), err)
 	}
-	return writeFile(issuePath(w.baseDir, ref, "timeline.json"), joined)
+	return writeFile(evidencePath(w.baseDir, ref, "timeline.json"), joined)
 }
 
 // WritePullRequest implements repositories.EvidenceWriter.
@@ -52,7 +52,7 @@ func (w *evidenceWriter) WritePullRequest(ctx context.Context, ref valueobjects.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return writeFile(issuePath(w.baseDir, ref, "pull.json"), raw)
+	return writeFile(evidencePath(w.baseDir, ref, "pull.json"), raw)
 }
 
 // WriteReviewComments implements repositories.EvidenceWriter.
@@ -64,14 +64,14 @@ func (w *evidenceWriter) WriteReviewComments(ctx context.Context, ref valueobjec
 	if err != nil {
 		return fmt.Errorf("could not combine the review comment pages into one array for %s/%d: %w", ref.Repo(), ref.Number(), err)
 	}
-	return writeFile(issuePath(w.baseDir, ref, "review-comments.json"), joined)
+	return writeFile(evidencePath(w.baseDir, ref, "review-comments.json"), joined)
 }
 
-// issuePath builds the on-disk path for ref's evidence file with the given
-// suffix, shared by evidenceWriter and documentWriter (owner is
-// deliberately not part of the path).
-func issuePath(baseDir string, ref valueobjects.IssueRef, suffix string) string {
-	return filepath.Join(baseDir, ref.Repo(), fmt.Sprintf("%d.%s", ref.Number(), suffix))
+// evidencePath builds the on-disk path for one of ref's raw evidence files
+// named filename, under {repo}/{number}/evidence/ (owner is deliberately
+// not part of the path).
+func evidencePath(baseDir string, ref valueobjects.IssueRef, filename string) string {
+	return filepath.Join(issueDir(baseDir, ref), "evidence", filename)
 }
 
 // joinRawArray concatenates items into a JSON array by splicing their raw

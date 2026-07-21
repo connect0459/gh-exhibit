@@ -17,8 +17,8 @@ type AttachmentWriter interface {
 	WriteAsset(ctx context.Context, ref valueobjects.IssueRef, filename valueobjects.AssetFilename, data []byte) error
 
 	// WriteFetchErrorLog persists this run's attachment fetch-failure
-	// summary to {repo}/{number}/fetch-errors.log, so a failure is
-	// traceable even after the Markdown placeholder is the only inline
+	// summary to {repo}/{number}/evidence/fetch-errors.log, so a failure
+	// is traceable even after the Markdown placeholder is the only inline
 	// trace of it. An empty log removes any existing fetch-errors.log
 	// instead of writing one, so a stale log from a prior failing run
 	// does not survive a rerun where every attachment now succeeds.

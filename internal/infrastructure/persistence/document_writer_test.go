@@ -20,7 +20,7 @@ func TestWriteDocument_WritesRenderedBytesVerbatimUnderRepoNumberWithMdSuffix(t 
 		t.Fatalf("WriteDocument() error = %v", err)
 	}
 
-	got := readFile(t, filepath.Join(baseDir, "hello-world", "42.md"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "index.md"))
 	if got != rendered {
 		t.Fatalf("WriteDocument() wrote %q, want %q", got, rendered)
 	}
@@ -38,8 +38,8 @@ func TestWriteDocument_OmitsOwnerFromThePath(t *testing.T) {
 		t.Fatalf("WriteDocument() error = %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(baseDir, "hello-world", "42.md")); err != nil {
-		t.Fatalf("expected file at hello-world/42.md regardless of owner, stat error = %v", err)
+	if _, err := os.Stat(filepath.Join(baseDir, "hello-world", "42", "index.md")); err != nil {
+		t.Fatalf("expected file at hello-world/42/index.md regardless of owner, stat error = %v", err)
 	}
 }
 
@@ -55,7 +55,7 @@ func TestWriteDocument_OverwritesAnExistingFileForTheSameRef(t *testing.T) {
 		t.Fatalf("WriteDocument() error = %v", err)
 	}
 
-	got := readFile(t, filepath.Join(baseDir, "hello-world", "42.md"))
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "index.md"))
 	if got != "# second\n" {
 		t.Fatalf("WriteDocument() wrote %q, want %q", got, "# second\n")
 	}
@@ -71,7 +71,7 @@ func TestWriteDocument_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCance
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("WriteDocument() error = %v, want context.Canceled", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42.md")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42", "index.md")); !os.IsNotExist(statErr) {
 		t.Fatalf("WriteDocument() wrote a file despite the cancelled context, stat error = %v", statErr)
 	}
 }

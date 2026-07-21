@@ -24,8 +24,8 @@ type attachmentWriter struct {
 
 // NewAttachmentWriter builds a repositories.AttachmentWriter that persists
 // fetched attachments and this run's failure log under baseDir, at
-// {repo}/{number}/assets/{filename} and {repo}/{number}/fetch-errors.log
-// respectively.
+// {repo}/{number}/assets/{filename} and
+// {repo}/{number}/evidence/fetch-errors.log respectively.
 func NewAttachmentWriter(baseDir string) repositories.AttachmentWriter {
 	return &attachmentWriter{baseDir: baseDir}
 }
@@ -47,7 +47,7 @@ func (w *attachmentWriter) WriteFetchErrorLog(ctx context.Context, ref valueobje
 		return err
 	}
 
-	path := filepath.Join(issueDir(w.baseDir, ref), "fetch-errors.log")
+	path := filepath.Join(issueDir(w.baseDir, ref), "evidence", "fetch-errors.log")
 	if len(log) == 0 {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("remove %s: %w", path, err)
@@ -57,9 +57,10 @@ func (w *attachmentWriter) WriteFetchErrorLog(ctx context.Context, ref valueobje
 	return writeFile(path, log)
 }
 
-// issueDir builds the on-disk directory for ref's per-issue attachment
-// artifacts (owner is deliberately not part of the path, matching
-// issuePath's own precedent).
+// issueDir builds the on-disk directory for ref's per-issue artifacts
+// (owner is deliberately not part of the path), shared by every writer in
+// this package: attachmentWriter uses it directly, evidenceWriter builds
+// on it via evidencePath, and documentWriter joins it with index.md.
 func issueDir(baseDir string, ref valueobjects.IssueRef) string {
 	return filepath.Join(baseDir, ref.Repo(), strconv.Itoa(ref.Number()))
 }

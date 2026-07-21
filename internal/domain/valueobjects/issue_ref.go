@@ -88,10 +88,11 @@ func (r IssueRef) Number() int {
 
 // AssetPath returns the relative path — from the rendered document's own
 // on-disk location — to a downloaded attachment named filename
-// ({number}/assets/{filename}), for referencing an issue's own downloaded
-// attachments from its rendered Markdown.
+// (assets/{filename}), for referencing an issue's own downloaded
+// attachments from its rendered Markdown. Both the document and its assets
+// live under the same {number}/ directory, so no number prefix is needed.
 func (r IssueRef) AssetPath(filename AssetFilename) string {
-	return fmt.Sprintf("%d/assets/%s", r.number, filename.String())
+	return fmt.Sprintf("assets/%s", filename.String())
 }
 
 // Equals reports whether r and other identify the same owner, repo, and
