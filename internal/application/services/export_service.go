@@ -23,23 +23,25 @@ import (
 // assemble it into a Document, download any referenced attachments, and
 // persist the rendered Markdown.
 type ExportService struct {
-	fetcher     repositories.EvidenceFetcher
-	writer      repositories.EvidenceWriter
-	docs        repositories.DocumentWriter
-	attachments repositories.AttachmentFetcher
-	assets      repositories.AttachmentWriter
-	host        string
-	provenance  valueobjects.Provenance
+	fetcher          repositories.EvidenceFetcher
+	writer           repositories.EvidenceWriter
+	provenanceWriter repositories.ProvenanceWriter
+	docs             repositories.DocumentWriter
+	attachments      repositories.AttachmentFetcher
+	assets           repositories.AttachmentWriter
+	host             string
+	provenance       valueobjects.Provenance
 }
 
-// NewExportService builds an ExportService from its five collaborating
+// NewExportService builds an ExportService from its six collaborating
 // ports (dependency inversion — this constructor takes abstract types,
 // not infrastructure-layer concrete implementations), host, the target
 // repository's own host (e.g. "github.com" or a GitHub Enterprise Server
 // hostname) used to recognize that host's own attachment URLs, and
-// provenance, recorded in every Document this ExportService renders.
-func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.EvidenceWriter, docs repositories.DocumentWriter, attachments repositories.AttachmentFetcher, assets repositories.AttachmentWriter, host string, provenance valueobjects.Provenance) *ExportService {
-	return &ExportService{fetcher: fetcher, writer: writer, docs: docs, attachments: attachments, assets: assets, host: host, provenance: provenance}
+// provenance, persisted via provenanceWriter for every ref this
+// ExportService exports.
+func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.EvidenceWriter, provenanceWriter repositories.ProvenanceWriter, docs repositories.DocumentWriter, attachments repositories.AttachmentFetcher, assets repositories.AttachmentWriter, host string, provenance valueobjects.Provenance) *ExportService {
+	return &ExportService{fetcher: fetcher, writer: writer, provenanceWriter: provenanceWriter, docs: docs, attachments: attachments, assets: assets, host: host, provenance: provenance}
 }
 
 // Export fetches, classifies, and renders the evidence for ref, returning
@@ -77,7 +79,7 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 	classified, skipped := services.BuildEntries(fetched.timeline, fetched.reviewComments)
 	entries := append([]valueobjects.Entry{body}, classified...)
 
-	doc, err := valueobjects.NewDocument(title, entries, s.provenance)
+	doc, err := valueobjects.NewDocument(title, entries)
 	if err != nil {
 		return nil, fmt.Errorf("assemble document: %w", err)
 	}
@@ -94,6 +96,9 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 
 	if err := s.writer.WriteIssue(ctx, ref, rawIssue); err != nil {
 		return nil, fmt.Errorf("could not persist the raw issue/PR resource: %w", err)
+	}
+	if err := s.provenanceWriter.WriteProvenance(ctx, ref, s.provenance); err != nil {
+		return nil, fmt.Errorf("could not persist which tool produced this export: %w", err)
 	}
 	if issue.IsPullRequest() {
 		if err := s.writer.WritePullRequest(ctx, ref, fetched.pullRequest); err != nil {
