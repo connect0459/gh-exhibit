@@ -96,11 +96,13 @@ guaranteed by its constructor to be a single path-safe segment — see
 
 ### Timeline classification
 
-Three of the five Tier 1 types (`IssueComment`, `PullRequestReview`,
-`LabelEvent`, and the timeline's other member kinds) are classified from
-`GET .../issues/{number}/timeline`'s heterogeneous array via a two-pass
-unmarshal (discriminator peek, then dispatch), checked for exhaustiveness by
-the `exhaustive` golangci-lint rule against `eventKind`.
+Three of the five Tier 1 types (`IssueComment`, `PullRequestReview`, and
+`LabelEvent`) are classified from `GET .../issues/{number}/timeline`'s
+heterogeneous array via a two-pass unmarshal (discriminator peek, then
+dispatch), checked for exhaustiveness by the `exhaustive` golangci-lint
+rule against `eventKind`. The timeline array also carries other event
+kinds with no corresponding Tier 1 type (e.g. `review_requested`), which
+are left unclassified rather than causing an error.
 `InlineReviewComment` is not part of the timeline array at all — it is
 fetched from `GET /pulls/{number}/comments` and joined to its parent
 `PullRequestReview` via `pull_request_review_id`, matching the `reviewed`
