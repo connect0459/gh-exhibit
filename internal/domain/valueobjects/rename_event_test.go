@@ -24,6 +24,14 @@ func mustNewRenameEvent(t *testing.T, attribution valueobjects.Attribution, from
 	return event
 }
 
+func TestNewRenameEvent_RejectsAnEmptyFrom(t *testing.T) {
+	_, err := valueobjects.NewRenameEvent(newRenameEventAttribution(t), "", "New title")
+
+	if err == nil {
+		t.Fatal("expected an error for an empty renamed-from title, got nil")
+	}
+}
+
 func TestNewRenameEvent_RejectsAnEmptyTo(t *testing.T) {
 	_, err := valueobjects.NewRenameEvent(newRenameEventAttribution(t), "Old title", "")
 

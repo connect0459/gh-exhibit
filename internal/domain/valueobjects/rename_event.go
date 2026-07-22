@@ -16,9 +16,14 @@ type RenameEvent struct {
 }
 
 // NewRenameEvent constructs a RenameEvent from its attribution and the
-// title's previous (from) and new (to) values. It returns an error if to is
-// empty.
+// title's previous (from) and new (to) values. It returns an error if
+// either from or to is empty: GitHub never allows an issue/PR title to be
+// empty, so either one being empty indicates a malformed payload rather
+// than a genuine title.
 func NewRenameEvent(attribution Attribution, from, to string) (RenameEvent, error) {
+	if from == "" {
+		return RenameEvent{}, errors.New("rename event from-title must not be empty")
+	}
 	if to == "" {
 		return RenameEvent{}, errors.New("rename event to-title must not be empty")
 	}
