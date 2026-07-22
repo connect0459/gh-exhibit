@@ -526,19 +526,38 @@ ordinary per-reference failure — it aborts the whole export, the same as
 any other fetch step.
 
 The substitution places the resolved title *before* the link rather than
-inside its `[...]` text — `{title} [{original text}](url)`, e.g. `Fix the
-thing [#42](https://github.com/owner/repo/issues/42)` — rather than
-`[{title}](url)`. An issue/PR title is arbitrary, attacker-influenceable
-text (anyone can title their own issue), so it is never embedded inside
-this rewrite's own constructed link syntax: the same "untrusted text is
-never placed inside a `[text](url)` span" precedent
-`changedFileLine`/`commitLine`/`issueSummaryLine`/`checkRunLine` already
-establish for a filename/commit identity/issue title/check-run name of
-their own (see "Pull request check-run rendering" above), applied here to
-a link this rewrite constructs itself rather than avoiding a link
+inside its `[...]` text — `` `{title}` [{original text}](url) ``, e.g.
+`` `Fix the thing` [#42](https://github.com/owner/repo/issues/42) `` —
+rather than `[{title}](url)`. An issue/PR title is arbitrary,
+attacker-influenceable text (anyone can title their own issue), so it is
+never embedded inside this rewrite's own constructed link syntax: the
+same "untrusted text is never placed inside a `[text](url)` span"
+precedent `changedFileLine`/`commitLine`/`issueSummaryLine`/`checkRunLine`
+already establish for a filename/commit identity/issue title/check-run
+name of their own (see "Pull request check-run rendering" above), applied
+here to a link this rewrite constructs itself rather than avoiding a link
 altogether. The original matched text (`#123` or `owner/repo#123`,
 verbatim as the author wrote it) is reused as the link's own label,
 rather than a normalized form.
+
+The title is additionally backtick-wrapped, rather than left as bare
+prose: without a delimiter, a title that itself starts with a bracketed
+tag (e.g. an issue titled "[Feature] ...", a common convention this
+project's own issues use) reads as ambiguous with this rewrite's own
+inserted text, with no visual boundary between the two. This matches the
+same backtick-wrapped-untrusted-text convention
+`issueSummaryLine`/`changedFileLine`/`commitLine`/`checkRunLine` already
+use elsewhere, and is safe for the same structural reason placing title
+outside the link already is: a backtick inside title only ends its own
+code span early, unlike `]`/`(`, it cannot affect this rewrite's own link
+destination, which is built entirely from url, never from title. The
+fence itself uses a backtick run one character longer than the longest
+run already inside title — the same longest-run-plus-one technique
+`diffFence` uses for a fenced diff hunk, adapted for an inline span — with
+a single padding space added when title starts or ends with a backtick,
+so the fence's own delimiter does not merge with title's; CommonMark
+strips exactly one leading and trailing space from a code span's content
+when it has both, so this padding never appears in the rendered result.
 
 This pass runs *after* the attachment policy's own detect/resolve/rewrite
 pass, not before: a referenced issue/PR's own title is text controlled by

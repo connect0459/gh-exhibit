@@ -1635,7 +1635,7 @@ func TestExportService_Export_LinksABareIssueReferenceWithItsResolvedTitle(t *te
 	}
 
 	rendered := string(docs.written)
-	want := "The referenced issue [#42](https://github.com/octocat/hello-world/issues/42)"
+	want := "`The referenced issue` [#42](https://github.com/octocat/hello-world/issues/42)"
 	if !strings.Contains(rendered, want) {
 		t.Fatalf("rendered document = %q, want it to contain %q", rendered, want)
 	}
@@ -1660,7 +1660,7 @@ func TestExportService_Export_LinksACrossRepoIssueReferenceWithItsResolvedTitle(
 	}
 
 	rendered := string(docs.written)
-	want := "Cross repo issue [other-owner/other-repo#7](https://github.com/other-owner/other-repo/issues/7)"
+	want := "`Cross repo issue` [other-owner/other-repo#7](https://github.com/other-owner/other-repo/issues/7)"
 	if !strings.Contains(rendered, want) {
 		t.Fatalf("rendered document = %q, want it to contain %q", rendered, want)
 	}
@@ -1713,7 +1713,7 @@ func TestExportService_Export_FetchesARepeatedIssueReferenceOnlyOnce(t *testing.
 	}
 
 	rendered := string(docs.written)
-	if strings.Count(rendered, "The referenced issue [#42]") != 2 {
+	if strings.Count(rendered, "`The referenced issue` [#42]") != 2 {
 		t.Fatalf("rendered document = %q, want both occurrences linked", rendered)
 	}
 }

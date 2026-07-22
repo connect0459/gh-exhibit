@@ -27,7 +27,7 @@ func TestRewriteIssueReferences_SubstitutesAResolvedReferenceWithTitleBeforeTheL
 		services.Resolved(refs[0], "Fix the thing", url),
 	})
 
-	want := "see Fix the thing [#42](https://github.com/connect0459/gh-exhibit/issues/42) for context"
+	want := "see `Fix the thing` [#42](https://github.com/connect0459/gh-exhibit/issues/42) for context"
 	if string(got) != want {
 		t.Fatalf("RewriteIssueReferences() = %q, want %q", got, want)
 	}
@@ -43,7 +43,55 @@ func TestRewriteIssueReferences_UsesTheOriginalMatchedTextAsTheLinkLabel(t *test
 		services.Resolved(refs[0], "Fix the thing", url),
 	})
 
-	want := "see Fix the thing [other-owner/other-repo#42](https://github.com/other-owner/other-repo/issues/42) for context"
+	want := "see `Fix the thing` [other-owner/other-repo#42](https://github.com/other-owner/other-repo/issues/42) for context"
+	if string(got) != want {
+		t.Fatalf("RewriteIssueReferences() = %q, want %q", got, want)
+	}
+}
+
+func TestRewriteIssueReferences_UsesALongerFenceWhenTheTitleContainsABacktick(t *testing.T) {
+	current := mustIssueRef(t, "connect0459", "gh-exhibit", 1)
+	markdown := []byte("see #42 for context")
+	refs := services.DetectIssueReferences(markdown, current)
+	url := mustReferenceURL(t, "https://github.com/connect0459/gh-exhibit/issues/42")
+
+	got := services.RewriteIssueReferences(markdown, []services.ResolvedIssueReference{
+		services.Resolved(refs[0], "Use `foo` here", url),
+	})
+
+	want := "see ``Use `foo` here`` [#42](https://github.com/connect0459/gh-exhibit/issues/42) for context"
+	if string(got) != want {
+		t.Fatalf("RewriteIssueReferences() = %q, want %q", got, want)
+	}
+}
+
+func TestRewriteIssueReferences_PadsWithASpaceWhenTheTitleStartsWithABacktick(t *testing.T) {
+	current := mustIssueRef(t, "connect0459", "gh-exhibit", 1)
+	markdown := []byte("see #42 for context")
+	refs := services.DetectIssueReferences(markdown, current)
+	url := mustReferenceURL(t, "https://github.com/connect0459/gh-exhibit/issues/42")
+
+	got := services.RewriteIssueReferences(markdown, []services.ResolvedIssueReference{
+		services.Resolved(refs[0], "`code` in the title", url),
+	})
+
+	want := "see `` `code` in the title `` [#42](https://github.com/connect0459/gh-exhibit/issues/42) for context"
+	if string(got) != want {
+		t.Fatalf("RewriteIssueReferences() = %q, want %q", got, want)
+	}
+}
+
+func TestRewriteIssueReferences_UsesAFenceLongerThanTheLongestInternalBacktickRun(t *testing.T) {
+	current := mustIssueRef(t, "connect0459", "gh-exhibit", 1)
+	markdown := []byte("see #42 for context")
+	refs := services.DetectIssueReferences(markdown, current)
+	url := mustReferenceURL(t, "https://github.com/connect0459/gh-exhibit/issues/42")
+
+	got := services.RewriteIssueReferences(markdown, []services.ResolvedIssueReference{
+		services.Resolved(refs[0], "a``b", url),
+	})
+
+	want := "see ```a``b``` [#42](https://github.com/connect0459/gh-exhibit/issues/42) for context"
 	if string(got) != want {
 		t.Fatalf("RewriteIssueReferences() = %q, want %q", got, want)
 	}
@@ -84,7 +132,7 @@ func TestRewriteIssueReferences_HandlesMultipleReferencesInASinglePass(t *testin
 		services.Unresolved(refs[1]),
 	})
 
-	want := "First [#1](https://github.com/connect0459/gh-exhibit/issues/1) then #2"
+	want := "`First` [#1](https://github.com/connect0459/gh-exhibit/issues/1) then #2"
 	if string(got) != want {
 		t.Fatalf("RewriteIssueReferences() = %q, want %q", got, want)
 	}
