@@ -295,9 +295,19 @@ are done.
 the same shape `LabelEvent` uses for a single self-contained fact — its
 meta line already carries the parent's number, title, state, and url in
 full. `SubIssues` renders a `sub_issues` count in its meta line plus a
-bullet list of every child's number, title, and state, the same
-count-in-meta-plus-per-item-list shape `PullRequestCommits` uses for its
-own list of commits.
+bullet list of every child, the same count-in-meta-plus-per-item-list
+shape `PullRequestCommits` uses for its own list of commits. Each bullet
+(`issueSummaryLine`) reuses the title-first, backtick-wrapped,
+linked-number shape "Issue/PR reference linking" below established for a
+bare issue/PR reference — `` `{title}` [#{number}](url) ({state}) ``,
+e.g. `` `Include issue/PR labels` [#65](https://github.com/example/repo/issues/65) (closed) ``
+— rather than its own earlier `` `#{number}` {title} ({state}) `` shape,
+which left title as unlinked plain prose. The backtick-fencing technique
+(`titleCodeSpan`/`longestBacktickRun`) is duplicated in `valueobjects`
+rather than shared with `services`' own copy: `services` already depends
+on `valueobjects`, so the reverse dependency sharing would need is
+unavailable, and this project prefers duplication over a premature
+cross-package abstraction for a handful of similar lines.
 
 ### Pull request check-run rendering
 

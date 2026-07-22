@@ -3,6 +3,7 @@ package valueobjects
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // IssueSummary is a lightweight reference to an issue related to the one
@@ -62,7 +63,44 @@ func (s IssueSummary) Equals(other IssueSummary) bool {
 }
 
 // issueSummaryLine formats s as a single bullet-list line, used by
-// SubIssues' Render.
+// SubIssues' Render. It reuses the title-first, backtick-wrapped,
+// linked-number shape services.RewriteIssueReferences established for a
+// bare issue/PR reference elsewhere in a rendered document, rather than
+// leaving s's title as unlinked plain text.
 func issueSummaryLine(s IssueSummary) string {
-	return fmt.Sprintf("`#%d` %s (%s)", s.number, s.title, s.state.String())
+	return fmt.Sprintf("%s [#%d](%s) (%s)", titleCodeSpan(s.title), s.number, s.url, s.state.String())
+}
+
+// titleCodeSpan returns title wrapped in an inline code span, using a
+// backtick fence one character longer than the longest run of backticks
+// already inside title, with a padding space added when title starts or
+// ends with a backtick so the fence's own delimiter does not merge with
+// title's. This duplicates services.titleCodeSpan rather than sharing it:
+// services already depends on valueobjects, so the reverse dependency
+// this shape would need is unavailable, and this project prefers
+// duplication over a premature cross-package abstraction for a handful of
+// similar lines.
+func titleCodeSpan(title string) string {
+	fence := strings.Repeat("`", longestBacktickRun(title)+1)
+	if strings.HasPrefix(title, "`") || strings.HasSuffix(title, "`") {
+		return fence + " " + title + " " + fence
+	}
+	return fence + title + fence
+}
+
+// longestBacktickRun returns the length of the longest run of consecutive
+// backtick characters in s.
+func longestBacktickRun(s string) int {
+	longest, current := 0, 0
+	for _, r := range s {
+		if r == '`' {
+			current++
+			if current > longest {
+				longest = current
+			}
+		} else {
+			current = 0
+		}
+	}
+	return longest
 }

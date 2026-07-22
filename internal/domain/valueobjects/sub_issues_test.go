@@ -29,10 +29,42 @@ func TestSubIssues_Render_ListsEachChildWithItsCompletionStatus(t *testing.T) {
 
 	want := "<!-- {\"meta\":{\"author\":\"octocat\",\"created\":\"2026-07-02T14:19:40Z\",\"sub_issues\":2,\"url\":\"https://github.com/example/repo/issues/64\"}} -->\n" +
 		"\n" +
-		"- `#65` Include issue/PR labels (closed)\n" +
-		"- `#69` Include parent/child issue relationships (open)\n"
+		"- `Include issue/PR labels` [#65](https://github.com/example/repo/issues/65) (closed)\n" +
+		"- `Include parent/child issue relationships` [#69](https://github.com/example/repo/issues/69) (open)\n"
 	if buf.String() != want {
 		t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
+	}
+}
+
+func TestSubIssues_Render_UsesALongerFenceWhenAChildTitleContainsABacktick(t *testing.T) {
+	children := []valueobjects.IssueSummary{
+		mustNewIssueSummary(t, 65, "Use `foo` here", valueobjects.IssueStateOpen, "https://github.com/example/repo/issues/65"),
+	}
+	s := valueobjects.NewSubIssues(newSubIssuesAttribution(t), children)
+
+	var buf strings.Builder
+	if err := s.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering sub-issues: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "- ``Use `foo` here`` [#65](https://github.com/example/repo/issues/65) (open)\n") {
+		t.Fatalf("Render() = %q, want a bullet with a double-backtick fence", buf.String())
+	}
+}
+
+func TestSubIssues_Render_PadsWithASpaceWhenAChildTitleStartsWithABacktick(t *testing.T) {
+	children := []valueobjects.IssueSummary{
+		mustNewIssueSummary(t, 65, "`code` in the title", valueobjects.IssueStateOpen, "https://github.com/example/repo/issues/65"),
+	}
+	s := valueobjects.NewSubIssues(newSubIssuesAttribution(t), children)
+
+	var buf strings.Builder
+	if err := s.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering sub-issues: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "- `` `code` in the title `` [#65](https://github.com/example/repo/issues/65) (open)\n") {
+		t.Fatalf("Render() = %q, want a bullet padded around the leading backtick", buf.String())
 	}
 }
 
