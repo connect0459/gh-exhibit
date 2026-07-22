@@ -90,12 +90,21 @@ func (r *evidenceFetcher) FetchSubIssues(ctx context.Context, ref valueobjects.I
 	return r.fetchPaginated(ctx, issuePath(ref)+"/sub_issues")
 }
 
+// FetchCheckRuns implements repositories.EvidenceFetcher.
+func (r *evidenceFetcher) FetchCheckRuns(ctx context.Context, ref valueobjects.IssueRef, commitSHA string) ([]json.RawMessage, error) {
+	return r.fetchPaginatedDecode(ctx, checkRunsPath(ref, commitSHA), decodeCheckRunsPage)
+}
+
 func issuePath(ref valueobjects.IssueRef) string {
 	return fmt.Sprintf("repos/%s/%s/issues/%d", ref.Owner(), ref.Repo(), ref.Number())
 }
 
 func pullPath(ref valueobjects.IssueRef) string {
 	return fmt.Sprintf("repos/%s/%s/pulls/%d", ref.Owner(), ref.Repo(), ref.Number())
+}
+
+func checkRunsPath(ref valueobjects.IssueRef, commitSHA string) string {
+	return fmt.Sprintf("repos/%s/%s/commits/%s/check-runs", ref.Owner(), ref.Repo(), commitSHA)
 }
 
 func (r *evidenceFetcher) fetchSingle(ctx context.Context, path string) (json.RawMessage, error) {
@@ -124,6 +133,34 @@ const maxPaginationPages = 1000
 // pages, following the Link header's "next" relation; the caller, not this
 // fetcher, concatenates pages into a single persisted array.
 func (r *evidenceFetcher) fetchPaginated(ctx context.Context, path string) ([]json.RawMessage, error) {
+	return r.fetchPaginatedDecode(ctx, path, decodeArrayPage)
+}
+
+// decodeArrayPage decodes a page whose own response body is a bare JSON
+// array, the shape most paginated GitHub REST endpoints use.
+func decodeArrayPage(dec *json.Decoder) ([]json.RawMessage, error) {
+	var page []json.RawMessage
+	err := dec.Decode(&page)
+	return page, err
+}
+
+// decodeCheckRunsPage decodes a page whose response body wraps its items
+// under a "check_runs" key alongside a "total_count" — the shape GET
+// /commits/{sha}/check-runs uses instead of a bare array.
+func decodeCheckRunsPage(dec *json.Decoder) ([]json.RawMessage, error) {
+	var page struct {
+		CheckRuns []json.RawMessage `json:"check_runs"`
+	}
+	err := dec.Decode(&page)
+	return page.CheckRuns, err
+}
+
+// fetchPaginatedDecode returns one json.RawMessage per item across all
+// pages, following the Link header's "next" relation; the caller, not this
+// fetcher, concatenates pages into a single persisted array. decode
+// extracts a page's items from its own response body shape, since not
+// every paginated endpoint returns a bare array (see decodeCheckRunsPage).
+func (r *evidenceFetcher) fetchPaginatedDecode(ctx context.Context, path string, decode func(*json.Decoder) ([]json.RawMessage, error)) ([]json.RawMessage, error) {
 	var all []json.RawMessage
 	var expectedOrigin string
 
@@ -140,8 +177,7 @@ func (r *evidenceFetcher) fetchPaginated(ctx context.Context, path string) ([]js
 			expectedOrigin = requestOrigin(resp)
 		}
 
-		var page []json.RawMessage
-		decodeErr := json.NewDecoder(resp.Body).Decode(&page)
+		page, decodeErr := decode(json.NewDecoder(resp.Body))
 		_ = resp.Body.Close()
 		if decodeErr != nil {
 			return nil, fmt.Errorf("decode GitHub API page for %s: %w", path, decodeErr)

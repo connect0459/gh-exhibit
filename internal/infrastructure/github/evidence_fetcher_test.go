@@ -239,6 +239,54 @@ func TestFetchSubIssues_FollowsLinkHeaderAndConcatenatesPages(t *testing.T) {
 	}
 }
 
+func TestFetchCheckRuns_FollowsLinkHeaderAndConcatenatesPages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/octocat/hello-world/commits/abc1234/check-runs" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		switch r.URL.Query().Get("page") {
+		case "", "1":
+			w.Header().Set("Link", fmt.Sprintf(`<http://%s/repos/octocat/hello-world/commits/abc1234/check-runs?page=2>; rel="next"`, r.Host))
+			_, _ = w.Write([]byte(`{"total_count":2,"check_runs":[{"name":"build"}]}`))
+		case "2":
+			_, _ = w.Write([]byte(`{"total_count":2,"check_runs":[{"name":"test"}]}`))
+		default:
+			t.Errorf("unexpected page: %s", r.URL.Query().Get("page"))
+		}
+	}))
+	defer server.Close()
+
+	fetcher := newTestFetcher(t, server)
+	got, err := fetcher.FetchCheckRuns(context.Background(), testIssueRef(t), "abc1234")
+	if err != nil {
+		t.Fatalf("FetchCheckRuns() error = %v", err)
+	}
+	if len(got) != 2 || string(got[0]) != `{"name":"build"}` || string(got[1]) != `{"name":"test"}` {
+		t.Fatalf("FetchCheckRuns() = %v, want [{\"name\":\"build\"} {\"name\":\"test\"}]", got)
+	}
+}
+
+func TestFetchCheckRuns_StopsAfterOnePageWhenLinkHeaderIsAbsent(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(`{"total_count":1,"check_runs":[{"name":"build"}]}`))
+	}))
+	defer server.Close()
+
+	fetcher := newTestFetcher(t, server)
+	got, err := fetcher.FetchCheckRuns(context.Background(), testIssueRef(t), "abc1234")
+	if err != nil {
+		t.Fatalf("FetchCheckRuns() error = %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("server received %d calls, want 1 (no Link header means no next page)", calls)
+	}
+	if len(got) != 1 || string(got[0]) != `{"name":"build"}` {
+		t.Fatalf("FetchCheckRuns() = %v, want [{\"name\":\"build\"}]", got)
+	}
+}
+
 func TestFetchIssue_RetriesAfterRateLimitedResponseThenSucceeds(t *testing.T) {
 	const body = `{"number":42,"title":"Some issue"}`
 	calls := 0

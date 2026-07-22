@@ -214,6 +214,41 @@ func TestWriteSubIssues_WritesAnEmptyArrayWhenGivenNoItems(t *testing.T) {
 	}
 }
 
+func TestWriteCheckRuns_ConcatenatesItemsIntoOneArrayFileWithCheckRunsSuffix(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+	items := []json.RawMessage{
+		json.RawMessage(`{"name":"build"}`),
+		json.RawMessage(`{"name":"test"}`),
+	}
+
+	err := writer.WriteCheckRuns(context.Background(), testIssueRef(t), items)
+	if err != nil {
+		t.Fatalf("WriteCheckRuns() error = %v", err)
+	}
+
+	want := `[{"name":"build"},{"name":"test"}]`
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "check-runs.json"))
+	if got != want {
+		t.Fatalf("WriteCheckRuns() wrote %q, want %q", got, want)
+	}
+}
+
+func TestWriteCheckRuns_WritesAnEmptyArrayWhenGivenNoItems(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+
+	err := writer.WriteCheckRuns(context.Background(), testIssueRef(t), nil)
+	if err != nil {
+		t.Fatalf("WriteCheckRuns() error = %v", err)
+	}
+
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "check-runs.json"))
+	if got != "[]" {
+		t.Fatalf("WriteCheckRuns() wrote %q, want \"[]\"", got)
+	}
+}
+
 func TestWriteParentIssue_WritesResponseBodyVerbatimWithParentIssueSuffix(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewEvidenceWriter(baseDir)

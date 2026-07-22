@@ -37,4 +37,9 @@ type EvidenceFetcher interface {
 	// across all pages. Callers should only call this once ref is known to
 	// be a plain issue: a pull request always has no sub-issues.
 	FetchSubIssues(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error)
+	// FetchCheckRuns fetches the check runs associated with commitSHA (a
+	// pull request's head commit), one raw JSON element per item across all
+	// pages. Callers should only call this once ref is known to be a pull
+	// request and commitSHA has been resolved from its head commit.
+	FetchCheckRuns(ctx context.Context, ref valueobjects.IssueRef, commitSHA string) ([]json.RawMessage, error)
 }

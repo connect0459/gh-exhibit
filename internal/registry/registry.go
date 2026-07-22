@@ -12,6 +12,7 @@ import (
 
 	"github.com/connect0459/gh-exhibit/internal/application/services"
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
+	"github.com/connect0459/gh-exhibit/internal/infrastructure/clock"
 	"github.com/connect0459/gh-exhibit/internal/infrastructure/github"
 	"github.com/connect0459/gh-exhibit/internal/infrastructure/persistence"
 )
@@ -77,5 +78,5 @@ func NewExportService(cfg Config) (*services.ExportService, error) {
 	docs := persistence.NewDocumentWriter(cfg.OutputDir)
 	assets := persistence.NewAttachmentWriter(cfg.OutputDir)
 
-	return services.NewExportService(fetcher, writer, provenanceWriter, docs, attachments, assets, cfg.Host, provenance), nil
+	return services.NewExportService(fetcher, writer, provenanceWriter, docs, attachments, assets, cfg.Host, provenance, clock.NewClock()), nil
 }

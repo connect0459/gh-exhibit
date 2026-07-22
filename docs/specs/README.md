@@ -63,7 +63,7 @@ gh exhibit --version
 
 ### Tier 1 entries
 
-The rendered Markdown's content is drawn from thirteen entry types, all
+The rendered Markdown's content is drawn from fourteen entry types, all
 Value Objects (no identity-based tracking — re-fetch diffing is git's job
 in the separate repository the evidence is copied into, not gh-exhibit's):
 
@@ -110,8 +110,14 @@ in the separate repository the evidence is copied into, not gh-exhibit's):
   only when at least one exists), sourced from `GET
   /issues/{number}/sub_issues`, carrying a list of `IssueSummary`. See
   "Parent issue and sub-issue rendering" below.
+- `PullRequestChecks` — the check runs associated with a pull request's
+  head commit (PRs only, and only when at least one check run exists),
+  sourced from `GET /repos/{owner}/{repo}/commits/{sha}/check-runs`,
+  carrying a list of `CheckRun` (name, `CheckOutcome`, url) plus the head
+  commit sha and a `capturedAt` timestamp. See "Pull request check-run
+  rendering" below.
 
-All thirteen implement the sealed `valueobjects.Entry` interface
+All fourteen implement the sealed `valueobjects.Entry` interface
 (`Render(io.Writer) error` plus an unexported marker method) — the closest
 Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 (author, created, url — the common `<!-- {"meta":...} -->` fields), `Url`
@@ -123,7 +129,10 @@ followed by trailing spaces, via the same check `AssetFilename` uses —
 see "Attachment policy" below), `IssueSummary` (number, title, `IssueState`,
 url — a lightweight reference to a related issue, distinct from `IssueRef`
 in that it is display data already resolved from a fetched resource rather
-than an address used to fetch one), `Provenance` (tool,
+than an address used to fetch one), `CheckRun` (name, `CheckOutcome`, url
+— one check run), `CheckOutcome` (an enum unifying a check run's `status`
+before it completes with its `conclusion` once it does — see "Pull request
+check-run rendering" below), `Provenance` (tool,
 version, commit — which gh-exhibit build produced an export, persisted to
 `evidence/provenance.json` by `ProvenanceWriter` rather than rendered into
 `Document`), `AssetFilename` (a downloaded attachment's on-disk filename,
@@ -132,7 +141,7 @@ guaranteed by its constructor to be a single path-safe segment — see
 
 ### Timeline classification
 
-Seven of the thirteen Tier 1 types (`IssueComment`, `PullRequestReview`,
+Seven of the fourteen Tier 1 types (`IssueComment`, `PullRequestReview`,
 `LabelEvent`, `ClosureEvent`, `RenameEvent`, `MilestoneEvent`, and
 `AssignmentEvent`) are classified from `GET .../issues/{number}/timeline`'s
 heterogeneous array via a two-pass unmarshal (discriminator peek, then
@@ -290,6 +299,61 @@ bullet list of every child's number, title, and state, the same
 count-in-meta-plus-per-item-list shape `PullRequestCommits` uses for its
 own list of commits.
 
+### Pull request check-run rendering
+
+Unlike every other Tier 1 entry, the content `PullRequestChecks` captures
+can keep changing after the export is taken — a check can be re-run, or a
+pending one can later resolve — so it is a snapshot of something that may
+still be moving, not a fixed fact the way a posted comment or review is.
+This is addressed by recording an explicit `captured_at` timestamp (the
+wall-clock time the check-run fetch happened, resolved once per `Export`
+call via a `repositories.Clock` port so it stays substitutable in a test)
+in the meta line, alongside — not instead of — `PullRequestDiff`/
+`PullRequestCommits`/`ParentIssue`/`SubIssues`' existing `created`
+(the pull request's own creation time, reused via `Attribution` as usual).
+A reader is therefore not left to assume the rendered outcome is still
+current: `captured_at` names when it was observed, distinct from `created`.
+Whether this is worth capturing for a pull request that is already merged
+or closed (where the check state is less likely to change further) is
+treated as a secondary question that does not gate this design: every pull
+request's check runs are fetched and persisted the same way regardless of
+its own merged/closed state.
+
+Check runs are sourced from `GET
+/repos/{owner}/{repo}/commits/{sha}/check-runs` against the pull request's
+own head commit sha (`pull.head.sha`, resolved from the already-fetched
+pull request resource) — the Checks API, not the older combined-status
+API (`GET /commits/{sha}/status`), since the Checks API is what GitHub
+Actions and most modern third-party CI integrations report through. Like
+`PullRequestDiff`/`PullRequestCommits`, `PullRequestChecks` has no
+timeline event or per-event actor of its own, so it reuses the pull
+request's own `Attribution` (author, created, url). Unlike the two
+PR-only snapshot entries, whose presence is gated purely by ref kind, it
+is added to the document only when at least one check run exists — the
+same content-gated presence `ParentIssue`/`SubIssues` use, since a pull
+request with no CI configured would otherwise carry a permanently-empty
+entry.
+
+Each `CheckRun`'s displayable outcome unifies GitHub's own two-field
+`status`/`conclusion` shape (`conclusion` is populated only once `status`
+reaches `completed`) into a single `CheckOutcome` enum: a run not yet
+completed reports its status (`queued`, `in_progress`); a completed one
+reports its conclusion (`success`, `failure`, `neutral`, `cancelled`,
+`skipped`, `timed_out`, `action_required`, `stale`). `PullRequestChecks`
+renders a `checks` count, the head sha, and the captured-at timestamp in
+its meta line, plus a bullet list of every check run's name and outcome.
+A check run's name is arbitrary, attacker-influenceable text (a CI job
+name, or a third-party Checks app's own naming), so — unlike this entry's
+own meta line, whose fields are safe by construction (`encoding/json`
+escaping; see "Markdown dialect" above) — it is rendered as plain
+backtick-wrapped text rather than as a `[name](url)` markdown link: a name
+containing `]` or `(` embedded in link syntax could otherwise close the
+link early and splice in an attacker-chosen URL, the same untrusted-string
+handling `changedFileLine`/`commitLine`/`issueSummaryLine` already apply
+to a filename/commit-identity/issue-title of their own. Each run's own
+`html_url` is therefore not rendered inline — it is still available
+verbatim in `evidence/check-runs.json`.
+
 ## On-disk layout
 
 Every artifact for a given issue/PR number lives under one self-contained
@@ -310,6 +374,7 @@ directory holding its own assets:
     ├── pull-commits.json             commit list, from GET /pulls/{number}/commits (PRs only)
     ├── sub-issues.json               sub-issue list, from GET /issues/{number}/sub_issues (plain issues only)
     ├── parent-issue.json             parent issue resource, refetched via FetchIssue (plain issues with a parent only)
+    ├── check-runs.json               check runs, from GET /commits/{sha}/check-runs (PRs only)
     ├── provenance.json               which gh-exhibit tool/version/commit produced this export
     └── fetch-errors.log              this run's attachment fetch failures, if any
 ```
@@ -425,8 +490,8 @@ is mandatory, to keep the exported directory offline-verifiable. After a
 ## Rate limiting and retry
 
 REST API calls (issue/PR resource, timeline, pull request resource, review
-comments, pull request files, pull request commits, sub-issues, parent
-issue resource) retry on a 429, or a
+comments, pull request files, pull request commits, check runs,
+sub-issues, parent issue resource) retry on a 429, or a
 403 whose headers
 identify it as rate limiting (`Retry-After` present, or
 `X-RateLimit-Remaining: 0` — a 403 without either is a permission error and
@@ -489,7 +554,8 @@ expected origin is treated as a mismatch rather than trusted.
 branch that depends on whether ref is a pull request or a plain issue: for
 a pull request, the chain (`FetchPullRequest`, then, only on success,
 `FetchReviewComments`, then `FetchPullRequestFiles`, then
-`FetchPullRequestCommits`); for a plain issue, `FetchSubIssues`, then, only
+`FetchPullRequestCommits`, then, after resolving the pull request's own
+head commit sha, `FetchCheckRuns`); for a plain issue, `FetchSubIssues`, then, only
 on success, a second `FetchIssue` for the parent when
 `IssueResource.ParentIssueRef` resolves one. Either branch's own internal
 short-circuit is unaffected by running concurrently with `FetchTimeline`.
@@ -506,10 +572,10 @@ Attachment fetches run concurrently, bounded at 4 in flight
 
 Onion architecture, following this project's own reference layout:
 
-- `internal/domain/valueobjects` — the thirteen Tier 1 entry types and their
+- `internal/domain/valueobjects` — the fourteen Tier 1 entry types and their
   supporting Value Objects (`Attribution`, `Url`, `ReviewState`,
-  `InlineContext`, `IssueRef`, `IssueSummary`, `IssueState`, `Document`,
-  `Provenance`, `AssetFilename`).
+  `InlineContext`, `IssueRef`, `IssueSummary`, `IssueState`, `CheckRun`,
+  `CheckOutcome`, `Document`, `Provenance`, `AssetFilename`).
   No I/O.
 - `internal/domain/services` — stateless domain transformations: timeline
   classification/joining (`classify.go`, `join.go`, `body.go`), and
@@ -517,11 +583,13 @@ Onion architecture, following this project's own reference layout:
   `filename.go`, `rewrite.go`). No I/O.
 - `internal/domain/repositories` — abstract ports the application layer
   depends on: `EvidenceFetcher`, `EvidenceWriter`, `ProvenanceWriter`,
-  `DocumentWriter`, `AttachmentFetcher`, `AttachmentWriter`.
+  `DocumentWriter`, `AttachmentFetcher`, `AttachmentWriter`, `Clock`.
 - `internal/infrastructure/github` — `go-gh`-backed implementations of
   `EvidenceFetcher`/`AttachmentFetcher`, plus retry/pagination.
 - `internal/infrastructure/persistence` — local-filesystem implementations
   of `EvidenceWriter`/`ProvenanceWriter`/`DocumentWriter`/`AttachmentWriter`.
+- `internal/infrastructure/clock` — a `Clock` implementation backed by the
+  operating system's own wall clock.
 - `internal/application/services` — `ExportService`, orchestrating the
   ports above into one `Export` call. Distinct from
   `internal/domain/services` despite the shared base package name.
