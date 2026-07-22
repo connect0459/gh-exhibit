@@ -38,12 +38,12 @@ jobs:
               - 'go.sum'
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: steps.filter.outputs.code == 'true'
+        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         with:
           go-version-file: go.mod
 
       - name: Check formatting
-        if: steps.filter.outputs.code == 'true'
+        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           unformatted=$(gofmt -l .)
@@ -54,26 +54,26 @@ jobs:
           fi
 
       - name: Run go vet
-        if: steps.filter.outputs.code == 'true'
+        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: go vet ./...
 
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        if: steps.filter.outputs.code == 'true'
+        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         with:
           version: v2.12.2
 
       - name: Build
-        if: steps.filter.outputs.code == 'true'
+        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: go build ./...
 
       - name: Test
-        if: steps.filter.outputs.code == 'true'
+        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: go test ./... -race -cover
 
       - name: Skip CI checks (no relevant changes)
-        if: steps.filter.outputs.code != 'true'
+        if: steps.filter.outputs.code != 'true' && github.event_name != 'workflow_dispatch'
         shell: bash
         run: echo "No changes detected in code-related files."
