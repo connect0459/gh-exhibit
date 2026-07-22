@@ -44,6 +44,14 @@ func TestClosureEvent_Render_IncludesTheActionAndReasonInTheMetaLine(t *testing.
 	}
 }
 
+func TestNewClosureEvent_NormalizesReasonToEmptyForAReopenedAction(t *testing.T) {
+	event := valueobjects.NewClosureEvent(newClosureEventAttribution(t), valueobjects.ClosureActionReopened, "completed")
+
+	if event.Reason() != "" {
+		t.Fatalf("Reason() = %q, want empty: a reopened action has no reason regardless of what's passed in", event.Reason())
+	}
+}
+
 func TestClosureEvent_ExposesTheAttributionActionAndReasonItWasConstructedWith(t *testing.T) {
 	attribution := newClosureEventAttribution(t)
 	event := valueobjects.NewClosureEvent(attribution, valueobjects.ClosureActionClosed, "not_planned")

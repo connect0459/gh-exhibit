@@ -17,8 +17,14 @@ type ClosureEvent struct {
 
 // NewClosureEvent constructs a ClosureEvent from its attribution, action,
 // and reason (empty for a "reopened" action, or when GitHub reports no
-// state_reason for a "closed" one).
+// state_reason for a "closed" one). A non-empty reason passed alongside a
+// "reopened" action is normalized to empty, so Reason() always honors the
+// invariant this type's own Godoc states regardless of what a caller
+// happens to pass in.
 func NewClosureEvent(attribution Attribution, action ClosureAction, reason string) ClosureEvent {
+	if action != ClosureActionClosed {
+		reason = ""
+	}
 	return ClosureEvent{attribution: attribution, action: action, reason: reason}
 }
 
