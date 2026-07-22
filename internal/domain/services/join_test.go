@@ -1138,6 +1138,152 @@ func TestBuildEntries_SkipsADuplicateRenamedEventSharingAnAlreadySeenID(t *testi
 	}
 }
 
+func milestoneEventRaw(id int64, event, login, title string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{
+		"id": %d,
+		"event": %q,
+		"actor": {"login": %q},
+		"created_at": "2026-07-01T10:00:00Z",
+		"milestone": {"title": %q}
+	}`, id, event, login, title))
+}
+
+func TestBuildEntries_ClassifiesAMilestonedEventIntoAMilestoneEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "milestoned_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.MilestoneEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a MilestoneEvent: %#v", entries[0])
+	}
+
+	attribution, err := valueobjects.NewAttribution(
+		"tierninho",
+		time.Date(2020, 2, 4, 18, 10, 0, 0, time.UTC),
+		testIssueURL,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error building expected attribution: %v", err)
+	}
+	want, err := valueobjects.NewMilestoneEvent(attribution, valueobjects.MilestoneActionMilestoned, "v1.0")
+	if err != nil {
+		t.Fatalf("unexpected error building expected milestone event: %v", err)
+	}
+
+	if !got.Equals(want) {
+		t.Fatalf("entries[0] = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildEntries_ClassifiesADemilestonedEventIntoAMilestoneEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "demilestoned_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.MilestoneEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a MilestoneEvent: %#v", entries[0])
+	}
+	if got.Action() != valueobjects.MilestoneActionDemilestoned {
+		t.Fatalf("Action() = %v, want %v", got.Action(), valueobjects.MilestoneActionDemilestoned)
+	}
+	if got.Title() != "v0.9" {
+		t.Fatalf("Title() = %q, want %q", got.Title(), "v0.9")
+	}
+}
+
+func TestBuildEntries_AttributesAMilestoneEventToTheIssuesOwnURLNotAPerEventURL(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{milestoneEventRaw(1, "milestoned", "octocat", "v1.0")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.MilestoneEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a MilestoneEvent: %#v", entries[0])
+	}
+	if got.Attribution().URL().String() != testIssueURL {
+		t.Fatalf("Attribution().URL() = %q, want the issue's own URL %q", got.Attribution().URL().String(), testIssueURL)
+	}
+}
+
+func TestBuildEntries_AttributesAMilestoneEventFromADeletedActorToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1,
+		"event": "milestoned",
+		"actor": null,
+		"created_at": "2026-07-01T00:00:00Z",
+		"milestone": {"title": "v1.0"}
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.MilestoneEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a MilestoneEvent: %#v", entries[0])
+	}
+	if got.Attribution().Author() != "ghost" {
+		t.Fatalf("Attribution().Author() = %q, want %q", got.Attribution().Author(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsAMilestoneEventThatFailsToUnmarshal(t *testing.T) {
+	raw := json.RawMessage(`{"event": "milestoned", "created_at": 12345}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "unmarshal") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the unmarshal failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsAMilestoneEventWithAnEmptyTitle(t *testing.T) {
+	raw := milestoneEventRaw(1, "milestoned", "octocat", "")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func TestBuildEntries_SkipsADuplicateMilestonedEventSharingAnAlreadySeenID(t *testing.T) {
+	raw := milestoneEventRaw(1, "milestoned", "octocat", "v1.0")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil, testIssueURL)
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the duplicate should be skipped)", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
 func TestBuildEntries_PreservesChronologicalOrderOfClosureEventsAmongOtherTimelineItems(t *testing.T) {
 	rawTimeline := []json.RawMessage{
 		commentedEventRaw("alice", "First comment.", "https://github.com/example/repo/issues/1#issuecomment-1"),

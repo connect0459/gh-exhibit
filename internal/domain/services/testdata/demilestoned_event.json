@@ -1,0 +1,11 @@
+{
+  "id": 6430295005,
+  "event": "demilestoned",
+  "actor": {
+    "login": "billygriffin"
+  },
+  "created_at": "2020-02-28T22:10:00Z",
+  "milestone": {
+    "title": "v0.9"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": 6430295004,
+  "event": "milestoned",
+  "actor": {
+    "login": "tierninho"
+  },
+  "created_at": "2020-02-04T18:10:00Z",
+  "milestone": {
+    "title": "v1.0"
+  }
+}

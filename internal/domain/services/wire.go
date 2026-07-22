@@ -72,6 +72,18 @@ type renameEventWire struct {
 	} `json:"rename"`
 }
 
+// milestoneEventWire is the shape of a "milestoned"/"demilestoned" timeline
+// event. Like labelEventWire, its actor field is "actor" (not "user"), and
+// it carries no html_url of its own.
+type milestoneEventWire struct {
+	ID        int64     `json:"id"`
+	Actor     actorWire `json:"actor"`
+	CreatedAt time.Time `json:"created_at"`
+	Milestone struct {
+		Title string `json:"title"`
+	} `json:"milestone"`
+}
+
 type reviewCommentWire struct {
 	ID                  int64     `json:"id"`
 	PullRequestReviewID int64     `json:"pull_request_review_id"`

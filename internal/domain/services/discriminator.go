@@ -15,11 +15,13 @@ type discriminator struct {
 type eventKind string
 
 const (
-	eventKindCommented eventKind = "commented"
-	eventKindReviewed  eventKind = "reviewed"
-	eventKindLabeled   eventKind = "labeled"
-	eventKindUnlabeled eventKind = "unlabeled"
-	eventKindClosed    eventKind = "closed"
-	eventKindReopened  eventKind = "reopened"
-	eventKindRenamed   eventKind = "renamed"
+	eventKindCommented    eventKind = "commented"
+	eventKindReviewed     eventKind = "reviewed"
+	eventKindLabeled      eventKind = "labeled"
+	eventKindUnlabeled    eventKind = "unlabeled"
+	eventKindClosed       eventKind = "closed"
+	eventKindReopened     eventKind = "reopened"
+	eventKindRenamed      eventKind = "renamed"
+	eventKindMilestoned   eventKind = "milestoned"
+	eventKindDemilestoned eventKind = "demilestoned"
 )
