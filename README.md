@@ -30,6 +30,8 @@ gh exhibit --version
   - `-o`, `--output`: output directory the evidence is written under;
     defaults to `.`.
 - `--version`: print the version, commit, and build date, then exit.
+- `-h`, `--help`: print usage and exit. Run at the root for the
+  root-level flags, or `gh exhibit export -h` for `export`'s own flags.
 
 ### Examples
 
