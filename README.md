@@ -41,16 +41,28 @@ gh exhibit --help
 gh exhibit export --help
 ```
 
-Export GitHub issues or pull requests:
+Export GitHub issues or pull requests by number:
 
 ```sh
 gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
 ```
 
+Or export by filter criteria instead (mutually exclusive with the number list above):
+
+```sh
+gh exhibit export [--author <login>[,...]] [--assignee <login>[,...]] [--kind issue|pr[,...]] [--created-after <YYYY-MM-DD>] [--created-before <YYYY-MM-DD>] [--limit <n>] [--sort created|updated|comments] [--order asc|desc] [--dry-run] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
+```
+
 ## Flags and Subcommands
 
-- `export`: exports the given issue/PR(s).
-  - `<number>[,<number>...]`: a single issue/PR number, or a comma-separated list of them.
+- `export`: exports the matching issue/PR(s), selected either by an explicit number list or by filter criteria (never both in the same invocation).
+  - `<number>[,<number>...]`: a single issue/PR number, or a comma-separated list of them. Selects explicit-number mode.
+  - `--author`, `--assignee`: comma-separated GitHub login(s) to filter by; giving any of these (or any other filter flag below) selects filter mode instead.
+  - `--kind`: comma-separated `issue`,`pr` to restrict which ref kind matches; omitted (or both) means both.
+  - `--created-after`, `--created-before`: an inclusive `YYYY-MM-DD` bound on the ref's creation date.
+  - `--limit`: maximum number of matches to resolve, `1`-`100` (default `100`) — gh-exhibit's own conservative cap, well below GitHub search's raw 1000-result ceiling, so a filter-mode call with no other narrowing can't turn into a de facto whole-repository export.
+  - `--sort`, `--order`: which field (`created`/`updated`/`comments`) and direction (`asc`/`desc`) matches are ordered by; default `created`/`desc`.
+  - `--dry-run`: report the resolved match count and number list to stdout without exporting anything.
   - `--repo`: target repository as `owner/repo`; defaults to the current repository's context when omitted.
   - `-o`, `--output`: output directory the evidence is written under; defaults to `.`.
   - `--with-stdout`: in addition to the usual on-disk writes, also print each exported ref's rendered document to standard output. When multiple refs are exported, each document is preceded by a `=== owner/repo#N ===` header line; the printed bytes are exactly what gets written to `index.md`.
@@ -68,6 +80,12 @@ gh exhibit export 10
 
 # Export multiple issues/PRs from an explicit repository
 gh exhibit export 10,11,12 --repo connect0459/gh-exhibit -o ./exhibits
+
+# Preview every issue/PR a given author opened this year, without exporting anything
+gh exhibit export --author octocat --created-after 2026-01-01 --dry-run
+
+# Export every open pull request assigned to a given user
+gh exhibit export --assignee octocat --kind pr --repo connect0459/gh-exhibit -o ./exhibits
 ```
 
 ## Output
