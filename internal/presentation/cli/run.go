@@ -25,8 +25,14 @@ type Exporter interface {
 // attempted (this project's existing skip-and-continue precedent). Returns
 // 0 if every ref succeeded, 1 if any failed. outputDir is only used to
 // report the actual write location ({repo}/{number}/index.md) —
-// RunExports itself never touches the filesystem; exporter does.
-func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir string, numbers []int, stdout, stderr io.Writer) int {
+// RunExports itself never touches the filesystem; exporter does. When
+// withStdout is true, each successfully exported ref's rendered document
+// is additionally printed to stdout, preceded by a "=== owner/repo#N ==="
+// header line so multiple refs' documents can be told apart in the
+// combined stream; the printed bytes are exactly what exporter wrote to
+// disk, byte for byte. A ref that fails has no document printed, since
+// exporter never produced one for it.
+func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir string, numbers []int, withStdout bool, stdout, stderr io.Writer) int {
 	exitCode := 0
 
 	for _, number := range numbers {
@@ -37,7 +43,7 @@ func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir s
 			continue
 		}
 
-		_, skips, err := exporter.Export(ctx, ref)
+		rendered, skips, err := exporter.Export(ctx, ref)
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "failed #%d: %v\n", number, err)
 			exitCode = 1
@@ -50,6 +56,12 @@ func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir s
 			message += fmt.Sprintf(" (skipped %d entries)", len(skips))
 		}
 		_, _ = fmt.Fprintln(stdout, message)
+
+		if withStdout {
+			_, _ = fmt.Fprintf(stdout, "=== %s/%s#%d ===\n", owner, repo, number)
+			_, _ = stdout.Write(rendered)
+			_, _ = fmt.Fprintln(stdout)
+		}
 	}
 
 	return exitCode

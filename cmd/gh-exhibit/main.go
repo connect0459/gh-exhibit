@@ -56,5 +56,5 @@ func run() int {
 		return 2
 	}
 
-	return cli.RunExports(context.Background(), exporter, repo.Owner, repo.Name, args.OutputDir, args.Numbers, os.Stdout, os.Stderr)
+	return cli.RunExports(context.Background(), exporter, repo.Owner, repo.Name, args.OutputDir, args.Numbers, args.WithStdout, os.Stdout, os.Stderr)
 }

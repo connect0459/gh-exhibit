@@ -182,6 +182,28 @@ func TestParseArgs_AcceptsAnAttachedFlagValueForm(t *testing.T) {
 	}
 }
 
+func TestParseArgs_DefaultsWithStdoutToFalse(t *testing.T) {
+	got, err := ParseArgs([]string{"export", "123"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	if got.WithStdout {
+		t.Errorf("WithStdout = true, want false")
+	}
+}
+
+func TestParseArgs_ReadsTheWithStdoutFlag(t *testing.T) {
+	got, err := ParseArgs([]string{"export", "--with-stdout", "123"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	if !got.WithStdout {
+		t.Errorf("WithStdout = false, want true")
+	}
+}
+
 func TestParseArgs_ReadsTheOutputShorthandFlag(t *testing.T) {
 	got, err := ParseArgs([]string{"export", "-o", "/tmp/out", "123"})
 	if err != nil {
