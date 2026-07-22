@@ -94,6 +94,29 @@ func TestIssueResource_ParentIssueRef_ParsesTheParentIssueURL(t *testing.T) {
 	}
 }
 
+func TestIssueResource_ParentIssueRef_ParsesTheParentIssueURLOnAGitHubEnterpriseServerHost(t *testing.T) {
+	// A GitHub Enterprise Server installation serves its REST API under an
+	// /api/v3/ prefix (go-gh's own restPrefix does the same for outgoing
+	// requests), so a GHES-origin parent_issue_url carries two extra path
+	// segments ahead of repos/{owner}/{repo}/issues/{number} that a
+	// github.com-origin one never has.
+	raw := json.RawMessage(`{
+		"title": "Sub-issue",
+		"parent_issue_url": "https://ghe.example.com/api/v3/repos/octocat/hello-world/issues/64"
+	}`)
+
+	ref, ok, err := mustParseIssueResource(t, raw).ParentIssueRef()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("ok = false, want true when parent_issue_url is present")
+	}
+	if ref.Owner() != "octocat" || ref.Repo() != "hello-world" || ref.Number() != 64 {
+		t.Fatalf("ParentIssueRef() = %+v, want owner=octocat repo=hello-world number=64", ref)
+	}
+}
+
 func TestIssueResource_ParentIssueRef_ReturnsAnErrorForAMalformedParentIssueURL(t *testing.T) {
 	raw := json.RawMessage(`{
 		"title": "Sub-issue",

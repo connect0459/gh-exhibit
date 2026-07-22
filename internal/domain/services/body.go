@@ -66,9 +66,9 @@ func (r IssueResource) HTMLURL() string {
 // from the issue resource's own parent_issue_url. ok is false when
 // parent_issue_url is absent — an issue with no parent, or any pull
 // request, since GitHub never populates this field for one. err is
-// non-nil only when parent_issue_url is present but does not match
-// GitHub's own REST issue-resource URL shape
-// (.../repos/{owner}/{repo}/issues/{number}).
+// non-nil only when parent_issue_url is present but its path does not end
+// in .../repos/{owner}/{repo}/issues/{number} (see parseIssueResourceURL
+// for why only the path's tail is checked, not its whole shape).
 func (r IssueResource) ParentIssueRef() (ref valueobjects.IssueRef, ok bool, err error) {
 	if r.wire.ParentIssueURL == "" {
 		return valueobjects.IssueRef{}, false, nil
@@ -81,23 +81,30 @@ func (r IssueResource) ParentIssueRef() (ref valueobjects.IssueRef, ok bool, err
 }
 
 // parseIssueResourceURL extracts an IssueRef from raw, a GitHub REST issue
-// resource URL of the shape .../repos/{owner}/{repo}/issues/{number} (the
-// host itself is not inspected, since a GitHub Enterprise Server
-// installation uses the same path shape under its own host).
+// resource URL ending in .../repos/{owner}/{repo}/issues/{number}. Only the
+// path's trailing 5 segments are inspected, rather than requiring the whole
+// path to be exactly 5 segments: a GitHub Enterprise Server installation
+// serves its REST API under an additional /api/v3/ prefix (matching go-gh's
+// own restPrefix for outgoing requests), so a GHES-origin URL's path has
+// two extra leading segments a github.com-origin one never has.
 func parseIssueResourceURL(raw string) (valueobjects.IssueRef, error) {
 	parsed, err := url.Parse(raw)
 	if err != nil {
 		return valueobjects.IssueRef{}, fmt.Errorf("parse url %q: %w", raw, err)
 	}
 	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) != 5 || parts[0] != "repos" || parts[3] != "issues" {
-		return valueobjects.IssueRef{}, fmt.Errorf("url %q does not match the expected /repos/{owner}/{repo}/issues/{number} shape", raw)
+	if len(parts) < 5 {
+		return valueobjects.IssueRef{}, fmt.Errorf("url %q does not match the expected .../repos/{owner}/{repo}/issues/{number} shape", raw)
 	}
-	number, err := strconv.Atoi(parts[4])
+	tail := parts[len(parts)-5:]
+	if tail[0] != "repos" || tail[3] != "issues" {
+		return valueobjects.IssueRef{}, fmt.Errorf("url %q does not match the expected .../repos/{owner}/{repo}/issues/{number} shape", raw)
+	}
+	number, err := strconv.Atoi(tail[4])
 	if err != nil {
 		return valueobjects.IssueRef{}, fmt.Errorf("url %q has a non-numeric issue number: %w", raw, err)
 	}
-	return valueobjects.NewIssueRef(parts[1], parts[2], number)
+	return valueobjects.NewIssueRef(tail[1], tail[2], number)
 }
 
 // BuildBody constructs the document title and the Body Tier 1 entry from
