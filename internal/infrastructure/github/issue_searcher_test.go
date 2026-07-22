@@ -43,96 +43,121 @@ func testSearchQuery(t *testing.T, author, assignee string, kinds []valueobjects
 	return query
 }
 
-func TestBuildSearchQueryString_IncludesOnlyRepoWhenUnfiltered(t *testing.T) {
+// searchQParam runs a Search call against a fake server that always
+// responds with an empty result, and returns the "q" query-string
+// parameter the server actually received — the exported entry point this
+// package's Search-level tests assert query-string construction through,
+// rather than calling the unexported buildSearchQueryString directly (this
+// project's Evergreen Tests convention: a test names the exported unit it
+// exercises, not an unexported one, since the exported entry point already
+// reaches it).
+func searchQParam(t *testing.T, query valueobjects.SearchQuery) string {
+	t.Helper()
+
+	var got string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query().Get("q")
+		_, _ = w.Write([]byte(`{"total_count":0,"items":[]}`))
+	}))
+	defer server.Close()
+
+	searcher := newTestSearcher(t, server)
+	if _, err := searcher.Search(context.Background(), query); err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+	return got
+}
+
+func TestSearch_SendsARepoOnlyQualifierWhenUnfiltered(t *testing.T) {
 	query := testSearchQuery(t, "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
-	got := buildSearchQueryString(query)
+	got := searchQParam(t, query)
 
 	if got != "repo:octocat/hello-world" {
-		t.Fatalf("buildSearchQueryString() = %q, want %q", got, "repo:octocat/hello-world")
+		t.Fatalf("q = %q, want %q", got, "repo:octocat/hello-world")
 	}
 }
 
-func TestBuildSearchQueryString_IncludesAuthorAndAssignee(t *testing.T) {
+func TestSearch_SendsAuthorAndAssigneeQualifiers(t *testing.T) {
 	query := testSearchQuery(t, "monalisa", "hubot", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
-	got := buildSearchQueryString(query)
+	got := searchQParam(t, query)
 
 	want := "repo:octocat/hello-world author:monalisa assignee:hubot"
 	if got != want {
-		t.Fatalf("buildSearchQueryString() = %q, want %q", got, want)
+		t.Fatalf("q = %q, want %q", got, want)
 	}
 }
 
-func TestBuildSearchQueryString_OmitsIsQualifierWhenBothKindsAreRequested(t *testing.T) {
+func TestSearch_OmitsTheIsQualifierWhenBothKindsAreRequested(t *testing.T) {
 	kinds := []valueobjects.IssueKind{valueobjects.IssueKindIssue, valueobjects.IssueKindPullRequest}
 	query := testSearchQuery(t, "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
-	got := buildSearchQueryString(query)
+	got := searchQParam(t, query)
 
 	if got != "repo:octocat/hello-world" {
-		t.Fatalf("buildSearchQueryString() = %q, want no is: qualifier for both kinds", got)
+		t.Fatalf("q = %q, want no is: qualifier for both kinds", got)
 	}
 }
 
-func TestBuildSearchQueryString_AddsIsIssueWhenOnlyIssueKindIsRequested(t *testing.T) {
+func TestSearch_AddsIsIssueWhenOnlyIssueKindIsRequested(t *testing.T) {
 	kinds := []valueobjects.IssueKind{valueobjects.IssueKindIssue}
 	query := testSearchQuery(t, "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
-	got := buildSearchQueryString(query)
+	got := searchQParam(t, query)
 
 	want := "repo:octocat/hello-world is:issue"
 	if got != want {
-		t.Fatalf("buildSearchQueryString() = %q, want %q", got, want)
+		t.Fatalf("q = %q, want %q", got, want)
 	}
 }
 
-func TestBuildSearchQueryString_AddsIsPrWhenOnlyPullRequestKindIsRequested(t *testing.T) {
+func TestSearch_AddsIsPrWhenOnlyPullRequestKindIsRequested(t *testing.T) {
 	kinds := []valueobjects.IssueKind{valueobjects.IssueKindPullRequest}
 	query := testSearchQuery(t, "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
-	got := buildSearchQueryString(query)
+	got := searchQParam(t, query)
 
 	want := "repo:octocat/hello-world is:pr"
 	if got != want {
-		t.Fatalf("buildSearchQueryString() = %q, want %q", got, want)
+		t.Fatalf("q = %q, want %q", got, want)
 	}
 }
 
-func TestBuildSearchQueryString_CombinesBothDateBoundsIntoARange(t *testing.T) {
+func TestSearch_CombinesBothDateBoundsIntoARange(t *testing.T) {
 	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	before := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 	query := testSearchQuery(t, "", "", nil, &after, &before, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
-	got := buildSearchQueryString(query)
+	got := searchQParam(t, query)
 
 	want := "repo:octocat/hello-world created:2024-01-01..2024-06-01"
 	if got != want {
-		t.Fatalf("buildSearchQueryString() = %q, want %q", got, want)
+		t.Fatalf("q = %q, want %q", got, want)
 	}
 }
 
-func TestBuildSearchQueryString_UsesAOneSidedLowerBoundWhenOnlyCreatedAfterIsSet(t *testing.T) {
+func TestSearch_UsesAOneSidedLowerBoundWhenOnlyCreatedAfterIsSet(t *testing.T) {
 	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	query := testSearchQuery(t, "", "", nil, &after, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
-	got := buildSearchQueryString(query)
+	got := searchQParam(t, query)
 
 	want := "repo:octocat/hello-world created:>=2024-01-01"
 	if got != want {
-		t.Fatalf("buildSearchQueryString() = %q, want %q", got, want)
+		t.Fatalf("q = %q, want %q", got, want)
 	}
 }
 
-func TestBuildSearchQueryString_UsesAOneSidedUpperBoundWhenOnlyCreatedBeforeIsSet(t *testing.T) {
+func TestSearch_UsesAOneSidedUpperBoundWhenOnlyCreatedBeforeIsSet(t *testing.T) {
 	before := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 	query := testSearchQuery(t, "", "", nil, nil, &before, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
-	got := buildSearchQueryString(query)
+	got := searchQParam(t, query)
 
 	want := "repo:octocat/hello-world created:<=2024-06-01"
 	if got != want {
-		t.Fatalf("buildSearchQueryString() = %q, want %q", got, want)
+		t.Fatalf("q = %q, want %q", got, want)
 	}
 }
 
