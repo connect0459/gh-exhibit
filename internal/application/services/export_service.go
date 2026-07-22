@@ -31,17 +31,19 @@ type ExportService struct {
 	assets           repositories.AttachmentWriter
 	host             string
 	provenance       valueobjects.Provenance
+	clock            repositories.Clock
 }
 
 // NewExportService builds an ExportService from its six collaborating
 // ports (dependency inversion — this constructor takes abstract types,
 // not infrastructure-layer concrete implementations), host, the target
 // repository's own host (e.g. "github.com" or a GitHub Enterprise Server
-// hostname) used to recognize that host's own attachment URLs, and
-// provenance, persisted via provenanceWriter for every ref this
-// ExportService exports.
-func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.EvidenceWriter, provenanceWriter repositories.ProvenanceWriter, docs repositories.DocumentWriter, attachments repositories.AttachmentFetcher, assets repositories.AttachmentWriter, host string, provenance valueobjects.Provenance) *ExportService {
-	return &ExportService{fetcher: fetcher, writer: writer, provenanceWriter: provenanceWriter, docs: docs, attachments: attachments, assets: assets, host: host, provenance: provenance}
+// hostname) used to recognize that host's own attachment URLs, provenance,
+// persisted via provenanceWriter for every ref this ExportService exports,
+// and clock, used to capture the wall-clock time a pull request's
+// check-run snapshot was taken.
+func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.EvidenceWriter, provenanceWriter repositories.ProvenanceWriter, docs repositories.DocumentWriter, attachments repositories.AttachmentFetcher, assets repositories.AttachmentWriter, host string, provenance valueobjects.Provenance, clock repositories.Clock) *ExportService {
+	return &ExportService{fetcher: fetcher, writer: writer, provenanceWriter: provenanceWriter, docs: docs, attachments: attachments, assets: assets, host: host, provenance: provenance, clock: clock}
 }
 
 // Export fetches, classifies, and renders the evidence for ref, returning
@@ -50,6 +52,11 @@ func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.
 // services.BuildEntries). Any failure aborts the export and returns a
 // wrapped error.
 func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) ([]services.SkipNote, error) {
+	// Captured once, up front, rather than when the PullRequestChecks entry
+	// is built later: it names when this Export call observed the check
+	// state, not when any particular fetch happened to complete.
+	now := s.clock.Now()
+
 	rawIssue, err := s.fetcher.FetchIssue(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve the issue/PR resource: %w", err)
@@ -86,6 +93,15 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		}
 		skipped = append(skipped, commitsSkipped...)
 		entries = append(entries, commits)
+
+		checks, checksSkipped, err := services.BuildPullRequestChecks(body.Attribution(), fetched.checkRunsHeadSHA, now, fetched.checkRuns)
+		if err != nil {
+			return nil, fmt.Errorf("could not build the pull request checks: %w", err)
+		}
+		skipped = append(skipped, checksSkipped...)
+		if len(checks.Runs()) > 0 {
+			entries = append(entries, checks)
+		}
 	} else {
 		if len(fetched.parentIssue) > 0 {
 			parent, err := services.BuildParentIssue(body.Attribution(), fetched.parentIssue)
@@ -147,6 +163,9 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		if err := s.writer.WritePullRequestCommits(ctx, ref, fetched.pullRequestCommits); err != nil {
 			return nil, fmt.Errorf("could not persist the raw pull request commits: %w", err)
 		}
+		if err := s.writer.WriteCheckRuns(ctx, ref, fetched.checkRuns); err != nil {
+			return nil, fmt.Errorf("could not persist the raw check runs: %w", err)
+		}
 	} else {
 		if err := s.writer.WriteSubIssues(ctx, ref, fetched.subIssues); err != nil {
 			return nil, fmt.Errorf("could not persist the raw sub-issues: %w", err)
@@ -185,6 +204,8 @@ type fetchedPullRequestAndTimeline struct {
 	reviewComments     []json.RawMessage
 	pullRequestFiles   []json.RawMessage
 	pullRequestCommits []json.RawMessage
+	checkRuns          []json.RawMessage
+	checkRunsHeadSHA   string
 	subIssues          []json.RawMessage
 	parentIssue        json.RawMessage
 	timeline           []json.RawMessage
@@ -192,11 +213,12 @@ type fetchedPullRequestAndTimeline struct {
 
 // fetchPullRequestChainAndTimeline runs the pull-request chain
 // (FetchPullRequest, then FetchReviewComments, then FetchPullRequestFiles,
-// then FetchPullRequestCommits, when issue is a pull request) — or, for a
-// plain issue, FetchSubIssues followed by FetchIssue again for its parent
-// when one exists — concurrently with FetchTimeline, since neither depends
-// on the other's result — overlapping their round trips shortens Export's
-// overall latency.
+// then FetchPullRequestCommits, then FetchCheckRuns for the pull request's
+// head commit, when issue is a pull request) — or, for a plain issue,
+// FetchSubIssues followed by FetchIssue again for its parent when one
+// exists — concurrently with FetchTimeline, since neither depends on the
+// other's result — overlapping their round trips shortens Export's overall
+// latency.
 func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, ref valueobjects.IssueRef, issue services.IssueResource) (fetchedPullRequestAndTimeline, error) {
 	fetchCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -266,6 +288,20 @@ func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, re
 				return
 			}
 			result.pullRequestCommits = pullRequestCommits
+
+			headSHA, err := services.PullRequestHeadSHA(result.pullRequest)
+			if err != nil {
+				fail(fmt.Errorf("could not resolve the pull request's head commit sha: %w", err))
+				return
+			}
+			result.checkRunsHeadSHA = headSHA
+
+			checkRuns, err := s.fetcher.FetchCheckRuns(fetchCtx, ref, headSHA)
+			if err != nil {
+				fail(fmt.Errorf("could not retrieve the check runs: %w", err))
+				return
+			}
+			result.checkRuns = checkRuns
 		}()
 	} else {
 		// FetchIssue is not called a second time (for the parent) when
