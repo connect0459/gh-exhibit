@@ -14,6 +14,11 @@ import (
 // underlying query is always exactly one HTTP request.
 const MaxSearchLimit = 100
 
+// DefaultSearchLimit is filter-mode's --limit default when the flag is
+// omitted — the same as MaxSearchLimit, since GitHub search's own page
+// size ceiling means there is no smaller "natural" default to prefer.
+const DefaultSearchLimit = MaxSearchLimit
+
 // SearchCriteria is the validated, immutable shape of a criteria-based
 // export selection: which issues/PRs to resolve via GitHub's search API
 // rather than an explicit number list. Authors, assignees, and kinds may
