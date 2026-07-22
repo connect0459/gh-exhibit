@@ -48,6 +48,7 @@ func classify(rawTimeline []json.RawMessage, issueURL string) ([]classifiedItem,
 	seenReviewIDs := make(map[int64]bool)
 	seenCommentedIDs := make(map[int64]bool)
 	seenLabelIDs := make(map[int64]bool)
+	seenClosureIDs := make(map[int64]bool)
 
 	for _, raw := range rawTimeline {
 		var d discriminator
@@ -111,6 +112,23 @@ func classify(rawTimeline []json.RawMessage, issueURL string) ([]classifiedItem,
 			}
 			items = append(items, item)
 
+		case eventKindClosed, eventKindReopened:
+			item, id, err := classifyClosureEvent(raw, d.Event, issueURL)
+			if err != nil {
+				skipped = append(skipped, SkipNote{Reason: err.Error(), Raw: raw})
+				continue
+			}
+			// See markSeen: without this, a duplicate id would render the
+			// same ClosureEvent twice.
+			if markSeen(seenClosureIDs, id) {
+				skipped = append(skipped, SkipNote{
+					Reason: fmt.Sprintf("duplicate %s event id %d", d.Event, id),
+					Raw:    raw,
+				})
+				continue
+			}
+			items = append(items, item)
+
 		default:
 		}
 	}
@@ -156,6 +174,31 @@ func classifyLabelEvent(raw json.RawMessage, rawEvent string, issueURL string) (
 	if err != nil {
 		return classifiedItem{}, 0, fmt.Errorf("%s event: %w", rawEvent, err)
 	}
+
+	return classifiedItem{direct: event}, w.ID, nil
+}
+
+// classifyClosureEvent classifies a "closed"/"reopened" timeline event into
+// a ClosureEvent, attributed to issueURL (the issue/PR's own html_url) since
+// GitHub's payload for this event kind carries no per-event permalink of
+// its own, the same as classifyLabelEvent.
+func classifyClosureEvent(raw json.RawMessage, rawEvent string, issueURL string) (classifiedItem, int64, error) {
+	var w closureEventWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("unmarshal %s event: %w", rawEvent, err)
+	}
+
+	action, err := valueobjects.ParseClosureAction(rawEvent)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event action: %w", rawEvent, err)
+	}
+
+	attribution, err := valueobjects.NewAttribution(w.Actor.resolvedLogin(), w.CreatedAt, issueURL)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event attribution: %w", rawEvent, err)
+	}
+
+	event := valueobjects.NewClosureEvent(attribution, action, w.StateReason)
 
 	return classifiedItem{direct: event}, w.ID, nil
 }

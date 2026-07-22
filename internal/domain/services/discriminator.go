@@ -19,4 +19,6 @@ const (
 	eventKindReviewed  eventKind = "reviewed"
 	eventKindLabeled   eventKind = "labeled"
 	eventKindUnlabeled eventKind = "unlabeled"
+	eventKindClosed    eventKind = "closed"
+	eventKindReopened  eventKind = "reopened"
 )

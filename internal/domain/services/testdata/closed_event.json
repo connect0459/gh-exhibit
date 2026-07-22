@@ -1,0 +1,9 @@
+{
+  "id": 6430295001,
+  "event": "closed",
+  "actor": {
+    "login": "tierninho"
+  },
+  "created_at": "2020-02-04T18:00:00Z",
+  "state_reason": "completed"
+}

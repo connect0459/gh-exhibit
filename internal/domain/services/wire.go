@@ -48,6 +48,17 @@ type labelEventWire struct {
 	} `json:"label"`
 }
 
+// closureEventWire is the shape of a "closed"/"reopened" timeline event.
+// Like labelEventWire, its actor field is "actor" (not "user"), and it
+// carries no html_url of its own. state_reason mirrors GitHub's own field
+// name and is only ever populated on a "closed" event.
+type closureEventWire struct {
+	ID          int64     `json:"id"`
+	Actor       actorWire `json:"actor"`
+	CreatedAt   time.Time `json:"created_at"`
+	StateReason string    `json:"state_reason"`
+}
+
 type reviewCommentWire struct {
 	ID                  int64     `json:"id"`
 	PullRequestReviewID int64     `json:"pull_request_review_id"`

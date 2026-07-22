@@ -878,3 +878,169 @@ func TestBuildEntries_SkipsADuplicateLabeledEventSharingAnAlreadySeenID(t *testi
 		t.Fatalf("got %d skipped items, want 1", len(skipped))
 	}
 }
+
+func closureEventRaw(id int64, event, login, stateReason string) json.RawMessage {
+	reasonField := ""
+	if stateReason != "" {
+		reasonField = fmt.Sprintf(`, "state_reason": %q`, stateReason)
+	}
+	return json.RawMessage(fmt.Sprintf(`{
+		"id": %d,
+		"event": %q,
+		"actor": {"login": %q},
+		"created_at": "2026-07-01T10:00:00Z"%s
+	}`, id, event, login, reasonField))
+}
+
+func TestBuildEntries_ClassifiesAClosedEventIntoAClosureEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "closed_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.ClosureEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a ClosureEvent: %#v", entries[0])
+	}
+
+	attribution, err := valueobjects.NewAttribution(
+		"tierninho",
+		time.Date(2020, 2, 4, 18, 0, 0, 0, time.UTC),
+		testIssueURL,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error building expected attribution: %v", err)
+	}
+	want := valueobjects.NewClosureEvent(attribution, valueobjects.ClosureActionClosed, "completed")
+
+	if !got.Equals(want) {
+		t.Fatalf("entries[0] = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildEntries_ClassifiesAReopenedEventIntoAClosureEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "reopened_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.ClosureEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a ClosureEvent: %#v", entries[0])
+	}
+	if got.Action() != valueobjects.ClosureActionReopened {
+		t.Fatalf("Action() = %v, want %v", got.Action(), valueobjects.ClosureActionReopened)
+	}
+	if got.Reason() != "" {
+		t.Fatalf("Reason() = %q, want empty for a reopened event", got.Reason())
+	}
+}
+
+func TestBuildEntries_AttributesAClosureEventToTheIssuesOwnURLNotAPerEventURL(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{closureEventRaw(1, "closed", "octocat", "completed")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.ClosureEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a ClosureEvent: %#v", entries[0])
+	}
+	if got.Attribution().URL().String() != testIssueURL {
+		t.Fatalf("Attribution().URL() = %q, want the issue's own URL %q", got.Attribution().URL().String(), testIssueURL)
+	}
+}
+
+func TestBuildEntries_AttributesAClosureEventFromADeletedActorToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1,
+		"event": "closed",
+		"actor": null,
+		"created_at": "2026-07-01T00:00:00Z",
+		"state_reason": "not_planned"
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.ClosureEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a ClosureEvent: %#v", entries[0])
+	}
+	if got.Attribution().Author() != "ghost" {
+		t.Fatalf("Attribution().Author() = %q, want %q", got.Attribution().Author(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsAClosureEventThatFailsToUnmarshal(t *testing.T) {
+	raw := json.RawMessage(`{"event": "closed", "created_at": 12345}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "unmarshal") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the unmarshal failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsADuplicateClosedEventSharingAnAlreadySeenID(t *testing.T) {
+	raw := closureEventRaw(1, "closed", "octocat", "completed")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil, testIssueURL)
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the duplicate should be skipped)", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func TestBuildEntries_PreservesChronologicalOrderOfClosureEventsAmongOtherTimelineItems(t *testing.T) {
+	rawTimeline := []json.RawMessage{
+		commentedEventRaw("alice", "First comment.", "https://github.com/example/repo/issues/1#issuecomment-1"),
+		closureEventRaw(1, "closed", "octocat", "completed"),
+		closureEventRaw(2, "reopened", "octocat", ""),
+		commentedEventRaw("bob", "Second comment.", "https://github.com/example/repo/issues/1#issuecomment-2"),
+	}
+
+	entries, skipped := services.BuildEntries(rawTimeline, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 4 {
+		t.Fatalf("got %d entries, want 4", len(entries))
+	}
+
+	if _, ok := entries[0].(valueobjects.IssueComment); !ok {
+		t.Fatalf("entries[0] = %#v, want IssueComment", entries[0])
+	}
+	closed, ok := entries[1].(valueobjects.ClosureEvent)
+	if !ok || closed.Action() != valueobjects.ClosureActionClosed {
+		t.Fatalf("entries[1] = %#v, want a closed ClosureEvent", entries[1])
+	}
+	reopened, ok := entries[2].(valueobjects.ClosureEvent)
+	if !ok || reopened.Action() != valueobjects.ClosureActionReopened {
+		t.Fatalf("entries[2] = %#v, want a reopened ClosureEvent", entries[2])
+	}
+	if _, ok := entries[3].(valueobjects.IssueComment); !ok {
+		t.Fatalf("entries[3] = %#v, want IssueComment", entries[3])
+	}
+}
