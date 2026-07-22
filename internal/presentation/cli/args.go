@@ -26,6 +26,11 @@ type Args struct {
 	// written under; defaults to "." (the current directory) when omitted.
 	OutputDir string
 
+	// WithStdout is true when --with-stdout was given; the caller should,
+	// in addition to every file export already writes, also print each
+	// exported ref's rendered document to standard output.
+	WithStdout bool
+
 	// Version is true when --version was given; the caller should print
 	// the running binary's version and exit without requiring a
 	// positional issue/PR number.
@@ -78,6 +83,7 @@ func parseExportArgs(args []string) (Args, error) {
 	repo := fs.String("repo", "", "target repository as owner/repo (defaults to the current repository)")
 	output := fs.String("output", ".", "output directory the evidence is written under")
 	fs.StringVar(output, "o", ".", "shorthand for --output")
+	withStdout := fs.Bool("with-stdout", false, "also print each exported ref's rendered document to standard output")
 
 	flagArgs, positional, err := splitFlagsAndPositional(args)
 	if err != nil {
@@ -97,7 +103,7 @@ func parseExportArgs(args []string) (Args, error) {
 		return Args{}, err
 	}
 
-	return Args{Numbers: numbers, Repo: *repo, OutputDir: *output}, nil
+	return Args{Numbers: numbers, Repo: *repo, OutputDir: *output, WithStdout: *withStdout}, nil
 }
 
 // valueFlags are gh-exhibit's flags that consume a following token as their

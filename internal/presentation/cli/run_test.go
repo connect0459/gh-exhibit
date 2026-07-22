@@ -22,18 +22,19 @@ type fakeExporter struct {
 }
 
 type fakeExportResult struct {
-	skips []services.SkipNote
-	err   error
+	rendered []byte
+	skips    []services.SkipNote
+	err      error
 }
 
-func (f *fakeExporter) Export(_ context.Context, ref valueobjects.IssueRef) ([]services.SkipNote, error) {
+func (f *fakeExporter) Export(_ context.Context, ref valueobjects.IssueRef) ([]byte, []services.SkipNote, error) {
 	f.calledNumbers = append(f.calledNumbers, ref.Number())
 
 	result, ok := f.results[ref.Number()]
 	if !ok {
-		return nil, fmt.Errorf("no fake result configured for #%d", ref.Number())
+		return nil, nil, fmt.Errorf("no fake result configured for #%d", ref.Number())
 	}
-	return result.skips, result.err
+	return result.rendered, result.skips, result.err
 }
 
 func TestRunExports_ReturnsZeroWhenEveryRefSucceeds(t *testing.T) {
@@ -42,7 +43,7 @@ func TestRunExports_ReturnsZeroWhenEveryRefSucceeds(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	got := RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, &stdout, &stderr)
+	got := RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, false, &stdout, &stderr)
 
 	if got != 0 {
 		t.Errorf("RunExports() = %d, want 0", got)
@@ -59,7 +60,7 @@ func TestRunExports_ReturnsOneWhenAnyRefFails(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	got := RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, &stdout, &stderr)
+	got := RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, false, &stdout, &stderr)
 
 	if got != 1 {
 		t.Errorf("RunExports() = %d, want 1", got)
@@ -74,7 +75,7 @@ func TestRunExports_ContinuesToTheRemainingRefsAfterAFailure(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2, 3}, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2, 3}, false, &stdout, &stderr)
 
 	want := []int{1, 2, 3}
 	if !equalInts(exporter.calledNumbers, want) {
@@ -86,7 +87,7 @@ func TestRunExports_ReportsAnInvalidOwnerWithoutCallingExport(t *testing.T) {
 	exporter := &fakeExporter{results: map[int]fakeExportResult{1: {}}}
 	var stdout, stderr bytes.Buffer
 
-	got := RunExports(context.Background(), exporter, "connect_0459", "hello-world", ".", []int{1}, &stdout, &stderr)
+	got := RunExports(context.Background(), exporter, "connect_0459", "hello-world", ".", []int{1}, false, &stdout, &stderr)
 
 	if got != 1 {
 		t.Errorf("RunExports() = %d, want 1", got)
@@ -105,7 +106,7 @@ func TestRunExports_PrintsAFailureLineToStderr(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1}, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1}, false, &stdout, &stderr)
 
 	if !strings.Contains(stderr.String(), "1") || !strings.Contains(stderr.String(), "boom") {
 		t.Errorf("stderr = %q, want it to mention the failing ref number and the underlying error", stderr.String())
@@ -118,7 +119,7 @@ func TestRunExports_PrintsASuccessLineToStdout(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, &stdout, &stderr)
 
 	if !strings.Contains(stdout.String(), "42") {
 		t.Errorf("stdout = %q, want it to mention the exported ref number", stdout.String())
@@ -131,7 +132,7 @@ func TestRunExports_ReflectsTheOutputDirInTheSuccessMessage(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", "/tmp/gh-exhibit-out", []int{42}, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", "/tmp/gh-exhibit-out", []int{42}, false, &stdout, &stderr)
 
 	want := filepath.Join("/tmp/gh-exhibit-out", "hello-world", "42", "index.md")
 	if !strings.Contains(stdout.String(), want) {
@@ -145,9 +146,70 @@ func TestRunExports_ReportsTheSkipNoteCountForARef(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, &stdout, &stderr)
 
 	if !strings.Contains(stdout.String(), "2") {
 		t.Errorf("stdout = %q, want it to mention the skip note count (2)", stdout.String())
+	}
+}
+
+func TestRunExports_PrintsTheRenderedDocumentToStdoutWhenWithStdoutIsEnabled(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{
+		42: {rendered: []byte("# Title\n\nBody")},
+	}}
+	var stdout, stderr bytes.Buffer
+
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, true, &stdout, &stderr)
+
+	if !strings.Contains(stdout.String(), "# Title\n\nBody") {
+		t.Errorf("stdout = %q, want it to contain the rendered document", stdout.String())
+	}
+}
+
+func TestRunExports_DoesNotPrintTheRenderedDocumentWhenWithStdoutIsDisabled(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{
+		42: {rendered: []byte("# Title\n\nBody")},
+	}}
+	var stdout, stderr bytes.Buffer
+
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, &stdout, &stderr)
+
+	if strings.Contains(stdout.String(), "# Title\n\nBody") {
+		t.Errorf("stdout = %q, want it to not contain the rendered document when --with-stdout was not given", stdout.String())
+	}
+}
+
+func TestRunExports_PrintsAHeaderNamingEachRefBeforeItsDocument(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{
+		1: {rendered: []byte("doc one")},
+		2: {rendered: []byte("doc two")},
+	}}
+	var stdout, stderr bytes.Buffer
+
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, true, &stdout, &stderr)
+
+	out := stdout.String()
+	header1 := strings.Index(out, "=== octocat/hello-world#1 ===")
+	doc1 := strings.Index(out, "doc one")
+	header2 := strings.Index(out, "=== octocat/hello-world#2 ===")
+	doc2 := strings.Index(out, "doc two")
+	if header1 == -1 || doc1 == -1 || header2 == -1 || doc2 == -1 {
+		t.Fatalf("stdout = %q, want a header and document for both refs", out)
+	}
+	if header1 >= doc1 || doc1 >= header2 || header2 >= doc2 {
+		t.Errorf("stdout = %q, want each ref's header immediately before its own document, in ref order", out)
+	}
+}
+
+func TestRunExports_PrintsNoDocumentForARefThatFails(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{
+		1: {err: errors.New("boom")},
+	}}
+	var stdout, stderr bytes.Buffer
+
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1}, true, &stdout, &stderr)
+
+	if strings.Contains(stdout.String(), "===") {
+		t.Errorf("stdout = %q, want no document header for a ref that failed to export", stdout.String())
 	}
 }

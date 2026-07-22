@@ -18,7 +18,7 @@ gh-exhibit is a `gh` CLI extension that exports a GitHub issue or pull request's
 `cmd/gh-exhibit/main.go` is the composition root: `cli.ParseArgs` → `cli.ResolveRepo` → `registry.NewExportService` → `cli.RunExports`.
 
 ```sh
-gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
+gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
 gh exhibit --version
 ```
 
@@ -26,6 +26,7 @@ gh exhibit --version
 - `export`'s positional argument: a single issue/PR number, or a comma-separated list of them (deduplicated, first-seen order). No range or `--all` syntax. Flags may appear before, after, or interleaved around it.
 - `export --repo owner/repo`: target repository; defaults to the current directory's repository context (`go-gh`'s `repository.Current`) when omitted.
 - `export -o`, `export --output`: output directory the evidence is written under; defaults to `.`.
+- `export --with-stdout`: additive only — every file `export` already writes (rendered document, downloaded assets, raw evidence JSON) is written exactly as without this flag. When given, each successfully exported ref's rendered document is also printed to stdout, preceded by a `=== owner/repo#N ===` header line so multiple refs' documents can be told apart in the combined stream. The printed bytes are exactly what `ExportService.Export` hands to `DocumentWriter.WriteDocument`, byte for byte — not reformatted for display. A ref that fails has no document printed.
 - `--version`: prints `gh-exhibit {version} (commit {commit}, built {date})` and exits, without requiring a subcommand.
 - Every flag's leading dashes are interchangeable (`-repo` and `--repo` parse identically): this is the stdlib `flag` package's own behavior, not something `ParseArgs` implements. `-h`/`--help`'s generated usage text always prints the single-dash spelling, so this is each flag's base form; the double-dash spelling used above is a readability convention. `-o` and `-h` are the only flags that are true single-letter shorthands for a distinct long name (`--output`, `--help`) rather than the same name with fewer dashes.
 - A failing ref in a list does not stop the remaining ones in the same invocation. Each ref's success or failure is reported on its own line to stdout/stderr respectively. Process exit code is `0` only if every ref succeeded, `1` otherwise.

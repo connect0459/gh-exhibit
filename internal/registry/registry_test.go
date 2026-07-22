@@ -123,7 +123,7 @@ func TestNewExportService_DownloadsAnAttachmentServedViaACrossOriginRedirect(t *
 		t.Fatalf("NewIssueRef() error = %v", err)
 	}
 
-	skipped, err := exporter.Export(context.Background(), ref)
+	_, skipped, err := exporter.Export(context.Background(), ref)
 	if err != nil {
 		t.Fatalf("Export() error = %v, want the cross-origin-redirected attachment fetch to succeed", err)
 	}

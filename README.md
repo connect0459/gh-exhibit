@@ -44,7 +44,7 @@ gh exhibit export --help
 Export GitHub issues or pull requests:
 
 ```sh
-gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
+gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
 ```
 
 ## Flags and Subcommands
@@ -53,6 +53,7 @@ gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <d
   - `<number>[,<number>...]`: a single issue/PR number, or a comma-separated list of them.
   - `--repo`: target repository as `owner/repo`; defaults to the current repository's context when omitted.
   - `-o`, `--output`: output directory the evidence is written under; defaults to `.`.
+  - `--with-stdout`: in addition to the usual on-disk writes, also print each exported ref's rendered document to standard output. When multiple refs are exported, each document is preceded by a `=== owner/repo#N ===` header line; the printed bytes are exactly what gets written to `index.md`.
 - `-h`, `--help`: print usage and exit. Run at the root for the root-level flags, or `gh exhibit export -h` for `export`'s own flags.
 - `--version`: print the version, commit, and build date, then exit.
 

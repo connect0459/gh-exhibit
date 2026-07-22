@@ -47,11 +47,12 @@ func NewExportService(fetcher repositories.EvidenceFetcher, writer repositories.
 }
 
 // Export fetches, classifies, and renders the evidence for ref, returning
-// any services.SkipNote recorded while classifying it (an individual
-// unparsable item does not fail the whole export; see
+// the rendered document's exact bytes (identical to what WriteDocument
+// persists) alongside any services.SkipNote recorded while classifying it
+// (an individual unparsable item does not fail the whole export; see
 // services.BuildEntries). Any failure aborts the export and returns a
 // wrapped error.
-func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) ([]services.SkipNote, error) {
+func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) ([]byte, []services.SkipNote, error) {
 	// Captured once, up front, rather than when the PullRequestChecks entry
 	// is built later: it names when this Export call observed the check
 	// state, not when any particular fetch happened to complete.
@@ -59,22 +60,22 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 
 	rawIssue, err := s.fetcher.FetchIssue(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve the issue/PR resource: %w", err)
+		return nil, nil, fmt.Errorf("could not retrieve the issue/PR resource: %w", err)
 	}
 
 	issue, err := services.ParseIssueResource(rawIssue)
 	if err != nil {
-		return nil, fmt.Errorf("the issue/PR resource could not be parsed: %w", err)
+		return nil, nil, fmt.Errorf("the issue/PR resource could not be parsed: %w", err)
 	}
 
 	fetched, err := s.fetchPullRequestChainAndTimeline(ctx, ref, issue)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	body, title, err := services.BuildBody(issue, fetched.pullRequest)
 	if err != nil {
-		return nil, fmt.Errorf("could not derive a title and body from the issue/PR resource: %w", err)
+		return nil, nil, fmt.Errorf("could not derive a title and body from the issue/PR resource: %w", err)
 	}
 
 	classified, skipped := services.BuildEntries(fetched.timeline, fetched.reviewComments, issue.HTMLURL())
@@ -82,21 +83,21 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 	if issue.IsPullRequest() {
 		diff, diffSkipped, err := services.BuildPullRequestDiff(body.Attribution(), fetched.pullRequest, fetched.pullRequestFiles)
 		if err != nil {
-			return nil, fmt.Errorf("could not build the pull request diff: %w", err)
+			return nil, nil, fmt.Errorf("could not build the pull request diff: %w", err)
 		}
 		skipped = append(skipped, diffSkipped...)
 		entries = append(entries, diff)
 
 		commits, commitsSkipped, err := services.BuildPullRequestCommits(body.Attribution(), fetched.pullRequestCommits)
 		if err != nil {
-			return nil, fmt.Errorf("could not build the pull request commits: %w", err)
+			return nil, nil, fmt.Errorf("could not build the pull request commits: %w", err)
 		}
 		skipped = append(skipped, commitsSkipped...)
 		entries = append(entries, commits)
 
 		checks, checksSkipped, err := services.BuildPullRequestChecks(body.Attribution(), fetched.checkRunsHeadSHA, now, fetched.checkRuns)
 		if err != nil {
-			return nil, fmt.Errorf("could not build the pull request checks: %w", err)
+			return nil, nil, fmt.Errorf("could not build the pull request checks: %w", err)
 		}
 		skipped = append(skipped, checksSkipped...)
 		if len(checks.Runs()) > 0 {
@@ -106,14 +107,14 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		if len(fetched.parentIssue) > 0 {
 			parent, err := services.BuildParentIssue(body.Attribution(), fetched.parentIssue)
 			if err != nil {
-				return nil, fmt.Errorf("could not build the parent issue: %w", err)
+				return nil, nil, fmt.Errorf("could not build the parent issue: %w", err)
 			}
 			entries = append(entries, parent)
 		}
 
 		subIssues, subIssuesSkipped, err := services.BuildSubIssues(body.Attribution(), fetched.subIssues)
 		if err != nil {
-			return nil, fmt.Errorf("could not build the sub-issues: %w", err)
+			return nil, nil, fmt.Errorf("could not build the sub-issues: %w", err)
 		}
 		skipped = append(skipped, subIssuesSkipped...)
 		if len(subIssues.Children()) > 0 {
@@ -124,12 +125,12 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 
 	doc, err := valueobjects.NewDocument(title, entries)
 	if err != nil {
-		return nil, fmt.Errorf("assemble document: %w", err)
+		return nil, nil, fmt.Errorf("assemble document: %w", err)
 	}
 
 	var buf bytes.Buffer
 	if err := doc.Render(&buf); err != nil {
-		return nil, fmt.Errorf("could not render the document to Markdown: %w", err)
+		return nil, nil, fmt.Errorf("could not render the document to Markdown: %w", err)
 	}
 
 	// Attachment resolution runs before issue-reference resolution, not
@@ -146,12 +147,12 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 	// Detect never sees title text, because it does not exist yet.
 	resolvedAttachments, downloads, failureLog, err := s.resolveAttachments(ctx, ref, buf.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("could not resolve one or more attachments: %w", err)
+		return nil, nil, fmt.Errorf("could not resolve one or more attachments: %w", err)
 	}
 
 	rendered, err := s.resolveIssueReferences(ctx, ref, resolvedAttachments)
 	if err != nil {
-		return nil, fmt.Errorf("could not resolve one or more issue/PR references: %w", err)
+		return nil, nil, fmt.Errorf("could not resolve one or more issue/PR references: %w", err)
 	}
 
 	// Every fetch/build/validation step above — including downloading every
@@ -162,53 +163,53 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 	// behind, since this project has no transactional/staged-write
 	// mechanism for local files.
 	if err := s.writer.WriteIssue(ctx, ref, rawIssue); err != nil {
-		return nil, fmt.Errorf("could not persist the raw issue/PR resource: %w", err)
+		return nil, nil, fmt.Errorf("could not persist the raw issue/PR resource: %w", err)
 	}
 	if err := s.provenanceWriter.WriteProvenance(ctx, ref, s.provenance); err != nil {
-		return nil, fmt.Errorf("could not persist which tool produced this export: %w", err)
+		return nil, nil, fmt.Errorf("could not persist which tool produced this export: %w", err)
 	}
 	if issue.IsPullRequest() {
 		if err := s.writer.WritePullRequest(ctx, ref, fetched.pullRequest); err != nil {
-			return nil, fmt.Errorf("could not persist the raw pull request resource: %w", err)
+			return nil, nil, fmt.Errorf("could not persist the raw pull request resource: %w", err)
 		}
 		if err := s.writer.WriteReviewComments(ctx, ref, fetched.reviewComments); err != nil {
-			return nil, fmt.Errorf("could not persist the raw review comments: %w", err)
+			return nil, nil, fmt.Errorf("could not persist the raw review comments: %w", err)
 		}
 		if err := s.writer.WritePullRequestFiles(ctx, ref, fetched.pullRequestFiles); err != nil {
-			return nil, fmt.Errorf("could not persist the raw pull request files: %w", err)
+			return nil, nil, fmt.Errorf("could not persist the raw pull request files: %w", err)
 		}
 		if err := s.writer.WritePullRequestCommits(ctx, ref, fetched.pullRequestCommits); err != nil {
-			return nil, fmt.Errorf("could not persist the raw pull request commits: %w", err)
+			return nil, nil, fmt.Errorf("could not persist the raw pull request commits: %w", err)
 		}
 		if err := s.writer.WriteCheckRuns(ctx, ref, fetched.checkRuns); err != nil {
-			return nil, fmt.Errorf("could not persist the raw check runs: %w", err)
+			return nil, nil, fmt.Errorf("could not persist the raw check runs: %w", err)
 		}
 	} else {
 		if err := s.writer.WriteSubIssues(ctx, ref, fetched.subIssues); err != nil {
-			return nil, fmt.Errorf("could not persist the raw sub-issues: %w", err)
+			return nil, nil, fmt.Errorf("could not persist the raw sub-issues: %w", err)
 		}
 		if err := s.writer.WriteParentIssue(ctx, ref, fetched.parentIssue); err != nil {
-			return nil, fmt.Errorf("could not persist the raw parent issue: %w", err)
+			return nil, nil, fmt.Errorf("could not persist the raw parent issue: %w", err)
 		}
 	}
 	if err := s.writer.WriteTimeline(ctx, ref, fetched.timeline); err != nil {
-		return nil, fmt.Errorf("could not persist the raw timeline: %w", err)
+		return nil, nil, fmt.Errorf("could not persist the raw timeline: %w", err)
 	}
 	for _, d := range downloads {
 		if err := s.assets.WriteAsset(ctx, ref, d.filename, d.data); err != nil {
-			return nil, fmt.Errorf("could not persist the downloaded attachment %s: %w", d.filename, err)
+			return nil, nil, fmt.Errorf("could not persist the downloaded attachment %s: %w", d.filename, err)
 		}
 	}
 	// Always called, even when failureLog is empty — see
 	// repositories.AttachmentWriter.WriteFetchErrorLog.
 	if err := s.assets.WriteFetchErrorLog(ctx, ref, failureLog); err != nil {
-		return nil, fmt.Errorf("could not persist the attachment fetch error log: %w", err)
+		return nil, nil, fmt.Errorf("could not persist the attachment fetch error log: %w", err)
 	}
 	if err := s.docs.WriteDocument(ctx, ref, rendered); err != nil {
-		return nil, fmt.Errorf("could not persist the rendered document: %w", err)
+		return nil, nil, fmt.Errorf("could not persist the rendered document: %w", err)
 	}
 
-	return skipped, nil
+	return rendered, skipped, nil
 }
 
 // fetchedPullRequestAndTimeline groups fetchPullRequestChainAndTimeline's
