@@ -63,7 +63,7 @@ gh exhibit --version
 
 ### Tier 1 entries
 
-The rendered Markdown's content is drawn from five entry types, all Value
+The rendered Markdown's content is drawn from nine entry types, all Value
 Objects (no identity-based tracking — re-fetch diffing is git's job in the
 separate repository the evidence is copied into, not gh-exhibit's):
 
@@ -77,8 +77,23 @@ separate repository the evidence is copied into, not gh-exhibit's):
 - `LabelEvent` — a label added to or removed from the issue/PR, sourced from
   the timeline's `labeled`/`unlabeled` events, carrying a `LabelAction`
   (`labeled` / `unlabeled`) plus the affected label's name and color.
+- `ClosureEvent` — the issue/PR being closed or reopened, sourced from the
+  timeline's `closed`/`reopened` events, carrying a `ClosureAction`
+  (`closed` / `reopened`) plus an optional reason (GitHub's `state_reason`,
+  populated only for a `closed` action).
+- `RenameEvent` — the issue/PR's title being changed, sourced from the
+  timeline's `renamed` event, carrying the title's previous (`from`) and
+  new (`to`) values.
+- `MilestoneEvent` — a milestone added to or removed from the issue/PR,
+  sourced from the timeline's `milestoned`/`demilestoned` events, carrying
+  a `MilestoneAction` (`milestoned` / `demilestoned`) plus the affected
+  milestone's title.
+- `AssignmentEvent` — an assignee added to or removed from the issue/PR,
+  sourced from the timeline's `assigned`/`unassigned` events, carrying an
+  `AssignmentAction` (`assigned` / `unassigned`) plus the affected
+  assignee's login.
 
-All five implement the sealed `valueobjects.Entry` interface
+All nine implement the sealed `valueobjects.Entry` interface
 (`Render(io.Writer) error` plus an unexported marker method) — the closest
 Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 (author, created, url — the common `<!-- {"meta":...} -->` fields), `Url`
@@ -96,13 +111,15 @@ guaranteed by its constructor to be a single path-safe segment — see
 
 ### Timeline classification
 
-Three of the five Tier 1 types (`IssueComment`, `PullRequestReview`, and
-`LabelEvent`) are classified from `GET .../issues/{number}/timeline`'s
+Seven of the nine Tier 1 types (`IssueComment`, `PullRequestReview`,
+`LabelEvent`, `ClosureEvent`, `RenameEvent`, `MilestoneEvent`, and
+`AssignmentEvent`) are classified from `GET .../issues/{number}/timeline`'s
 heterogeneous array via a two-pass unmarshal (discriminator peek, then
 dispatch), checked for exhaustiveness by the `exhaustive` golangci-lint
 rule against `eventKind`. The timeline array also carries other event
-kinds with no corresponding Tier 1 type (e.g. `review_requested`), which
-are left unclassified rather than causing an error.
+kinds with no corresponding Tier 1 type (e.g. `review_requested`,
+`cross-referenced`), which are left unclassified rather than causing an
+error.
 `InlineReviewComment` is not part of the timeline array at all — it is
 fetched from `GET /pulls/{number}/comments` and joined to its parent
 `PullRequestReview` via `pull_request_review_id`, matching the `reviewed`
@@ -130,7 +147,7 @@ conflate a non-ASCII character with an ASCII one (e.g. U+212A KELVIN SIGN
 folds to `"k"`); this does not apply to `IssueRef.owner`/`repo`, which are
 already constrained to GitHub's ASCII username/repository-name pattern.
 
-### Label rendering
+### Label and other history-event rendering
 
 A label added to or removed from the issue/PR is rendered as a `LabelEvent`
 interleaved chronologically with the rest of the timeline (a `labeled` or
@@ -140,15 +157,18 @@ document's top. This was a deliberate choice over the static-list
 alternative: it stays consistent with how every other entry in the document
 already presents content in the order it happened, at the cost of needing to
 recognize the corresponding timeline event kind rather than only reading the
-issue/PR resource's own `labels` field.
+issue/PR resource's own `labels` field. `ClosureEvent`, `RenameEvent`,
+`MilestoneEvent`, and `AssignmentEvent` follow the identical
+interleaved-by-timeline-position approach, for the same reason.
 
-Unlike `commented`/`reviewed` events, GitHub's `labeled`/`unlabeled`
-timeline payload carries no per-event `html_url` — only an API URL
-(`.../issues/events/{id}`) that doesn't resolve to a human-readable page.
-`LabelEvent`'s attribution therefore falls back to the issue/PR's own
-`html_url` (already available from the issue/PR resource fetched
-alongside the timeline) rather than a link to the specific historical
-event.
+Unlike `commented`/`reviewed` events, GitHub's `labeled`/`unlabeled`,
+`closed`/`reopened`, `renamed`, `milestoned`/`demilestoned`, and
+`assigned`/`unassigned` timeline payloads carry no per-event `html_url` —
+only an API URL (`.../issues/events/{id}`) that doesn't resolve to a
+human-readable page. Each of these five Tier 1 types' attribution
+therefore falls back to the issue/PR's own `html_url` (already available
+from the issue/PR resource fetched alongside the timeline) rather than a
+link to the specific historical event.
 
 ## On-disk layout
 
@@ -349,7 +369,7 @@ Attachment fetches run concurrently, bounded at 4 in flight
 
 Onion architecture, following this project's own reference layout:
 
-- `internal/domain/valueobjects` — the four Tier 1 entry types and their
+- `internal/domain/valueobjects` — the nine Tier 1 entry types and their
   supporting Value Objects (`Attribution`, `Url`, `ReviewState`,
   `InlineContext`, `IssueRef`, `Document`, `Provenance`, `AssetFilename`).
   No I/O.
