@@ -18,16 +18,27 @@ gh extension install connect0459/gh-exhibit
 ## Usage
 
 ```sh
-gh exhibit <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
+gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
+gh exhibit --version
 ```
 
-- `<number>[,<number>...]`: a single issue/PR number, or a comma-separated
-  list of them.
-- `--repo`: target repository as `owner/repo`; defaults to the current
-  repository's context when omitted.
-- `-o`, `--output`: output directory the evidence is written under;
-  defaults to `.`.
+- `export`: exports the given issue/PR(s).
+  - `<number>[,<number>...]`: a single issue/PR number, or a comma-separated
+    list of them.
+  - `--repo`: target repository as `owner/repo`; defaults to the current
+    repository's context when omitted.
+  - `-o`, `--output`: output directory the evidence is written under;
+    defaults to `.`.
 - `--version`: print the version, commit, and build date, then exit.
+- `-h`, `--help`: print usage and exit. Run at the root for the
+  root-level flags, or `gh exhibit export -h` for `export`'s own flags.
+
+Every flag above works with either one or two leading dashes (`-repo` and
+`--repo` are the same flag, not separate short/long forms) — `-h`/`--help`'s
+own usage text always prints the single-dash spelling, which this project
+treats as each flag's base form; the double-dash spelling shown above is
+written for readability. `-o` and `-h` are the only flags that are true
+single-letter shorthands for a separate long name (`--output`, `--help`).
 
 ### Examples
 
@@ -36,10 +47,10 @@ gh exhibit <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
 gh exhibit --version
 
 # Export a single PR from the current repository
-gh exhibit 10
+gh exhibit export 10
 
 # Export multiple issues/PRs from an explicit repository
-gh exhibit 10,11,12 --repo connect0459/gh-exhibit -o ./evidence
+gh exhibit export 10,11,12 --repo connect0459/gh-exhibit -o ./evidence
 ```
 
 ## Documentation

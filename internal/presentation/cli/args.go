@@ -32,16 +32,52 @@ type Args struct {
 	Version bool
 }
 
+// exportSubcommand is the sole subcommand gh-exhibit currently recognizes.
+const exportSubcommand = "export"
+
 // ParseArgs parses and validates args (typically os.Args[1:]) into an Args
-// value. It fails on a missing or malformed issue/PR number, or on any
-// number of positional arguments other than exactly one. Flags may appear
-// before, after, or interleaved around the positional argument.
+// value. The root level recognizes only --version (and the automatic
+// -h/--help); everything else is dispatched to a subcommand, of which
+// "export" is currently the only one defined. ParseArgs fails when no
+// subcommand is given, when the given subcommand is not recognized, or when
+// the "export" subcommand's own arguments are invalid (see
+// parseExportArgs).
 func ParseArgs(args []string) (Args, error) {
-	fs := flag.NewFlagSet("gh-exhibit", flag.ContinueOnError)
+	rootFS := flag.NewFlagSet("gh-exhibit", flag.ContinueOnError)
+	version := rootFS.Bool("version", false, "print the version and exit")
+
+	if err := rootFS.Parse(args); err != nil {
+		return Args{}, fmt.Errorf("parse flags: %w", err)
+	}
+
+	if *version {
+		return Args{Version: true}, nil
+	}
+
+	remaining := rootFS.Args()
+	if len(remaining) == 0 {
+		return Args{}, fmt.Errorf("expected a subcommand (%q)", exportSubcommand)
+	}
+
+	subcommand, rest := remaining[0], remaining[1:]
+	switch subcommand {
+	case exportSubcommand:
+		return parseExportArgs(rest)
+	default:
+		return Args{}, fmt.Errorf("unknown subcommand %q (expected %q)", subcommand, exportSubcommand)
+	}
+}
+
+// parseExportArgs parses and validates the "export" subcommand's own
+// arguments (everything after the "export" token) into an Args value. It
+// fails on a missing or malformed issue/PR number, or on any number of
+// positional arguments other than exactly one. Flags may appear before,
+// after, or interleaved around the positional argument.
+func parseExportArgs(args []string) (Args, error) {
+	fs := flag.NewFlagSet("gh-exhibit export", flag.ContinueOnError)
 	repo := fs.String("repo", "", "target repository as owner/repo (defaults to the current repository)")
 	output := fs.String("output", ".", "output directory the evidence is written under")
 	fs.StringVar(output, "o", ".", "shorthand for --output")
-	version := fs.Bool("version", false, "print the version and exit")
 
 	flagArgs, positional, err := splitFlagsAndPositional(args)
 	if err != nil {
@@ -50,10 +86,6 @@ func ParseArgs(args []string) (Args, error) {
 
 	if err := fs.Parse(flagArgs); err != nil {
 		return Args{}, fmt.Errorf("parse flags: %w", err)
-	}
-
-	if *version {
-		return Args{Version: true}, nil
 	}
 
 	if len(positional) != 1 {
@@ -73,10 +105,11 @@ func ParseArgs(args []string) (Args, error) {
 var valueFlags = map[string]bool{"repo": true, "output": true, "o": true}
 
 // splitFlagsAndPositional separates args into the tokens flag.FlagSet.Parse
-// should see and the tokens that are gh-exhibit's own positional argument.
-// This exists because flag.Parse stops scanning for flags at the first
-// non-flag token, so without this split "gh-exhibit 123 --repo x" would
-// misread "--repo" and "x" as extra positional arguments instead of a flag.
+// should see and the tokens that are the "export" subcommand's own
+// positional argument. This exists because flag.Parse stops scanning for
+// flags at the first non-flag token, so without this split
+// "gh-exhibit export 123 --repo x" would misread "--repo" and "x" as extra
+// positional arguments instead of a flag.
 // A token shaped like a negative number or comma-separated list of them
 // (e.g. "-1") is treated as positional rather than an unrecognized flag,
 // since gh-exhibit's own numbers are the only thing that would ever look

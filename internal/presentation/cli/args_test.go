@@ -8,7 +8,7 @@ import (
 )
 
 func TestParseArgs_AcceptsASingleIssueNumber(t *testing.T) {
-	got, err := ParseArgs([]string{"123"})
+	got, err := ParseArgs([]string{"export", "123"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -20,7 +20,7 @@ func TestParseArgs_AcceptsASingleIssueNumber(t *testing.T) {
 }
 
 func TestParseArgs_AcceptsACommaSeparatedListOfNumbers(t *testing.T) {
-	got, err := ParseArgs([]string{"123,124,125"})
+	got, err := ParseArgs([]string{"export", "123,124,125"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -32,7 +32,7 @@ func TestParseArgs_AcceptsACommaSeparatedListOfNumbers(t *testing.T) {
 }
 
 func TestParseArgs_TrimsSpacesAroundCommas(t *testing.T) {
-	got, err := ParseArgs([]string{"123, 124 ,125"})
+	got, err := ParseArgs([]string{"export", "123, 124 ,125"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -44,7 +44,7 @@ func TestParseArgs_TrimsSpacesAroundCommas(t *testing.T) {
 }
 
 func TestParseArgs_DeduplicatesARepeatedNumberInFirstSeenOrder(t *testing.T) {
-	got, err := ParseArgs([]string{"123,123,124"})
+	got, err := ParseArgs([]string{"export", "123,123,124"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -56,21 +56,21 @@ func TestParseArgs_DeduplicatesARepeatedNumberInFirstSeenOrder(t *testing.T) {
 }
 
 func TestParseArgs_RejectsANonNumericEntry(t *testing.T) {
-	if _, err := ParseArgs([]string{"123,abc"}); err == nil {
+	if _, err := ParseArgs([]string{"export", "123,abc"}); err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for a non-numeric entry")
 	}
 }
 
 func TestParseArgs_RejectsAZeroOrNegativeNumber(t *testing.T) {
 	for _, in := range []string{"0", "-1", "123,0"} {
-		if _, err := ParseArgs([]string{in}); err == nil {
-			t.Fatalf("ParseArgs([%q]) error = nil, want an error for a non-positive number", in)
+		if _, err := ParseArgs([]string{"export", in}); err == nil {
+			t.Fatalf("ParseArgs([export %q]) error = nil, want an error for a non-positive number", in)
 		}
 	}
 }
 
 func TestParseArgs_RejectsABareNegativeNumberForTheRightReason(t *testing.T) {
-	_, err := ParseArgs([]string{"-1"})
+	_, err := ParseArgs([]string{"export", "-1"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for a non-positive number")
 	}
@@ -80,7 +80,7 @@ func TestParseArgs_RejectsABareNegativeNumberForTheRightReason(t *testing.T) {
 }
 
 func TestParseArgs_RejectsACommaSeparatedListOfNegativeNumbersForTheRightReason(t *testing.T) {
-	_, err := ParseArgs([]string{"-1,-2"})
+	_, err := ParseArgs([]string{"export", "-1,-2"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for a non-positive number")
 	}
@@ -90,25 +90,25 @@ func TestParseArgs_RejectsACommaSeparatedListOfNegativeNumbersForTheRightReason(
 }
 
 func TestParseArgs_RejectsAnEmptyListEntry(t *testing.T) {
-	if _, err := ParseArgs([]string{"123,,124"}); err == nil {
+	if _, err := ParseArgs([]string{"export", "123,,124"}); err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an empty list entry")
 	}
 }
 
 func TestParseArgs_RejectsAMissingPositionalArgument(t *testing.T) {
-	if _, err := ParseArgs([]string{}); err == nil {
+	if _, err := ParseArgs([]string{"export"}); err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error when no issue/PR number is given")
 	}
 }
 
 func TestParseArgs_RejectsMultiplePositionalArguments(t *testing.T) {
-	if _, err := ParseArgs([]string{"123", "124"}); err == nil {
+	if _, err := ParseArgs([]string{"export", "123", "124"}); err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for more than one positional argument")
 	}
 }
 
 func TestParseArgs_DefaultsOutputDirToTheCurrentDirectory(t *testing.T) {
-	got, err := ParseArgs([]string{"123"})
+	got, err := ParseArgs([]string{"export", "123"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -119,7 +119,7 @@ func TestParseArgs_DefaultsOutputDirToTheCurrentDirectory(t *testing.T) {
 }
 
 func TestParseArgs_ReadsTheRepoFlag(t *testing.T) {
-	got, err := ParseArgs([]string{"--repo", "octocat/hello-world", "123"})
+	got, err := ParseArgs([]string{"export", "--repo", "octocat/hello-world", "123"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -130,7 +130,7 @@ func TestParseArgs_ReadsTheRepoFlag(t *testing.T) {
 }
 
 func TestParseArgs_ReadsTheOutputFlag(t *testing.T) {
-	got, err := ParseArgs([]string{"--output", "/tmp/out", "123"})
+	got, err := ParseArgs([]string{"export", "--output", "/tmp/out", "123"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -141,7 +141,7 @@ func TestParseArgs_ReadsTheOutputFlag(t *testing.T) {
 }
 
 func TestParseArgs_AcceptsTheNumberBeforeTheRepoFlag(t *testing.T) {
-	got, err := ParseArgs([]string{"123", "--repo", "octocat/hello-world"})
+	got, err := ParseArgs([]string{"export", "123", "--repo", "octocat/hello-world"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -155,7 +155,7 @@ func TestParseArgs_AcceptsTheNumberBeforeTheRepoFlag(t *testing.T) {
 }
 
 func TestParseArgs_AcceptsFlagsOnBothSidesOfTheNumber(t *testing.T) {
-	got, err := ParseArgs([]string{"--repo", "octocat/hello-world", "123", "--output", "/tmp/out"})
+	got, err := ParseArgs([]string{"export", "--repo", "octocat/hello-world", "123", "--output", "/tmp/out"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -172,7 +172,7 @@ func TestParseArgs_AcceptsFlagsOnBothSidesOfTheNumber(t *testing.T) {
 }
 
 func TestParseArgs_AcceptsAnAttachedFlagValueForm(t *testing.T) {
-	got, err := ParseArgs([]string{"123", "--repo=octocat/hello-world"})
+	got, err := ParseArgs([]string{"export", "123", "--repo=octocat/hello-world"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -183,7 +183,7 @@ func TestParseArgs_AcceptsAnAttachedFlagValueForm(t *testing.T) {
 }
 
 func TestParseArgs_ReadsTheOutputShorthandFlag(t *testing.T) {
-	got, err := ParseArgs([]string{"-o", "/tmp/out", "123"})
+	got, err := ParseArgs([]string{"export", "-o", "/tmp/out", "123"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -194,7 +194,7 @@ func TestParseArgs_ReadsTheOutputShorthandFlag(t *testing.T) {
 }
 
 func TestParseArgs_TreatsTokensAfterADoubleDashAsLiteralPositionalText(t *testing.T) {
-	_, err := ParseArgs([]string{"--", "--repo"})
+	_, err := ParseArgs([]string{"export", "--", "--repo"})
 	if err == nil {
 		t.Fatal(`ParseArgs() error = nil, want an error since "--repo" after -- is not a valid issue/PR number`)
 	}
@@ -204,7 +204,7 @@ func TestParseArgs_TreatsTokensAfterADoubleDashAsLiteralPositionalText(t *testin
 }
 
 func TestParseArgs_MissingValueErrorNamesALongFormFlagWithBothDashes(t *testing.T) {
-	_, err := ParseArgs([]string{"123", "--repo"})
+	_, err := ParseArgs([]string{"export", "123", "--repo"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error since --repo has no following value")
 	}
@@ -214,7 +214,7 @@ func TestParseArgs_MissingValueErrorNamesALongFormFlagWithBothDashes(t *testing.
 }
 
 func TestParseArgs_MissingValueErrorNamesAShorthandFlagWithASingleDash(t *testing.T) {
-	_, err := ParseArgs([]string{"123", "-o"})
+	_, err := ParseArgs([]string{"export", "123", "-o"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error since -o has no following value")
 	}
@@ -224,14 +224,14 @@ func TestParseArgs_MissingValueErrorNamesAShorthandFlagWithASingleDash(t *testin
 }
 
 func TestParseArgs_RejectsAShorthandOutputFlagImmediatelyFollowedByAnAttachedFlag(t *testing.T) {
-	_, err := ParseArgs([]string{"-o", "--repo=x", "123"})
+	_, err := ParseArgs([]string{"export", "-o", "--repo=x", "123"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error since -o has no value before the next flag")
 	}
 }
 
 func TestParseArgs_RejectsARepoFlagImmediatelyFollowedByAnAttachedFlag(t *testing.T) {
-	_, err := ParseArgs([]string{"--repo", "--output=custom", "123"})
+	_, err := ParseArgs([]string{"export", "--repo", "--output=custom", "123"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error since --repo has no value before the next flag")
 	}
@@ -243,7 +243,7 @@ func TestParseArgs_RejectsARepoFlagImmediatelyFollowedByAnAttachedFlag(t *testin
 // the same silent-adjacency misparse this issue targets, just with the
 // flag terminator instead of another named flag.
 func TestParseArgs_RejectsARepoFlagImmediatelyFollowedByTheFlagTerminator(t *testing.T) {
-	_, err := ParseArgs([]string{"--repo", "--", "123"})
+	_, err := ParseArgs([]string{"export", "--repo", "--", "123"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error since --repo has no value before the flag terminator")
 	}
@@ -259,8 +259,8 @@ func TestParseArgs_AcceptsTheVersionFlagWithoutAPositionalArgument(t *testing.T)
 	}
 }
 
-func TestParseArgs_TheVersionFlagTakesPriorityOverAMissingPositionalArgument(t *testing.T) {
-	got, err := ParseArgs([]string{"--repo", "octocat/hello-world", "--version"})
+func TestParseArgs_TheVersionFlagTakesPriorityOverASubcommand(t *testing.T) {
+	got, err := ParseArgs([]string{"--version", "export", "123"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -273,6 +273,44 @@ func TestParseArgs_WrapsFlagErrHelpForTheHelpFlag(t *testing.T) {
 	_, err := ParseArgs([]string{"--help"})
 	if !errors.Is(err, flag.ErrHelp) {
 		t.Errorf("ParseArgs() error = %v, want it to wrap flag.ErrHelp", err)
+	}
+}
+
+func TestParseArgs_ExportSubcommandWrapsFlagErrHelpForTheHelpFlag(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "--help"})
+	if !errors.Is(err, flag.ErrHelp) {
+		t.Errorf("ParseArgs() error = %v, want it to wrap flag.ErrHelp", err)
+	}
+}
+
+func TestParseArgs_RejectsAMissingSubcommand(t *testing.T) {
+	_, err := ParseArgs([]string{})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error when no subcommand is given")
+	}
+	if !strings.Contains(err.Error(), "export") {
+		t.Errorf("ParseArgs() error = %v, want it to mention the %q subcommand", err, "export")
+	}
+}
+
+func TestParseArgs_RejectsAnUnknownSubcommand(t *testing.T) {
+	_, err := ParseArgs([]string{"frobnicate", "123"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an unrecognized subcommand")
+	}
+	if !strings.Contains(err.Error(), "frobnicate") {
+		t.Errorf("ParseArgs() error = %v, want it to name the unrecognized subcommand %q", err, "frobnicate")
+	}
+}
+
+// The bare-number invocation ("gh exhibit 123") this project supported
+// before this issue is a breaking change removed outright: a positional
+// number alone is no longer implicitly "export" and is now read as an
+// (unrecognized) subcommand name.
+func TestParseArgs_RejectsABareNumberWithoutTheExportSubcommand(t *testing.T) {
+	_, err := ParseArgs([]string{"123"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since a bare number is no longer an implicit export")
 	}
 }
 
