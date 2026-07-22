@@ -59,6 +59,19 @@ type closureEventWire struct {
 	StateReason string    `json:"state_reason"`
 }
 
+// renameEventWire is the shape of a "renamed" timeline event. Like
+// labelEventWire, its actor field is "actor" (not "user"), and it carries
+// no html_url of its own.
+type renameEventWire struct {
+	ID        int64     `json:"id"`
+	Actor     actorWire `json:"actor"`
+	CreatedAt time.Time `json:"created_at"`
+	Rename    struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	} `json:"rename"`
+}
+
 type reviewCommentWire struct {
 	ID                  int64     `json:"id"`
 	PullRequestReviewID int64     `json:"pull_request_review_id"`

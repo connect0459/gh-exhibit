@@ -21,4 +21,5 @@ const (
 	eventKindUnlabeled eventKind = "unlabeled"
 	eventKindClosed    eventKind = "closed"
 	eventKindReopened  eventKind = "reopened"
+	eventKindRenamed   eventKind = "renamed"
 )

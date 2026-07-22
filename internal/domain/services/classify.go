@@ -49,6 +49,7 @@ func classify(rawTimeline []json.RawMessage, issueURL string) ([]classifiedItem,
 	seenCommentedIDs := make(map[int64]bool)
 	seenLabelIDs := make(map[int64]bool)
 	seenClosureIDs := make(map[int64]bool)
+	seenRenameIDs := make(map[int64]bool)
 
 	for _, raw := range rawTimeline {
 		var d discriminator
@@ -129,6 +130,23 @@ func classify(rawTimeline []json.RawMessage, issueURL string) ([]classifiedItem,
 			}
 			items = append(items, item)
 
+		case eventKindRenamed:
+			item, id, err := classifyRenameEvent(raw, issueURL)
+			if err != nil {
+				skipped = append(skipped, SkipNote{Reason: err.Error(), Raw: raw})
+				continue
+			}
+			// See markSeen: without this, a duplicate id would render the
+			// same RenameEvent twice.
+			if markSeen(seenRenameIDs, id) {
+				skipped = append(skipped, SkipNote{
+					Reason: fmt.Sprintf("duplicate renamed event id %d", id),
+					Raw:    raw,
+				})
+				continue
+			}
+			items = append(items, item)
+
 		default:
 		}
 	}
@@ -199,6 +217,29 @@ func classifyClosureEvent(raw json.RawMessage, rawEvent string, issueURL string)
 	}
 
 	event := valueobjects.NewClosureEvent(attribution, action, w.StateReason)
+
+	return classifiedItem{direct: event}, w.ID, nil
+}
+
+// classifyRenameEvent classifies a "renamed" timeline event into a
+// RenameEvent, attributed to issueURL (the issue/PR's own html_url) since
+// GitHub's payload for this event kind carries no per-event permalink of
+// its own, the same as classifyLabelEvent.
+func classifyRenameEvent(raw json.RawMessage, issueURL string) (classifiedItem, int64, error) {
+	var w renameEventWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("unmarshal renamed event: %w", err)
+	}
+
+	attribution, err := valueobjects.NewAttribution(w.Actor.resolvedLogin(), w.CreatedAt, issueURL)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("renamed event attribution: %w", err)
+	}
+
+	event, err := valueobjects.NewRenameEvent(attribution, w.Rename.From, w.Rename.To)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("renamed event: %w", err)
+	}
 
 	return classifiedItem{direct: event}, w.ID, nil
 }
