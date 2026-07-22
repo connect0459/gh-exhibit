@@ -30,6 +30,8 @@ type fakeEvidenceFetcher struct {
 	subIssuesErr          error
 	parentIssue           json.RawMessage
 	parentIssueErr        error
+	checkRuns             []json.RawMessage
+	checkRunsErr          error
 
 	fetchPullRequestCalled        bool
 	fetchReviewCommentsCalled     bool
@@ -37,6 +39,8 @@ type fakeEvidenceFetcher struct {
 	fetchPullRequestCommitsCalled bool
 	fetchSubIssuesCalled          bool
 	fetchParentIssueCalled        bool
+	fetchCheckRunsCalled          bool
+	fetchCheckRunsCommitSHA       string
 
 	// issueCalls counts FetchIssue invocations: the first is always for
 	// ref itself (called synchronously before any concurrent fetch
@@ -81,6 +85,13 @@ func (f *fakeEvidenceFetcher) FetchPullRequestCommits(context.Context, valueobje
 func (f *fakeEvidenceFetcher) FetchSubIssues(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
 	f.fetchSubIssuesCalled = true
 	return f.subIssues, f.subIssuesErr
+}
+
+// FetchCheckRuns is not yet called from ExportService.
+func (f *fakeEvidenceFetcher) FetchCheckRuns(_ context.Context, _ valueobjects.IssueRef, commitSHA string) ([]json.RawMessage, error) {
+	f.fetchCheckRunsCalled = true
+	f.fetchCheckRunsCommitSHA = commitSHA
+	return f.checkRuns, f.checkRunsErr
 }
 
 type fakeEvidenceWriter struct {
