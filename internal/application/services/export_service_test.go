@@ -76,6 +76,8 @@ type fakeEvidenceWriter struct {
 	reviewCommentsErr     error
 	pullRequestFilesErr   error
 	pullRequestCommitsErr error
+	subIssuesErr          error
+	parentIssueErr        error
 
 	wroteIssue                    json.RawMessage
 	wroteTimeline                 []json.RawMessage
@@ -83,10 +85,14 @@ type fakeEvidenceWriter struct {
 	wroteReviewComments           []json.RawMessage
 	wrotePullRequestFiles         []json.RawMessage
 	wrotePullRequestCommits       []json.RawMessage
+	wroteSubIssues                []json.RawMessage
+	wroteParentIssue              json.RawMessage
 	writePullRequestCalled        bool
 	writeReviewCommentsCalled     bool
 	writePullRequestFilesCalled   bool
 	writePullRequestCommitsCalled bool
+	writeSubIssuesCalled          bool
+	writeParentIssueCalled        bool
 }
 
 func (f *fakeEvidenceWriter) WriteIssue(_ context.Context, _ valueobjects.IssueRef, raw json.RawMessage) error {
@@ -121,6 +127,18 @@ func (f *fakeEvidenceWriter) WritePullRequestCommits(_ context.Context, _ valueo
 	f.writePullRequestCommitsCalled = true
 	f.wrotePullRequestCommits = items
 	return f.pullRequestCommitsErr
+}
+
+func (f *fakeEvidenceWriter) WriteSubIssues(_ context.Context, _ valueobjects.IssueRef, items []json.RawMessage) error {
+	f.writeSubIssuesCalled = true
+	f.wroteSubIssues = items
+	return f.subIssuesErr
+}
+
+func (f *fakeEvidenceWriter) WriteParentIssue(_ context.Context, _ valueobjects.IssueRef, raw json.RawMessage) error {
+	f.writeParentIssueCalled = true
+	f.wroteParentIssue = raw
+	return f.parentIssueErr
 }
 
 type fakeDocumentWriter struct {

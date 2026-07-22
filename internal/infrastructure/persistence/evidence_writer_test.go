@@ -179,6 +179,96 @@ func TestWritePullRequestCommits_ConcatenatesItemsIntoOneArrayFileWithPullCommit
 	}
 }
 
+func TestWriteSubIssues_ConcatenatesItemsIntoOneArrayFileWithSubIssuesSuffix(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+	items := []json.RawMessage{
+		json.RawMessage(`{"number":65}`),
+		json.RawMessage(`{"number":66}`),
+	}
+
+	err := writer.WriteSubIssues(context.Background(), testIssueRef(t), items)
+	if err != nil {
+		t.Fatalf("WriteSubIssues() error = %v", err)
+	}
+
+	want := `[{"number":65},{"number":66}]`
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "sub-issues.json"))
+	if got != want {
+		t.Fatalf("WriteSubIssues() wrote %q, want %q", got, want)
+	}
+}
+
+func TestWriteSubIssues_WritesAnEmptyArrayWhenGivenNoItems(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+
+	err := writer.WriteSubIssues(context.Background(), testIssueRef(t), nil)
+	if err != nil {
+		t.Fatalf("WriteSubIssues() error = %v", err)
+	}
+
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "sub-issues.json"))
+	if got != "[]" {
+		t.Fatalf("WriteSubIssues() wrote %q, want \"[]\"", got)
+	}
+}
+
+func TestWriteParentIssue_WritesResponseBodyVerbatimWithParentIssueSuffix(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+	const body = `{"number":64,"title":"Parent issue"}`
+
+	err := writer.WriteParentIssue(context.Background(), testIssueRef(t), json.RawMessage(body))
+	if err != nil {
+		t.Fatalf("WriteParentIssue() error = %v", err)
+	}
+
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "parent-issue.json"))
+	if got != body {
+		t.Fatalf("WriteParentIssue() wrote %q, want %q", got, body)
+	}
+}
+
+func TestWriteParentIssue_RemovesAnExistingFileWhenGivenNoRawData(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+	ref := testIssueRef(t)
+	path := filepath.Join(baseDir, "hello-world", "42", "evidence", "parent-issue.json")
+
+	if err := writer.WriteParentIssue(context.Background(), ref, json.RawMessage(`{"number":64}`)); err != nil {
+		t.Fatalf("WriteParentIssue() error = %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected parent-issue.json to exist after the first write, stat error = %v", err)
+	}
+
+	// A rerun where the issue no longer has a parent must remove the stale
+	// file left by an earlier run, so the exported directory stays a
+	// self-healing view of the issue's current state rather than keeping a
+	// parent reference that no longer exists.
+	if err := writer.WriteParentIssue(context.Background(), ref, nil); err != nil {
+		t.Fatalf("WriteParentIssue() error = %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected parent-issue.json to be removed once the parent is gone, stat error = %v", err)
+	}
+}
+
+func TestWriteParentIssue_IsANoOpWhenGivenNoRawDataAndNoFileExists(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+
+	err := writer.WriteParentIssue(context.Background(), testIssueRef(t), nil)
+	if err != nil {
+		t.Fatalf("WriteParentIssue() error = %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(baseDir, "hello-world", "42", "evidence", "parent-issue.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no parent-issue.json to be created, stat error = %v", err)
+	}
+}
+
 func TestWriteTimeline_ReturnsAnErrorInsteadOfWritingAMalformedArrayForAnEmptyElement(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewEvidenceWriter(baseDir)

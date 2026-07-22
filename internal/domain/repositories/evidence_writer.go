@@ -32,4 +32,12 @@ type EvidenceWriter interface {
 	// WritePullRequestCommits persists ref's commit items, concatenated
 	// into a single JSON array.
 	WritePullRequestCommits(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error
+	// WriteSubIssues persists ref's sub-issue items, concatenated into a
+	// single JSON array.
+	WriteSubIssues(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error
+	// WriteParentIssue persists ref's parent issue resource verbatim. raw
+	// is nil/empty when ref has no parent, in which case any file left by
+	// an earlier run (from when ref did have one) is removed instead, so a
+	// rerun stays a self-healing view of ref's current state.
+	WriteParentIssue(ctx context.Context, ref valueobjects.IssueRef, raw json.RawMessage) error
 }
