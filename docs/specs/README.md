@@ -63,9 +63,9 @@ gh exhibit --version
 
 ### Tier 1 entries
 
-The rendered Markdown's content is drawn from eleven entry types, all Value
-Objects (no identity-based tracking — re-fetch diffing is git's job in the
-separate repository the evidence is copied into, not gh-exhibit's):
+The rendered Markdown's content is drawn from thirteen entry types, all
+Value Objects (no identity-based tracking — re-fetch diffing is git's job
+in the separate repository the evidence is copied into, not gh-exhibit's):
 
 - `Body` — the issue/PR's own body.
 - `IssueComment` — a top-level comment.
@@ -102,8 +102,16 @@ separate repository the evidence is copied into, not gh-exhibit's):
   from `GET /pulls/{number}/commits`, carrying a list of `Commit` (sha, git
   author name and authored time, git committer name and committed time, and
   full message). See "Pull request diff and commit list rendering" below.
+- `ParentIssue` — the issue this issue is a sub-issue of (plain issues
+  only, and only when one exists), sourced from the issue resource's own
+  `parent_issue_url` refetched via `FetchIssue`, carrying a single
+  `IssueSummary`. See "Parent issue and sub-issue rendering" below.
+- `SubIssues` — this issue's list of sub-issues (plain issues only, and
+  only when at least one exists), sourced from `GET
+  /issues/{number}/sub_issues`, carrying a list of `IssueSummary`. See
+  "Parent issue and sub-issue rendering" below.
 
-All eleven implement the sealed `valueobjects.Entry` interface
+All thirteen implement the sealed `valueobjects.Entry` interface
 (`Render(io.Writer) error` plus an unexported marker method) — the closest
 Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 (author, created, url — the common `<!-- {"meta":...} -->` fields), `Url`
@@ -112,7 +120,10 @@ Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 repository-name character-set and length rules; `repo` additionally
 rejects an all-dots segment such as `.`, `..`, or `...`, optionally
 followed by trailing spaces, via the same check `AssetFilename` uses —
-see "Attachment policy" below), `Provenance` (tool,
+see "Attachment policy" below), `IssueSummary` (number, title, `IssueState`,
+url — a lightweight reference to a related issue, distinct from `IssueRef`
+in that it is display data already resolved from a fetched resource rather
+than an address used to fetch one), `Provenance` (tool,
 version, commit — which gh-exhibit build produced an export, persisted to
 `evidence/provenance.json` by `ProvenanceWriter` rather than rendered into
 `Document`), `AssetFilename` (a downloaded attachment's on-disk filename,
@@ -121,7 +132,7 @@ guaranteed by its constructor to be a single path-safe segment — see
 
 ### Timeline classification
 
-Seven of the eleven Tier 1 types (`IssueComment`, `PullRequestReview`,
+Seven of the thirteen Tier 1 types (`IssueComment`, `PullRequestReview`,
 `LabelEvent`, `ClosureEvent`, `RenameEvent`, `MilestoneEvent`, and
 `AssignmentEvent`) are classified from `GET .../issues/{number}/timeline`'s
 heterogeneous array via a two-pass unmarshal (discriminator peek, then
@@ -182,11 +193,13 @@ link to the specific historical event.
 
 ### Pull request diff and commit list rendering
 
-Unlike the other nine Tier 1 types, `PullRequestDiff` and
-`PullRequestCommits` have no timeline event or per-event actor of their
+Unlike the nine timeline-classified/`Body` Tier 1 types, `PullRequestDiff`
+and `PullRequestCommits` have no timeline event or per-event actor of their
 own — each is a snapshot of the pull request's current state (its changed
 files, or its commit list), not something that happened at a point in
-time. Both therefore reuse the pull request's own `Attribution` (author,
+time (`ParentIssue`/`SubIssues`, described further below, share this same
+snapshot property for a plain issue's parent/children). Both therefore
+reuse the pull request's own `Attribution` (author,
 created, url) — the same `Attribution` `Body` was built from — rather than
 a per-event one, the same "fall back to the resource's own attribution"
 precedent `LabelEvent`/`ClosureEvent`/`RenameEvent`/`MilestoneEvent`/
@@ -223,6 +236,60 @@ every commit's full message is always rendered in full under a
 "**Commit `sha`**" label, the same per-item expansion shape
 `PullRequestDiff` uses for a file's diff hunk.
 
+### Parent issue and sub-issue rendering
+
+GitHub's sub-issue (parent/child issue) relationship is a plain-issue-only
+feature: a pull request's own resource never carries a `parent_issue_url`,
+and its `GET /issues/{number}/sub_issues` always returns an empty list
+(verified directly against a merged pull request). `ParentIssue` and
+`SubIssues` are therefore only ever fetched, built, and rendered when the
+exported ref is a plain issue — the opposite gating condition from
+`PullRequestDiff`/`PullRequestCommits`, which are PR-only.
+
+Like `PullRequestDiff`/`PullRequestCommits`, both are snapshots with no
+timeline event or per-event actor of their own, so both reuse the issue's
+own `Attribution` — the same one `Body` was built from — rather than a
+per-event one. Unlike the two PR-only entries, each is added to the
+document only when it actually has content: `ParentIssue` is present only
+when the issue resource's own `parent_issue_url` is populated; `SubIssues`
+is present only when `GET /issues/{number}/sub_issues` returns at least one
+item. This is a deliberate difference from `PullRequestDiff`/
+`PullRequestCommits`, whose presence is gated purely by ref kind (a PR
+always gets both, even one with an empty commit list) — here, presence is
+additionally gated by whether the issue actually has a parent or children,
+since most issues have neither and a permanently-empty entry on every
+plain issue export would be pure noise.
+
+`ParentIssue`'s parent is not the issue resource's own `parent_issue_url`
+value — that field only names the parent's API URL — but a second
+`FetchIssue` call against the `IssueRef` parsed out of it, giving
+`ParentIssue` the parent's title, state, and URL the same way `Body`
+itself is built. Parsing that URL only checks the path's trailing
+`repos/{owner}/{repo}/issues/{number}` segments rather than the path's
+whole shape, since a GitHub Enterprise Server host serves its REST API
+under an additional `/api/v3/` prefix (matching `go-gh`'s own outgoing
+request routing), giving a GHES-origin `parent_issue_url` two more leading
+path segments than a `github.com`-origin one. `SubIssues`' children need
+no such second fetch: `GET
+/issues/{number}/sub_issues` already returns each child's full resource
+(number, title, state, `html_url`), the same shape `ParentIssue`'s second
+fetch produces. Both are modeled as `IssueSummary` (number, title,
+`IssueState`, url) — a lightweight reference distinct from `IssueRef`,
+which addresses an issue for fetching rather than displaying it. A
+sub-issue's own "completion status" is simply its own `IssueSummary.State`
+(open/closed), read directly off the fetched child rather than from the
+issue resource's separate `sub_issues_summary` total/completed counter,
+so the rendered list can never disagree with itself about which children
+are done.
+
+`ParentIssue` renders as a meta-line-only entry (no separate body content),
+the same shape `LabelEvent` uses for a single self-contained fact — its
+meta line already carries the parent's number, title, state, and url in
+full. `SubIssues` renders a `sub_issues` count in its meta line plus a
+bullet list of every child's number, title, and state, the same
+count-in-meta-plus-per-item-list shape `PullRequestCommits` uses for its
+own list of commits.
+
 ## On-disk layout
 
 Every artifact for a given issue/PR number lives under one self-contained
@@ -241,6 +308,8 @@ directory holding its own assets:
     ├── review-comments.json          inline review comments (PRs only)
     ├── pull-files.json               changed files, from GET /pulls/{number}/files (PRs only)
     ├── pull-commits.json             commit list, from GET /pulls/{number}/commits (PRs only)
+    ├── sub-issues.json               sub-issue list, from GET /issues/{number}/sub_issues (plain issues only)
+    ├── parent-issue.json             parent issue resource, refetched via FetchIssue (plain issues with a parent only)
     ├── provenance.json               which gh-exhibit tool/version/commit produced this export
     └── fetch-errors.log              this run's attachment fetch failures, if any
 ```
@@ -261,7 +330,7 @@ grouping is "final rendered exhibit" (`index.md` + `assets/`) vs.
 "everything else supporting it," so gh-exhibit-generated artifacts about
 the export itself — a failed fetch's log, or which tool/version/commit
 produced the export — belong with the other non-presentation artifacts.
-Unlike its six siblings, `provenance.json`'s content is not a verbatim
+Unlike its eight siblings, `provenance.json`'s content is not a verbatim
 external REST response — it is gh-exhibit's own self-reported
 `{"tool":...,"version":...,"commit":...}`, written by a distinct
 `ProvenanceWriter` port rather than `EvidenceWriter`, which is scoped to
@@ -274,7 +343,12 @@ through it (e.g. the timeline file succeeds but the rendered document fails)
 can leave a partial evidence directory behind. This is accepted rather than
 built around: a rerun of the same ref overwrites every file, so the
 directory is a self-healing, regenerable view, not the record of truth
-itself (the raw JSON is).
+itself (the raw JSON is). `parent-issue.json` is the one file this
+overwrite-every-time rule doesn't literally cover, since its presence can
+change between runs of the same ref (an issue's parent can be added or
+removed): a rerun that finds no parent removes any file an earlier run
+left behind, the same self-healing property applied to a file whose
+absence, not just its content, needs to be regenerated.
 
 ## Markdown dialect
 
@@ -351,7 +425,8 @@ is mandatory, to keep the exported directory offline-verifiable. After a
 ## Rate limiting and retry
 
 REST API calls (issue/PR resource, timeline, pull request resource, review
-comments, pull request files, pull request commits) retry on a 429, or a
+comments, pull request files, pull request commits, sub-issues, parent
+issue resource) retry on a 429, or a
 403 whose headers
 identify it as rate limiting (`Retry-After` present, or
 `X-RateLimit-Remaining: 0` — a 403 without either is a permission error and
@@ -410,12 +485,16 @@ expected origin is treated as a mismatch rather than trusted.
 
 ## Concurrency
 
-`ExportService.Export` runs `FetchTimeline` concurrently with the
-pull-request chain (`FetchPullRequest`, then, only on success,
+`ExportService.Export` runs `FetchTimeline` concurrently with a second
+branch that depends on whether ref is a pull request or a plain issue: for
+a pull request, the chain (`FetchPullRequest`, then, only on success,
 `FetchReviewComments`, then `FetchPullRequestFiles`, then
-`FetchPullRequestCommits`) — the chain's own internal short-circuit is
-unaffected. Both share a cancellable context: whichever branch fails first
-cancels it, so the other branch's in-flight fetch (possibly blocked in a
+`FetchPullRequestCommits`); for a plain issue, `FetchSubIssues`, then, only
+on success, a second `FetchIssue` for the parent when
+`IssueResource.ParentIssueRef` resolves one. Either branch's own internal
+short-circuit is unaffected by running concurrently with `FetchTimeline`.
+All branches share a cancellable context: whichever fails first cancels
+it, so the other branch's in-flight fetch (possibly blocked in a
 rate-limit wait up to an hour long) is interrupted rather than waited out.
 The first genuine failure to occur is what `Export` reports, not whichever
 branch happens to observe cancellation first.
@@ -427,9 +506,10 @@ Attachment fetches run concurrently, bounded at 4 in flight
 
 Onion architecture, following this project's own reference layout:
 
-- `internal/domain/valueobjects` — the eleven Tier 1 entry types and their
+- `internal/domain/valueobjects` — the thirteen Tier 1 entry types and their
   supporting Value Objects (`Attribution`, `Url`, `ReviewState`,
-  `InlineContext`, `IssueRef`, `Document`, `Provenance`, `AssetFilename`).
+  `InlineContext`, `IssueRef`, `IssueSummary`, `IssueState`, `Document`,
+  `Provenance`, `AssetFilename`).
   No I/O.
 - `internal/domain/services` — stateless domain transformations: timeline
   classification/joining (`classify.go`, `join.go`, `body.go`), and

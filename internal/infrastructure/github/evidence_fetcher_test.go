@@ -212,6 +212,33 @@ func TestFetchPullRequestCommits_FollowsLinkHeaderAndConcatenatesPages(t *testin
 	}
 }
 
+func TestFetchSubIssues_FollowsLinkHeaderAndConcatenatesPages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/octocat/hello-world/issues/42/sub_issues" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		switch r.URL.Query().Get("page") {
+		case "", "1":
+			w.Header().Set("Link", fmt.Sprintf(`<http://%s/repos/octocat/hello-world/issues/42/sub_issues?page=2>; rel="next"`, r.Host))
+			_, _ = w.Write([]byte(`[{"number":65}]`))
+		case "2":
+			_, _ = w.Write([]byte(`[{"number":66}]`))
+		default:
+			t.Errorf("unexpected page: %s", r.URL.Query().Get("page"))
+		}
+	}))
+	defer server.Close()
+
+	fetcher := newTestFetcher(t, server)
+	got, err := fetcher.FetchSubIssues(context.Background(), testIssueRef(t))
+	if err != nil {
+		t.Fatalf("FetchSubIssues() error = %v", err)
+	}
+	if len(got) != 2 || string(got[0]) != `{"number":65}` || string(got[1]) != `{"number":66}` {
+		t.Fatalf("FetchSubIssues() = %v, want [{\"number\":65} {\"number\":66}]", got)
+	}
+}
+
 func TestFetchIssue_RetriesAfterRateLimitedResponseThenSucceeds(t *testing.T) {
 	const body = `{"number":42,"title":"Some issue"}`
 	calls := 0

@@ -85,6 +85,11 @@ func (r *evidenceFetcher) FetchPullRequestCommits(ctx context.Context, ref value
 	return r.fetchPaginated(ctx, pullPath(ref)+"/commits")
 }
 
+// FetchSubIssues implements repositories.EvidenceFetcher.
+func (r *evidenceFetcher) FetchSubIssues(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error) {
+	return r.fetchPaginated(ctx, issuePath(ref)+"/sub_issues")
+}
+
 func issuePath(ref valueobjects.IssueRef) string {
 	return fmt.Sprintf("repos/%s/%s/issues/%d", ref.Owner(), ref.Repo(), ref.Number())
 }

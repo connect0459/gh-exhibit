@@ -89,6 +89,34 @@ func (w *evidenceWriter) WritePullRequestCommits(ctx context.Context, ref valueo
 	return writeFile(evidencePath(w.baseDir, ref, "pull-commits.json"), joined)
 }
 
+// WriteSubIssues implements repositories.EvidenceWriter.
+func (w *evidenceWriter) WriteSubIssues(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	joined, err := joinRawArray(items)
+	if err != nil {
+		return fmt.Errorf("could not combine the sub-issue pages into one array for %s/%d: %w", ref.Repo(), ref.Number(), err)
+	}
+	return writeFile(evidencePath(w.baseDir, ref, "sub-issues.json"), joined)
+}
+
+// WriteParentIssue implements repositories.EvidenceWriter.
+func (w *evidenceWriter) WriteParentIssue(ctx context.Context, ref valueobjects.IssueRef, raw json.RawMessage) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	path := evidencePath(w.baseDir, ref, "parent-issue.json")
+	if len(raw) == 0 {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove %s: %w", path, err)
+		}
+		return nil
+	}
+	return writeFile(path, raw)
+}
+
 // evidencePath builds the on-disk path for one of ref's raw evidence files
 // named filename, under {repo}/{number}/evidence/ (owner is deliberately
 // not part of the path).

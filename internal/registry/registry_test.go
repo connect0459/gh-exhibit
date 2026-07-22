@@ -82,6 +82,9 @@ func TestNewExportService_DownloadsAnAttachmentServedViaACrossOriginRedirect(t *
 		case "/repos/octocat/hello-world/issues/42/timeline":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`[]`))
+		case "/repos/octocat/hello-world/issues/42/sub_issues":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[]`))
 		case attachmentPath:
 			http.Redirect(w, r, cdn.URL+attachmentPath, http.StatusFound)
 		default:

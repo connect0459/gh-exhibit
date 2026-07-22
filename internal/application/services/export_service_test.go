@@ -26,15 +26,32 @@ type fakeEvidenceFetcher struct {
 	pullRequestFilesErr   error
 	pullRequestCommits    []json.RawMessage
 	pullRequestCommitsErr error
+	subIssues             []json.RawMessage
+	subIssuesErr          error
+	parentIssue           json.RawMessage
+	parentIssueErr        error
 
 	fetchPullRequestCalled        bool
 	fetchReviewCommentsCalled     bool
 	fetchPullRequestFilesCalled   bool
 	fetchPullRequestCommitsCalled bool
+	fetchSubIssuesCalled          bool
+	fetchParentIssueCalled        bool
+
+	// issueCalls counts FetchIssue invocations: the first is always for
+	// ref itself (called synchronously before any concurrent fetch
+	// starts), so only a second call — made, if at all, from within the
+	// concurrent sub-issues/parent-issue branch — can be for the parent.
+	issueCalls int
 }
 
 func (f *fakeEvidenceFetcher) FetchIssue(context.Context, valueobjects.IssueRef) (json.RawMessage, error) {
-	return f.issue, f.issueErr
+	f.issueCalls++
+	if f.issueCalls == 1 {
+		return f.issue, f.issueErr
+	}
+	f.fetchParentIssueCalled = true
+	return f.parentIssue, f.parentIssueErr
 }
 
 func (f *fakeEvidenceFetcher) FetchTimeline(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
@@ -61,6 +78,11 @@ func (f *fakeEvidenceFetcher) FetchPullRequestCommits(context.Context, valueobje
 	return f.pullRequestCommits, f.pullRequestCommitsErr
 }
 
+func (f *fakeEvidenceFetcher) FetchSubIssues(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
+	f.fetchSubIssuesCalled = true
+	return f.subIssues, f.subIssuesErr
+}
+
 type fakeEvidenceWriter struct {
 	issueErr              error
 	timelineErr           error
@@ -68,6 +90,8 @@ type fakeEvidenceWriter struct {
 	reviewCommentsErr     error
 	pullRequestFilesErr   error
 	pullRequestCommitsErr error
+	subIssuesErr          error
+	parentIssueErr        error
 
 	wroteIssue                    json.RawMessage
 	wroteTimeline                 []json.RawMessage
@@ -75,10 +99,14 @@ type fakeEvidenceWriter struct {
 	wroteReviewComments           []json.RawMessage
 	wrotePullRequestFiles         []json.RawMessage
 	wrotePullRequestCommits       []json.RawMessage
+	wroteSubIssues                []json.RawMessage
+	wroteParentIssue              json.RawMessage
 	writePullRequestCalled        bool
 	writeReviewCommentsCalled     bool
 	writePullRequestFilesCalled   bool
 	writePullRequestCommitsCalled bool
+	writeSubIssuesCalled          bool
+	writeParentIssueCalled        bool
 }
 
 func (f *fakeEvidenceWriter) WriteIssue(_ context.Context, _ valueobjects.IssueRef, raw json.RawMessage) error {
@@ -113,6 +141,18 @@ func (f *fakeEvidenceWriter) WritePullRequestCommits(_ context.Context, _ valueo
 	f.writePullRequestCommitsCalled = true
 	f.wrotePullRequestCommits = items
 	return f.pullRequestCommitsErr
+}
+
+func (f *fakeEvidenceWriter) WriteSubIssues(_ context.Context, _ valueobjects.IssueRef, items []json.RawMessage) error {
+	f.writeSubIssuesCalled = true
+	f.wroteSubIssues = items
+	return f.subIssuesErr
+}
+
+func (f *fakeEvidenceWriter) WriteParentIssue(_ context.Context, _ valueobjects.IssueRef, raw json.RawMessage) error {
+	f.writeParentIssueCalled = true
+	f.wroteParentIssue = raw
+	return f.parentIssueErr
 }
 
 type fakeDocumentWriter struct {
@@ -395,6 +435,262 @@ func TestExportService_Export_IncludesAPullRequestCommitsEntryForAPullRequest(t 
 	}
 	if !strings.Contains(rendered, "feat: add retry backoff") {
 		t.Fatalf("rendered document = %q, want it to contain the commit's message", rendered)
+	}
+}
+
+const subIssueJSON = `{"number":65,"title":"Include issue/PR labels","state":"closed","html_url":"https://github.com/example/repo/issues/65"}`
+
+func TestExportService_Export_FetchesAndPersistsSubIssuesForAPlainIssue(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:     json.RawMessage(plainIssueJSON),
+		subIssues: []json.RawMessage{json.RawMessage(subIssueJSON)},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if !repo.fetchSubIssuesCalled {
+		t.Fatal("FetchSubIssues was not called for a plain issue")
+	}
+	if !writer.writeSubIssuesCalled {
+		t.Fatal("WriteSubIssues was not called for a plain issue")
+	}
+	if string(writer.wroteSubIssues[0]) != subIssueJSON {
+		t.Fatalf("WriteSubIssues got %q, want the raw sub-issue JSON verbatim", writer.wroteSubIssues)
+	}
+
+	rendered := string(docs.written)
+	if !strings.Contains(rendered, `"sub_issues":1`) {
+		t.Fatalf("rendered document = %q, want a SubIssues entry reporting 1 child", rendered)
+	}
+	if !strings.Contains(rendered, "Include issue/PR labels") {
+		t.Fatalf("rendered document = %q, want it to list the child issue's title", rendered)
+	}
+}
+
+func TestExportService_Export_OmitsSubIssuesEntryWhenThereAreNoChildren(t *testing.T) {
+	repo := &fakeEvidenceFetcher{issue: json.RawMessage(plainIssueJSON)}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if !writer.writeSubIssuesCalled {
+		t.Fatal("WriteSubIssues should still be called (writing an empty array) even with no children")
+	}
+	if strings.Contains(string(docs.written), `"sub_issues"`) {
+		t.Fatalf("rendered document = %q, want no SubIssues entry when there are no children", docs.written)
+	}
+}
+
+func TestExportService_Export_DoesNotFetchSubIssuesForAPullRequest(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:       json.RawMessage(pullRequestIssueJSON),
+		pullRequest: json.RawMessage(mergedPullRequestJSON),
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if repo.fetchSubIssuesCalled {
+		t.Fatal("FetchSubIssues was called for a pull request")
+	}
+	if writer.writeSubIssuesCalled {
+		t.Fatal("WriteSubIssues was called for a pull request")
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenFetchSubIssuesFails(t *testing.T) {
+	wantErr := errors.New("fetch sub-issues failed")
+	repo := &fakeEvidenceFetcher{
+		issue:        json.RawMessage(plainIssueJSON),
+		subIssuesErr: wantErr,
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
+	}
+}
+
+const issueWithParentJSON = `{
+	"title": "Sub-issue",
+	"body": "x",
+	"user": {"login": "octocat"},
+	"created_at": "2026-07-01T00:00:00Z",
+	"html_url": "https://github.com/example/repo/issues/69",
+	"parent_issue_url": "https://api.github.com/repos/octocat/hello-world/issues/64"
+}`
+
+const parentIssueJSON = `{"number":64,"title":"Round of Tier 1 entries","state":"open","html_url":"https://github.com/example/repo/issues/64"}`
+
+func TestExportService_Export_FetchesAndIncludesTheParentIssueWhenPresent(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:       json.RawMessage(issueWithParentJSON),
+		parentIssue: json.RawMessage(parentIssueJSON),
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if !repo.fetchParentIssueCalled {
+		t.Fatal("FetchIssue was not called a second time for the parent issue")
+	}
+	if !writer.writeParentIssueCalled {
+		t.Fatal("WriteParentIssue was not called")
+	}
+	if string(writer.wroteParentIssue) != parentIssueJSON {
+		t.Fatalf("WriteParentIssue got %q, want the raw parent issue JSON verbatim", writer.wroteParentIssue)
+	}
+
+	rendered := string(docs.written)
+	if !strings.Contains(rendered, `"number":64`) {
+		t.Fatalf("rendered document = %q, want a ParentIssue entry naming the parent's number", rendered)
+	}
+	if !strings.Contains(rendered, "Round of Tier 1 entries") {
+		t.Fatalf("rendered document = %q, want it to include the parent's title", rendered)
+	}
+}
+
+func TestExportService_Export_OmitsParentIssueEntryWhenAbsentButStillWritesToRemoveAnyStaleFile(t *testing.T) {
+	repo := &fakeEvidenceFetcher{issue: json.RawMessage(plainIssueJSON)}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if repo.fetchParentIssueCalled {
+		t.Fatal("FetchIssue was called a second time despite no parent_issue_url")
+	}
+	if !writer.writeParentIssueCalled {
+		t.Fatal("WriteParentIssue should still be called (to remove any stale file) even with no parent")
+	}
+	if writer.wroteParentIssue != nil {
+		t.Fatalf("WriteParentIssue got %q, want nil/empty when there is no parent", writer.wroteParentIssue)
+	}
+	if strings.Contains(string(docs.written), `"number":64`) {
+		t.Fatalf("rendered document = %q, want no ParentIssue entry when there is no parent", docs.written)
+	}
+}
+
+func TestExportService_Export_DoesNotFetchParentIssueForAPullRequest(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:       json.RawMessage(pullRequestIssueJSON),
+		pullRequest: json.RawMessage(mergedPullRequestJSON),
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if repo.fetchParentIssueCalled {
+		t.Fatal("FetchIssue was called a second time for a pull request")
+	}
+	if writer.writeParentIssueCalled {
+		t.Fatal("WriteParentIssue was called for a pull request")
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenFetchParentIssueFails(t *testing.T) {
+	wantErr := errors.New("fetch parent issue failed")
+	repo := &fakeEvidenceFetcher{
+		issue:          json.RawMessage(issueWithParentJSON),
+		parentIssueErr: wantErr,
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorForAMalformedParentIssueURL(t *testing.T) {
+	rawIssue := json.RawMessage(`{
+		"title": "Sub-issue",
+		"body": "x",
+		"user": {"login": "octocat"},
+		"created_at": "2026-07-01T00:00:00Z",
+		"html_url": "https://github.com/example/repo/issues/69",
+		"parent_issue_url": "https://api.github.com/not-the-expected-shape"
+	}`)
+	repo := &fakeEvidenceFetcher{issue: rawIssue}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err == nil {
+		t.Fatal("Export() error = nil, want an error for a malformed parent_issue_url")
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenWriteSubIssuesFails(t *testing.T) {
+	wantErr := errors.New("write sub-issues failed")
+	repo := &fakeEvidenceFetcher{issue: json.RawMessage(plainIssueJSON)}
+	writer := &fakeEvidenceWriter{subIssuesErr: wantErr}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenWriteParentIssueFails(t *testing.T) {
+	wantErr := errors.New("write parent issue failed")
+	repo := &fakeEvidenceFetcher{issue: json.RawMessage(plainIssueJSON)}
+	writer := &fakeEvidenceWriter{parentIssueErr: wantErr}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
 	}
 }
 
