@@ -139,6 +139,26 @@ func TestWriteReviewComments_ConcatenatesItemsIntoOneArrayFileWithReviewComments
 	}
 }
 
+func TestWritePullRequestFiles_ConcatenatesItemsIntoOneArrayFileWithPullFilesSuffix(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+	items := []json.RawMessage{
+		json.RawMessage(`{"filename":"a.go"}`),
+		json.RawMessage(`{"filename":"b.go"}`),
+	}
+
+	err := writer.WritePullRequestFiles(context.Background(), testIssueRef(t), items)
+	if err != nil {
+		t.Fatalf("WritePullRequestFiles() error = %v", err)
+	}
+
+	want := `[{"filename":"a.go"},{"filename":"b.go"}]`
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "pull-files.json"))
+	if got != want {
+		t.Fatalf("WritePullRequestFiles() wrote %q, want %q", got, want)
+	}
+}
+
 func TestWriteTimeline_ReturnsAnErrorInsteadOfWritingAMalformedArrayForAnEmptyElement(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewEvidenceWriter(baseDir)

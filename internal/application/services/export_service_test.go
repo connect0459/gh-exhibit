@@ -54,17 +54,20 @@ func (f *fakeEvidenceFetcher) FetchPullRequestFiles(context.Context, valueobject
 }
 
 type fakeEvidenceWriter struct {
-	issueErr          error
-	timelineErr       error
-	pullRequestErr    error
-	reviewCommentsErr error
+	issueErr            error
+	timelineErr         error
+	pullRequestErr      error
+	reviewCommentsErr   error
+	pullRequestFilesErr error
 
-	wroteIssue                json.RawMessage
-	wroteTimeline             []json.RawMessage
-	wrotePullRequest          json.RawMessage
-	wroteReviewComments       []json.RawMessage
-	writePullRequestCalled    bool
-	writeReviewCommentsCalled bool
+	wroteIssue                  json.RawMessage
+	wroteTimeline               []json.RawMessage
+	wrotePullRequest            json.RawMessage
+	wroteReviewComments         []json.RawMessage
+	wrotePullRequestFiles       []json.RawMessage
+	writePullRequestCalled      bool
+	writeReviewCommentsCalled   bool
+	writePullRequestFilesCalled bool
 }
 
 func (f *fakeEvidenceWriter) WriteIssue(_ context.Context, _ valueobjects.IssueRef, raw json.RawMessage) error {
@@ -87,6 +90,12 @@ func (f *fakeEvidenceWriter) WriteReviewComments(_ context.Context, _ valueobjec
 	f.writeReviewCommentsCalled = true
 	f.wroteReviewComments = items
 	return f.reviewCommentsErr
+}
+
+func (f *fakeEvidenceWriter) WritePullRequestFiles(_ context.Context, _ valueobjects.IssueRef, items []json.RawMessage) error {
+	f.writePullRequestFilesCalled = true
+	f.wrotePullRequestFiles = items
+	return f.pullRequestFilesErr
 }
 
 type fakeDocumentWriter struct {
