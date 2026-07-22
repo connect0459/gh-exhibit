@@ -25,4 +25,8 @@ type EvidenceFetcher interface {
 	// FetchReviewComments fetches ref's inline review comments, one raw
 	// JSON element per item across all pages.
 	FetchReviewComments(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error)
+	// FetchPullRequestFiles fetches ref's changed files, one raw JSON
+	// element per item across all pages. Callers should only call this
+	// once ref is known to be a pull request.
+	FetchPullRequestFiles(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error)
 }

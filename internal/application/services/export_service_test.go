@@ -14,17 +14,20 @@ import (
 )
 
 type fakeEvidenceFetcher struct {
-	issue             json.RawMessage
-	issueErr          error
-	timeline          []json.RawMessage
-	timelineErr       error
-	pullRequest       json.RawMessage
-	pullRequestErr    error
-	reviewComments    []json.RawMessage
-	reviewCommentsErr error
+	issue               json.RawMessage
+	issueErr            error
+	timeline            []json.RawMessage
+	timelineErr         error
+	pullRequest         json.RawMessage
+	pullRequestErr      error
+	reviewComments      []json.RawMessage
+	reviewCommentsErr   error
+	pullRequestFiles    []json.RawMessage
+	pullRequestFilesErr error
 
-	fetchPullRequestCalled    bool
-	fetchReviewCommentsCalled bool
+	fetchPullRequestCalled      bool
+	fetchReviewCommentsCalled   bool
+	fetchPullRequestFilesCalled bool
 }
 
 func (f *fakeEvidenceFetcher) FetchIssue(context.Context, valueobjects.IssueRef) (json.RawMessage, error) {
@@ -43,6 +46,11 @@ func (f *fakeEvidenceFetcher) FetchPullRequest(context.Context, valueobjects.Iss
 func (f *fakeEvidenceFetcher) FetchReviewComments(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
 	f.fetchReviewCommentsCalled = true
 	return f.reviewComments, f.reviewCommentsErr
+}
+
+func (f *fakeEvidenceFetcher) FetchPullRequestFiles(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
+	f.fetchPullRequestFilesCalled = true
+	return f.pullRequestFiles, f.pullRequestFilesErr
 }
 
 type fakeEvidenceWriter struct {
