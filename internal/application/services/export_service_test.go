@@ -26,11 +26,14 @@ type fakeEvidenceFetcher struct {
 	pullRequestFilesErr   error
 	pullRequestCommits    []json.RawMessage
 	pullRequestCommitsErr error
+	subIssues             []json.RawMessage
+	subIssuesErr          error
 
 	fetchPullRequestCalled        bool
 	fetchReviewCommentsCalled     bool
 	fetchPullRequestFilesCalled   bool
 	fetchPullRequestCommitsCalled bool
+	fetchSubIssuesCalled          bool
 }
 
 func (f *fakeEvidenceFetcher) FetchIssue(context.Context, valueobjects.IssueRef) (json.RawMessage, error) {
@@ -59,6 +62,11 @@ func (f *fakeEvidenceFetcher) FetchPullRequestFiles(context.Context, valueobject
 func (f *fakeEvidenceFetcher) FetchPullRequestCommits(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
 	f.fetchPullRequestCommitsCalled = true
 	return f.pullRequestCommits, f.pullRequestCommitsErr
+}
+
+func (f *fakeEvidenceFetcher) FetchSubIssues(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
+	f.fetchSubIssuesCalled = true
+	return f.subIssues, f.subIssuesErr
 }
 
 type fakeEvidenceWriter struct {
