@@ -22,18 +22,19 @@ type fakeExporter struct {
 }
 
 type fakeExportResult struct {
-	skips []services.SkipNote
-	err   error
+	rendered []byte
+	skips    []services.SkipNote
+	err      error
 }
 
-func (f *fakeExporter) Export(_ context.Context, ref valueobjects.IssueRef) ([]services.SkipNote, error) {
+func (f *fakeExporter) Export(_ context.Context, ref valueobjects.IssueRef) ([]byte, []services.SkipNote, error) {
 	f.calledNumbers = append(f.calledNumbers, ref.Number())
 
 	result, ok := f.results[ref.Number()]
 	if !ok {
-		return nil, fmt.Errorf("no fake result configured for #%d", ref.Number())
+		return nil, nil, fmt.Errorf("no fake result configured for #%d", ref.Number())
 	}
-	return result.skips, result.err
+	return result.rendered, result.skips, result.err
 }
 
 func TestRunExports_ReturnsZeroWhenEveryRefSucceeds(t *testing.T) {

@@ -16,7 +16,7 @@ import (
 // production path); defined here so tests can inject a fake instead of
 // exercising real network/filesystem I/O.
 type Exporter interface {
-	Export(ctx context.Context, ref valueobjects.IssueRef) ([]services.SkipNote, error)
+	Export(ctx context.Context, ref valueobjects.IssueRef) (rendered []byte, skips []services.SkipNote, err error)
 }
 
 // RunExports exports every ref in numbers (owner/repo/outputDir held fixed)
@@ -37,7 +37,7 @@ func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir s
 			continue
 		}
 
-		skips, err := exporter.Export(ctx, ref)
+		_, skips, err := exporter.Export(ctx, ref)
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "failed #%d: %v\n", number, err)
 			exitCode = 1
