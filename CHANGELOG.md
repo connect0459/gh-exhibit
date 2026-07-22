@@ -27,6 +27,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-22
+
+### Added
+
+- Issue/PR labels: a label added to or removed from the issue/PR is now
+  rendered as a new `LabelEvent` Tier 1 entry, interleaved chronologically
+  with the rest of the timeline the same way a comment or review already
+  is.
+- Issue/PR history: closing/reopening (`ClosureEvent`), a title rename
+  (`RenameEvent`), a milestone being added or removed (`MilestoneEvent`),
+  and an assignee being added or removed (`AssignmentEvent`) are now
+  rendered as new Tier 1 entries, interleaved chronologically with the
+  rest of the timeline.
+- Pull requests: the full changed-file diff is now rendered as a new
+  `PullRequestDiff` Tier 1 entry, sourced from `GET
+  /pulls/{number}/files`. A file's patch is suppressed once the pull
+  request's total changed lines exceed 1000; the changed-file list itself
+  (filename, status, additions, deletions) still renders in full.
+- Pull requests: the commit list is now rendered as a new
+  `PullRequestCommits` Tier 1 entry, sourced from `GET
+  /pulls/{number}/commits`, carrying each commit's distinct author and
+  committer identity plus its full message.
+- Issues: parent/child (sub-issue) relationships are now rendered as new
+  `ParentIssue`/`SubIssues` Tier 1 entries, sourced from the issue
+  resource's `parent_issue_url` and a new `GET
+  /issues/{number}/sub_issues` endpoint; each renders only when it
+  actually has content. A `SubIssues` bullet renders as
+  `` `{title}` [#{number}](url) ({state}) ``.
+- Pull requests: check-run status is now rendered as a new
+  `PullRequestChecks` Tier 1 entry, sourced from `GET
+  /repos/{owner}/{repo}/commits/{sha}/check-runs` against the pull
+  request's head commit, labeled with an explicit `captured_at` snapshot
+  timestamp so a reader does not mistake it for the pull request's
+  current, possibly-since-changed state.
+- A bare issue/PR reference (`#123`, `owner/repo#123`) in a comment's or
+  body's text is now resolved and rewritten to a backtick-wrapped,
+  title-first linked form (`` `{title}` [{original text}](url) ``),
+  skipping a reference already linked, inside an HTML comment, a fenced
+  code block, or an inline code span. An unresolvable target (deleted,
+  private, a transient failure) is left exactly as originally written.
+
+### Changed
+
+- **Breaking**: the CLI now requires an explicit `export` subcommand
+  (`gh exhibit export <number>[,<number>...]`); a bare `gh exhibit
+  <number>` (no subcommand) is rejected instead of being treated as an
+  implicit export. Root-level flags are now limited to `--version` and
+  the automatic `--help`; `--repo`/`-o`/`--output` usage moved under `gh
+  exhibit export --help`.
+
 ## [0.4.0] - 2026-07-21
 
 ### Changed
@@ -219,7 +269,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.4.0...HEAD>
+[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.5.0...HEAD>
+[0.5.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.4.0...v0.5.0>
 [0.4.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.1...v0.4.0>
 [0.3.1]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.0...v0.3.1>
 [0.3.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.2.0...v0.3.0>
