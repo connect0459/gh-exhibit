@@ -3,19 +3,23 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
 type issueResourceWire struct {
-	Title       string          `json:"title"`
-	Body        string          `json:"body"`
-	User        actorWire       `json:"user"`
-	CreatedAt   time.Time       `json:"created_at"`
-	HTMLURL     string          `json:"html_url"`
-	ClosedAt    *time.Time      `json:"closed_at"`
-	PullRequest json.RawMessage `json:"pull_request,omitempty"`
+	Title          string          `json:"title"`
+	Body           string          `json:"body"`
+	User           actorWire       `json:"user"`
+	CreatedAt      time.Time       `json:"created_at"`
+	HTMLURL        string          `json:"html_url"`
+	ClosedAt       *time.Time      `json:"closed_at"`
+	PullRequest    json.RawMessage `json:"pull_request,omitempty"`
+	ParentIssueURL string          `json:"parent_issue_url"`
 }
 
 type pullRequestResourceWire struct {
@@ -56,6 +60,44 @@ func (r IssueResource) IsPullRequest() bool {
 // fall back to this as their attribution's url.
 func (r IssueResource) HTMLURL() string {
 	return r.wire.HTMLURL
+}
+
+// ParentIssueRef reports the ref this issue is a sub-issue of, resolved
+// from the issue resource's own parent_issue_url. ok is false when
+// parent_issue_url is absent — an issue with no parent, or any pull
+// request, since GitHub never populates this field for one. err is
+// non-nil only when parent_issue_url is present but does not match
+// GitHub's own REST issue-resource URL shape
+// (.../repos/{owner}/{repo}/issues/{number}).
+func (r IssueResource) ParentIssueRef() (ref valueobjects.IssueRef, ok bool, err error) {
+	if r.wire.ParentIssueURL == "" {
+		return valueobjects.IssueRef{}, false, nil
+	}
+	ref, err = parseIssueResourceURL(r.wire.ParentIssueURL)
+	if err != nil {
+		return valueobjects.IssueRef{}, false, fmt.Errorf("parse parent issue url: %w", err)
+	}
+	return ref, true, nil
+}
+
+// parseIssueResourceURL extracts an IssueRef from raw, a GitHub REST issue
+// resource URL of the shape .../repos/{owner}/{repo}/issues/{number} (the
+// host itself is not inspected, since a GitHub Enterprise Server
+// installation uses the same path shape under its own host).
+func parseIssueResourceURL(raw string) (valueobjects.IssueRef, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return valueobjects.IssueRef{}, fmt.Errorf("parse url %q: %w", raw, err)
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) != 5 || parts[0] != "repos" || parts[3] != "issues" {
+		return valueobjects.IssueRef{}, fmt.Errorf("url %q does not match the expected /repos/{owner}/{repo}/issues/{number} shape", raw)
+	}
+	number, err := strconv.Atoi(parts[4])
+	if err != nil {
+		return valueobjects.IssueRef{}, fmt.Errorf("url %q has a non-numeric issue number: %w", raw, err)
+	}
+	return valueobjects.NewIssueRef(parts[1], parts[2], number)
 }
 
 // BuildBody constructs the document title and the Body Tier 1 entry from
