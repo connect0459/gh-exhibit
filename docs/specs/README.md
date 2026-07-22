@@ -63,7 +63,7 @@ gh exhibit --version
 
 ### Tier 1 entries
 
-The rendered Markdown's content is drawn from nine entry types, all Value
+The rendered Markdown's content is drawn from ten entry types, all Value
 Objects (no identity-based tracking — re-fetch diffing is git's job in the
 separate repository the evidence is copied into, not gh-exhibit's):
 
@@ -92,8 +92,14 @@ separate repository the evidence is copied into, not gh-exhibit's):
   sourced from the timeline's `assigned`/`unassigned` events, carrying an
   `AssignmentAction` (`assigned` / `unassigned`) plus the affected
   assignee's login.
+- `PullRequestDiff` — a pull request's changed files (PRs only), sourced
+  from `GET /pulls/{number}/files`, carrying a list of `ChangedFile`
+  (filename, optional previous filename for a rename, `FileStatus`,
+  additions, deletions, and an optional unified diff patch) plus the pull
+  request's total additions/deletions and a `truncated` flag. See
+  "Pull request diff rendering" below.
 
-All nine implement the sealed `valueobjects.Entry` interface
+All ten implement the sealed `valueobjects.Entry` interface
 (`Render(io.Writer) error` plus an unexported marker method) — the closest
 Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 (author, created, url — the common `<!-- {"meta":...} -->` fields), `Url`
@@ -170,6 +176,33 @@ therefore falls back to the issue/PR's own `html_url` (already available
 from the issue/PR resource fetched alongside the timeline) rather than a
 link to the specific historical event.
 
+### Pull request diff rendering
+
+Unlike the other nine Tier 1 types, `PullRequestDiff` has no timeline event
+or per-event actor of its own — it is a snapshot of the pull request's
+current changed files, not something that happened at a point in time. Its
+`Attribution` therefore reuses the pull request's own (author, created,
+url) — the same `Attribution` `Body` was built from — rather than a
+per-event one, the same "fall back to the resource's own attribution"
+precedent `LabelEvent`/`ClosureEvent`/`RenameEvent`/`MilestoneEvent`/
+`AssignmentEvent` already established for a different reason (their event
+payload's missing `html_url`). Because it is a snapshot rather than a
+chronological event, it is placed once, immediately after `Body`, rather
+than interleaved by timeline position; it is present only when the
+exported ref is a pull request.
+
+The pull request resource's own `additions`/`deletions` fields (already
+fetched as part of building `Body`, no extra request needed) decide
+whether each changed file's patch is rendered: once their total exceeds
+`maxDiffTotalLines` (1000 changed lines), every file's patch is suppressed
+while the file list itself (filename, status, additions, deletions) is
+still rendered in full — the "list of changed files" fallback. A file's
+own patch can also be empty below that threshold, when GitHub itself
+omits `patch` for an individually oversized file; `PullRequestDiff`'s
+render logic does not distinguish the two cases (it renders a diff block
+only when a file's `Patch()` is non-empty), but its `truncated` flag,
+carried in the meta line, records only the threshold case.
+
 ## On-disk layout
 
 Every artifact for a given issue/PR number lives under one self-contained
@@ -186,6 +219,7 @@ directory holding its own assets:
     ├── timeline.json                 timeline (paginated responses concatenated into one array)
     ├── pull.json                     pull request resource (PRs only)
     ├── review-comments.json          inline review comments (PRs only)
+    ├── pull-files.json               changed files, from GET /pulls/{number}/files (PRs only)
     ├── provenance.json               which gh-exhibit tool/version/commit produced this export
     └── fetch-errors.log              this run's attachment fetch failures, if any
 ```
@@ -296,9 +330,10 @@ is mandatory, to keep the exported directory offline-verifiable. After a
 ## Rate limiting and retry
 
 REST API calls (issue/PR resource, timeline, pull request resource, review
-comments) retry on a 429, or a 403 whose headers identify it as rate
-limiting (`Retry-After` present, or `X-RateLimit-Remaining: 0` — a 403
-without either is a permission error and is not retried). Wait duration
+comments, pull request files) retry on a 429, or a 403 whose headers
+identify it as rate limiting (`Retry-After` present, or
+`X-RateLimit-Remaining: 0` — a 403 without either is a permission error and
+is not retried). Wait duration
 honors `Retry-After` (seconds) or `X-RateLimit-Reset` (epoch seconds) when
 present and parseable as a non-negative value that does not overflow
 `time.Duration`/`time.Unix`'s arithmetic; an absent, negative, or
@@ -355,8 +390,8 @@ expected origin is treated as a mismatch rather than trusted.
 
 `ExportService.Export` runs `FetchTimeline` concurrently with the
 pull-request chain (`FetchPullRequest`, then, only on success,
-`FetchReviewComments`) — the chain's own internal short-circuit is
-unaffected. Both share a cancellable context: whichever branch fails first
+`FetchReviewComments`, then `FetchPullRequestFiles`) — the chain's own
+internal short-circuit is unaffected. Both share a cancellable context: whichever branch fails first
 cancels it, so the other branch's in-flight fetch (possibly blocked in a
 rate-limit wait up to an hour long) is interrupted rather than waited out.
 The first genuine failure to occur is what `Export` reports, not whichever

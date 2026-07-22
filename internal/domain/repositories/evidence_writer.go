@@ -26,4 +26,7 @@ type EvidenceWriter interface {
 	// WriteReviewComments persists ref's review comment items,
 	// concatenated into a single JSON array.
 	WriteReviewComments(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error
+	// WritePullRequestFiles persists ref's changed-file items, concatenated
+	// into a single JSON array.
+	WritePullRequestFiles(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error
 }

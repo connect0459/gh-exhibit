@@ -19,7 +19,9 @@ type issueResourceWire struct {
 }
 
 type pullRequestResourceWire struct {
-	MergedAt *time.Time `json:"merged_at"`
+	MergedAt  *time.Time `json:"merged_at"`
+	Additions int        `json:"additions"`
+	Deletions int        `json:"deletions"`
 }
 
 // IssueResource is the parsed issue/PR resource (from

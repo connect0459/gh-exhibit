@@ -71,7 +71,16 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 	}
 
 	classified, skipped := services.BuildEntries(fetched.timeline, fetched.reviewComments, issue.HTMLURL())
-	entries := append([]valueobjects.Entry{body}, classified...)
+	entries := []valueobjects.Entry{body}
+	if issue.IsPullRequest() {
+		diff, diffSkipped, err := services.BuildPullRequestDiff(body.Attribution(), fetched.pullRequest, fetched.pullRequestFiles)
+		if err != nil {
+			return nil, fmt.Errorf("could not build the pull request diff: %w", err)
+		}
+		skipped = append(skipped, diffSkipped...)
+		entries = append(entries, diff)
+	}
+	entries = append(entries, classified...)
 
 	doc, err := valueobjects.NewDocument(title, entries)
 	if err != nil {
@@ -108,6 +117,9 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		if err := s.writer.WriteReviewComments(ctx, ref, fetched.reviewComments); err != nil {
 			return nil, fmt.Errorf("could not persist the raw review comments: %w", err)
 		}
+		if err := s.writer.WritePullRequestFiles(ctx, ref, fetched.pullRequestFiles); err != nil {
+			return nil, fmt.Errorf("could not persist the raw pull request files: %w", err)
+		}
 	}
 	if err := s.writer.WriteTimeline(ctx, ref, fetched.timeline); err != nil {
 		return nil, fmt.Errorf("could not persist the raw timeline: %w", err)
@@ -135,15 +147,17 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 // positional return gives the compiler nothing to catch a transposed
 // assignment at either call site.
 type fetchedPullRequestAndTimeline struct {
-	pullRequest    json.RawMessage
-	reviewComments []json.RawMessage
-	timeline       []json.RawMessage
+	pullRequest      json.RawMessage
+	reviewComments   []json.RawMessage
+	pullRequestFiles []json.RawMessage
+	timeline         []json.RawMessage
 }
 
 // fetchPullRequestChainAndTimeline runs the pull-request chain
-// (FetchPullRequest, then FetchReviewComments when issue is a pull request)
-// concurrently with FetchTimeline, since neither depends on the other's
-// result — overlapping their round trips shortens Export's overall latency.
+// (FetchPullRequest, then FetchReviewComments, then FetchPullRequestFiles,
+// when issue is a pull request) concurrently with FetchTimeline, since
+// neither depends on the other's result — overlapping their round trips
+// shortens Export's overall latency.
 func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, ref valueobjects.IssueRef, issue services.IssueResource) (fetchedPullRequestAndTimeline, error) {
 	fetchCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -199,6 +213,13 @@ func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, re
 				return
 			}
 			result.reviewComments = reviewComments
+
+			pullRequestFiles, err := s.fetcher.FetchPullRequestFiles(fetchCtx, ref)
+			if err != nil {
+				fail(fmt.Errorf("could not retrieve the pull request files: %w", err))
+				return
+			}
+			result.pullRequestFiles = pullRequestFiles
 		}()
 	}
 	wg.Wait()

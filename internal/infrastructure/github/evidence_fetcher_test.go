@@ -158,6 +158,33 @@ func TestFetchReviewComments_FollowsLinkHeaderAndConcatenatesPages(t *testing.T)
 	}
 }
 
+func TestFetchPullRequestFiles_FollowsLinkHeaderAndConcatenatesPages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/octocat/hello-world/pulls/42/files" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		switch r.URL.Query().Get("page") {
+		case "", "1":
+			w.Header().Set("Link", fmt.Sprintf(`<http://%s/repos/octocat/hello-world/pulls/42/files?page=2>; rel="next"`, r.Host))
+			_, _ = w.Write([]byte(`[{"filename":"a.go"}]`))
+		case "2":
+			_, _ = w.Write([]byte(`[{"filename":"b.go"}]`))
+		default:
+			t.Errorf("unexpected page: %s", r.URL.Query().Get("page"))
+		}
+	}))
+	defer server.Close()
+
+	fetcher := newTestFetcher(t, server)
+	got, err := fetcher.FetchPullRequestFiles(context.Background(), testIssueRef(t))
+	if err != nil {
+		t.Fatalf("FetchPullRequestFiles() error = %v", err)
+	}
+	if len(got) != 2 || string(got[0]) != `{"filename":"a.go"}` || string(got[1]) != `{"filename":"b.go"}` {
+		t.Fatalf("FetchPullRequestFiles() = %v, want [{\"filename\":\"a.go\"} {\"filename\":\"b.go\"}]", got)
+	}
+}
+
 func TestFetchIssue_RetriesAfterRateLimitedResponseThenSucceeds(t *testing.T) {
 	const body = `{"number":42,"title":"Some issue"}`
 	calls := 0

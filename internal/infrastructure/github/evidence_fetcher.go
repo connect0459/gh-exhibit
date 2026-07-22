@@ -75,6 +75,11 @@ func (r *evidenceFetcher) FetchReviewComments(ctx context.Context, ref valueobje
 	return r.fetchPaginated(ctx, pullPath(ref)+"/comments")
 }
 
+// FetchPullRequestFiles implements repositories.EvidenceFetcher.
+func (r *evidenceFetcher) FetchPullRequestFiles(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error) {
+	return r.fetchPaginated(ctx, pullPath(ref)+"/files")
+}
+
 func issuePath(ref valueobjects.IssueRef) string {
 	return fmt.Sprintf("repos/%s/%s/issues/%d", ref.Owner(), ref.Repo(), ref.Number())
 }
