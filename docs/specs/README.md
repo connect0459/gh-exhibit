@@ -60,6 +60,14 @@ gh exhibit --version
   under; defaults to `.`.
 - `--version`: prints `gh-exhibit {version} (commit {commit}, built {date})`
   and exits, without requiring a subcommand.
+- Every flag's leading dashes are interchangeable (`-repo` and `--repo`
+  parse identically): this is the stdlib `flag` package's own behavior, not
+  something `ParseArgs` implements. `-h`/`--help`'s generated usage text
+  always prints the single-dash spelling, so this is each flag's base form;
+  the double-dash spelling used above is a readability convention. `-o` and
+  `-h` are the only flags that are true single-letter shorthands for a
+  distinct long name (`--output`, `--help`) rather than the same name with
+  fewer dashes.
 - A failing ref in a list does not stop the remaining ones in the same
   invocation. Each ref's success or failure is reported on its own line to
   stdout/stderr respectively. Process exit code is `0` only if every ref

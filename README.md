@@ -33,6 +33,13 @@ gh exhibit --version
 - `-h`, `--help`: print usage and exit. Run at the root for the
   root-level flags, or `gh exhibit export -h` for `export`'s own flags.
 
+Every flag above works with either one or two leading dashes (`-repo` and
+`--repo` are the same flag, not separate short/long forms) — `-h`/`--help`'s
+own usage text always prints the single-dash spelling, which this project
+treats as each flag's base form; the double-dash spelling shown above is
+written for readability. `-o` and `-h` are the only flags that are true
+single-letter shorthands for a separate long name (`--output`, `--help`).
+
 ### Examples
 
 ```sh
