@@ -132,14 +132,26 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		return nil, fmt.Errorf("could not render the document to Markdown: %w", err)
 	}
 
-	linked, err := s.resolveIssueReferences(ctx, ref, buf.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("could not resolve one or more issue/PR references: %w", err)
-	}
-
-	rendered, downloads, failureLog, err := s.resolveAttachments(ctx, ref, linked)
+	// Attachment resolution runs before issue-reference resolution, not
+	// after: resolveIssueReferences splices a referenced issue/PR's own
+	// title — text controlled by whoever titled that other issue, not a
+	// participant in ref's own discussion, and, for a cross-repository
+	// reference, not even someone with any relationship to ref's own
+	// repository — into this buffer. Were resolveAttachments to run
+	// afterward, its Detect would treat any user-attachments-shaped URL
+	// embedded in that title as if it were a genuine attachment
+	// referenced by ref's own discussion, fetching and downloading
+	// content that a third party never actually attached to ref at all.
+	// Running attachment resolution first closes this off structurally:
+	// Detect never sees title text, because it does not exist yet.
+	resolvedAttachments, downloads, failureLog, err := s.resolveAttachments(ctx, ref, buf.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve one or more attachments: %w", err)
+	}
+
+	rendered, err := s.resolveIssueReferences(ctx, ref, resolvedAttachments)
+	if err != nil {
+		return nil, fmt.Errorf("could not resolve one or more issue/PR references: %w", err)
 	}
 
 	// Every fetch/build/validation step above — including downloading every

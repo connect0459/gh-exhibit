@@ -1740,6 +1740,46 @@ func TestExportService_Export_PropagatesAnErrorWhenIssueReferenceResolutionIsCan
 	}
 }
 
+func TestExportService_Export_DoesNotTreatAnAttachmentURLEmbeddedInAReferencedIssuesTitleAsAnAttachment(t *testing.T) {
+	ref42 := refFor(t, "octocat", "hello-world", 42)
+	maliciousTitleJSON := `{
+		"title": "See ` + attachmentURL + ` for details",
+		"body": "",
+		"user": {"login": "attacker"},
+		"created_at": "2026-06-01T00:00:00Z",
+		"html_url": "https://github.com/octocat/hello-world/issues/42"
+	}`
+	repo := &fakeEvidenceFetcher{
+		issue: json.RawMessage(issueWithBareReferenceJSON),
+		issueReferences: map[valueobjects.IssueRef]json.RawMessage{
+			ref42: json.RawMessage(maliciousTitleJSON),
+		},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	attachments := &fakeAttachmentFetcher{data: []byte("png-bytes"), contentType: "image/png"}
+	assets := &fakeAttachmentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, attachments, assets, "github.com", testProvenance(t), fakeClock{})
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if len(attachments.fetchedURLs) != 0 {
+		t.Fatalf("Fetch was called with %v, want none — a referenced issue's title text must never be treated as an attachment source", attachments.fetchedURLs)
+	}
+	if len(assets.wroteAssets) != 0 {
+		t.Fatalf("WriteAsset was called despite the URL only appearing in a referenced issue's title: %v", assets.wroteAssets)
+	}
+
+	rendered := string(docs.written)
+	if !strings.Contains(rendered, attachmentURL) {
+		t.Fatalf("rendered document = %q, want the referenced title's literal text preserved verbatim", rendered)
+	}
+}
+
 func TestExportService_Export_DoesNotFetchAnythingExtraWhenNoIssueReferencesArePresent(t *testing.T) {
 	repo := &fakeEvidenceFetcher{
 		issue:    json.RawMessage(plainIssueJSON),

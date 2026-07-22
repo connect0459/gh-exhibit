@@ -540,6 +540,20 @@ altogether. The original matched text (`#123` or `owner/repo#123`,
 verbatim as the author wrote it) is reused as the link's own label,
 rather than a normalized form.
 
+This pass runs *after* the attachment policy's own detect/resolve/rewrite
+pass, not before: a referenced issue/PR's own title is text controlled by
+whoever titled that other issue — not a participant in the exported
+issue/PR's own discussion, and, for a cross-repository reference, not
+even someone with any relationship to the exported repository at all.
+Were the attachment policy's `Detect` to run over a buffer that already
+had such a title spliced in, it would treat any `user-attachments`-shaped
+URL embedded in that title as a genuine attachment referenced by the
+exported discussion, fetching and downloading content a third party never
+actually attached to it. Running attachment resolution first closes this
+off structurally rather than by sanitizing the substituted title text:
+`Detect` never sees title text, because it does not exist in the buffer
+yet at the point it runs.
+
 ## Rate limiting and retry
 
 REST API calls (issue/PR resource, timeline, pull request resource, review
