@@ -234,11 +234,17 @@ func TestExportService_Export_WritesRawEvidenceAndRenderedDocumentForAPlainIssue
 	if repo.fetchReviewCommentsCalled {
 		t.Fatal("FetchReviewComments was called for a plain issue")
 	}
+	if repo.fetchPullRequestFilesCalled {
+		t.Fatal("FetchPullRequestFiles was called for a plain issue")
+	}
 	if writer.writePullRequestCalled {
 		t.Fatal("WritePullRequest was called for a plain issue")
 	}
 	if writer.writeReviewCommentsCalled {
 		t.Fatal("WriteReviewComments was called for a plain issue")
+	}
+	if writer.writePullRequestFilesCalled {
+		t.Fatal("WritePullRequestFiles was called for a plain issue")
 	}
 
 	if string(writer.wroteIssue) != plainIssueJSON {
@@ -298,6 +304,78 @@ func TestExportService_Export_AlsoFetchesAndPersistsPullRequestEvidence(t *testi
 	rendered := string(docs.written)
 	if !strings.Contains(rendered, `"merged":"2026-07-03T00:00:00Z"`) {
 		t.Fatalf("rendered document = %q, want it to reflect merged_at from the pull resource", rendered)
+	}
+}
+
+const changedFileJSON = `{"filename":"internal/foo.go","status":"modified","additions":12,"deletions":3,"patch":"@@ -1,3 +1,3 @@"}`
+
+func TestExportService_Export_IncludesAPullRequestDiffEntryForAPullRequest(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:            json.RawMessage(pullRequestIssueJSON),
+		pullRequest:      json.RawMessage(mergedPullRequestJSON),
+		pullRequestFiles: []json.RawMessage{json.RawMessage(changedFileJSON)},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if !repo.fetchPullRequestFilesCalled {
+		t.Fatal("FetchPullRequestFiles was not called for a pull request")
+	}
+	if !writer.writePullRequestFilesCalled {
+		t.Fatal("WritePullRequestFiles was not called for a pull request")
+	}
+	if string(writer.wrotePullRequestFiles[0]) != changedFileJSON {
+		t.Fatalf("WritePullRequestFiles got %q, want the raw changed file JSON verbatim", writer.wrotePullRequestFiles)
+	}
+
+	rendered := string(docs.written)
+	if !strings.Contains(rendered, `"files":1`) {
+		t.Fatalf("rendered document = %q, want a PullRequestDiff entry reporting 1 changed file", rendered)
+	}
+	if !strings.Contains(rendered, "internal/foo.go") {
+		t.Fatalf("rendered document = %q, want it to list the changed file's name", rendered)
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenFetchPullRequestFilesFails(t *testing.T) {
+	wantErr := errors.New("fetch pull request files failed")
+	repo := &fakeEvidenceFetcher{
+		issue:               json.RawMessage(pullRequestIssueJSON),
+		pullRequest:         json.RawMessage(mergedPullRequestJSON),
+		pullRequestFilesErr: wantErr,
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenWritePullRequestFilesFails(t *testing.T) {
+	wantErr := errors.New("write pull request files failed")
+	repo := &fakeEvidenceFetcher{
+		issue:       json.RawMessage(pullRequestIssueJSON),
+		pullRequest: json.RawMessage(mergedPullRequestJSON),
+	}
+	writer := &fakeEvidenceWriter{pullRequestFilesErr: wantErr}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
 	}
 }
 
