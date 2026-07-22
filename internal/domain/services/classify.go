@@ -48,6 +48,10 @@ func classify(rawTimeline []json.RawMessage, issueURL string) ([]classifiedItem,
 	seenReviewIDs := make(map[int64]bool)
 	seenCommentedIDs := make(map[int64]bool)
 	seenLabelIDs := make(map[int64]bool)
+	seenClosureIDs := make(map[int64]bool)
+	seenRenameIDs := make(map[int64]bool)
+	seenMilestoneIDs := make(map[int64]bool)
+	seenAssignmentIDs := make(map[int64]bool)
 
 	for _, raw := range rawTimeline {
 		var d discriminator
@@ -111,6 +115,74 @@ func classify(rawTimeline []json.RawMessage, issueURL string) ([]classifiedItem,
 			}
 			items = append(items, item)
 
+		case eventKindClosed, eventKindReopened:
+			item, id, err := classifyClosureEvent(raw, d.Event, issueURL)
+			if err != nil {
+				skipped = append(skipped, SkipNote{Reason: err.Error(), Raw: raw})
+				continue
+			}
+			// See markSeen: without this, a duplicate id would render the
+			// same ClosureEvent twice.
+			if markSeen(seenClosureIDs, id) {
+				skipped = append(skipped, SkipNote{
+					Reason: fmt.Sprintf("duplicate %s event id %d", d.Event, id),
+					Raw:    raw,
+				})
+				continue
+			}
+			items = append(items, item)
+
+		case eventKindRenamed:
+			item, id, err := classifyRenameEvent(raw, issueURL)
+			if err != nil {
+				skipped = append(skipped, SkipNote{Reason: err.Error(), Raw: raw})
+				continue
+			}
+			// See markSeen: without this, a duplicate id would render the
+			// same RenameEvent twice.
+			if markSeen(seenRenameIDs, id) {
+				skipped = append(skipped, SkipNote{
+					Reason: fmt.Sprintf("duplicate renamed event id %d", id),
+					Raw:    raw,
+				})
+				continue
+			}
+			items = append(items, item)
+
+		case eventKindMilestoned, eventKindDemilestoned:
+			item, id, err := classifyMilestoneEvent(raw, d.Event, issueURL)
+			if err != nil {
+				skipped = append(skipped, SkipNote{Reason: err.Error(), Raw: raw})
+				continue
+			}
+			// See markSeen: without this, a duplicate id would render the
+			// same MilestoneEvent twice.
+			if markSeen(seenMilestoneIDs, id) {
+				skipped = append(skipped, SkipNote{
+					Reason: fmt.Sprintf("duplicate %s event id %d", d.Event, id),
+					Raw:    raw,
+				})
+				continue
+			}
+			items = append(items, item)
+
+		case eventKindAssigned, eventKindUnassigned:
+			item, id, err := classifyAssignmentEvent(raw, d.Event, issueURL)
+			if err != nil {
+				skipped = append(skipped, SkipNote{Reason: err.Error(), Raw: raw})
+				continue
+			}
+			// See markSeen: without this, a duplicate id would render the
+			// same AssignmentEvent twice.
+			if markSeen(seenAssignmentIDs, id) {
+				skipped = append(skipped, SkipNote{
+					Reason: fmt.Sprintf("duplicate %s event id %d", d.Event, id),
+					Raw:    raw,
+				})
+				continue
+			}
+			items = append(items, item)
+
 		default:
 		}
 	}
@@ -153,6 +225,114 @@ func classifyLabelEvent(raw json.RawMessage, rawEvent string, issueURL string) (
 	}
 
 	event, err := valueobjects.NewLabelEvent(attribution, action, w.Label.Name, w.Label.Color)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event: %w", rawEvent, err)
+	}
+
+	return classifiedItem{direct: event}, w.ID, nil
+}
+
+// classifyClosureEvent classifies a "closed"/"reopened" timeline event into
+// a ClosureEvent, attributed to issueURL (the issue/PR's own html_url) since
+// GitHub's payload for this event kind carries no per-event permalink of
+// its own, the same as classifyLabelEvent.
+func classifyClosureEvent(raw json.RawMessage, rawEvent string, issueURL string) (classifiedItem, int64, error) {
+	var w closureEventWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("unmarshal %s event: %w", rawEvent, err)
+	}
+
+	action, err := valueobjects.ParseClosureAction(rawEvent)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event action: %w", rawEvent, err)
+	}
+
+	attribution, err := valueobjects.NewAttribution(w.Actor.resolvedLogin(), w.CreatedAt, issueURL)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event attribution: %w", rawEvent, err)
+	}
+
+	event := valueobjects.NewClosureEvent(attribution, action, w.StateReason)
+
+	return classifiedItem{direct: event}, w.ID, nil
+}
+
+// classifyRenameEvent classifies a "renamed" timeline event into a
+// RenameEvent, attributed to issueURL (the issue/PR's own html_url) since
+// GitHub's payload for this event kind carries no per-event permalink of
+// its own, the same as classifyLabelEvent.
+func classifyRenameEvent(raw json.RawMessage, issueURL string) (classifiedItem, int64, error) {
+	var w renameEventWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("unmarshal renamed event: %w", err)
+	}
+
+	attribution, err := valueobjects.NewAttribution(w.Actor.resolvedLogin(), w.CreatedAt, issueURL)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("renamed event attribution: %w", err)
+	}
+
+	event, err := valueobjects.NewRenameEvent(attribution, w.Rename.From, w.Rename.To)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("renamed event: %w", err)
+	}
+
+	return classifiedItem{direct: event}, w.ID, nil
+}
+
+// classifyMilestoneEvent classifies a "milestoned"/"demilestoned" timeline
+// event into a MilestoneEvent, attributed to issueURL (the issue/PR's own
+// html_url) since GitHub's payload for this event kind carries no per-event
+// permalink of its own, the same as classifyLabelEvent.
+func classifyMilestoneEvent(raw json.RawMessage, rawEvent string, issueURL string) (classifiedItem, int64, error) {
+	var w milestoneEventWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("unmarshal %s event: %w", rawEvent, err)
+	}
+
+	action, err := valueobjects.ParseMilestoneAction(rawEvent)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event action: %w", rawEvent, err)
+	}
+
+	attribution, err := valueobjects.NewAttribution(w.Actor.resolvedLogin(), w.CreatedAt, issueURL)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event attribution: %w", rawEvent, err)
+	}
+
+	event, err := valueobjects.NewMilestoneEvent(attribution, action, w.Milestone.Title)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event: %w", rawEvent, err)
+	}
+
+	return classifiedItem{direct: event}, w.ID, nil
+}
+
+// classifyAssignmentEvent classifies an "assigned"/"unassigned" timeline
+// event into an AssignmentEvent, attributed to issueURL (the issue/PR's own
+// html_url) since GitHub's payload for this event kind carries no per-event
+// permalink of its own, the same as classifyLabelEvent. The assignee is a
+// GitHub user reference like the actor, so it falls back to "ghost" the
+// same way (see actorWire.resolvedLogin): a deleted account is nulled out
+// wherever it's referenced in a timeline event, not only when it's the
+// actor who performed the action.
+func classifyAssignmentEvent(raw json.RawMessage, rawEvent string, issueURL string) (classifiedItem, int64, error) {
+	var w assignmentEventWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("unmarshal %s event: %w", rawEvent, err)
+	}
+
+	action, err := valueobjects.ParseAssignmentAction(rawEvent)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event action: %w", rawEvent, err)
+	}
+
+	attribution, err := valueobjects.NewAttribution(w.Actor.resolvedLogin(), w.CreatedAt, issueURL)
+	if err != nil {
+		return classifiedItem{}, 0, fmt.Errorf("%s event attribution: %w", rawEvent, err)
+	}
+
+	event, err := valueobjects.NewAssignmentEvent(attribution, action, w.Assignee.resolvedLogin())
 	if err != nil {
 		return classifiedItem{}, 0, fmt.Errorf("%s event: %w", rawEvent, err)
 	}

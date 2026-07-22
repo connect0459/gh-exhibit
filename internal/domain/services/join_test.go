@@ -878,3 +878,607 @@ func TestBuildEntries_SkipsADuplicateLabeledEventSharingAnAlreadySeenID(t *testi
 		t.Fatalf("got %d skipped items, want 1", len(skipped))
 	}
 }
+
+func closureEventRaw(id int64, event, login, stateReason string) json.RawMessage {
+	reasonField := ""
+	if stateReason != "" {
+		reasonField = fmt.Sprintf(`, "state_reason": %q`, stateReason)
+	}
+	return json.RawMessage(fmt.Sprintf(`{
+		"id": %d,
+		"event": %q,
+		"actor": {"login": %q},
+		"created_at": "2026-07-01T10:00:00Z"%s
+	}`, id, event, login, reasonField))
+}
+
+func TestBuildEntries_ClassifiesAClosedEventIntoAClosureEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "closed_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.ClosureEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a ClosureEvent: %#v", entries[0])
+	}
+
+	attribution, err := valueobjects.NewAttribution(
+		"tierninho",
+		time.Date(2020, 2, 4, 18, 0, 0, 0, time.UTC),
+		testIssueURL,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error building expected attribution: %v", err)
+	}
+	want := valueobjects.NewClosureEvent(attribution, valueobjects.ClosureActionClosed, "completed")
+
+	if !got.Equals(want) {
+		t.Fatalf("entries[0] = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildEntries_ClassifiesAReopenedEventIntoAClosureEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "reopened_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.ClosureEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a ClosureEvent: %#v", entries[0])
+	}
+	if got.Action() != valueobjects.ClosureActionReopened {
+		t.Fatalf("Action() = %v, want %v", got.Action(), valueobjects.ClosureActionReopened)
+	}
+	if got.Reason() != "" {
+		t.Fatalf("Reason() = %q, want empty for a reopened event", got.Reason())
+	}
+}
+
+func TestBuildEntries_AttributesAClosureEventToTheIssuesOwnURLNotAPerEventURL(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{closureEventRaw(1, "closed", "octocat", "completed")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.ClosureEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a ClosureEvent: %#v", entries[0])
+	}
+	if got.Attribution().URL().String() != testIssueURL {
+		t.Fatalf("Attribution().URL() = %q, want the issue's own URL %q", got.Attribution().URL().String(), testIssueURL)
+	}
+}
+
+func TestBuildEntries_AttributesAClosureEventFromADeletedActorToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1,
+		"event": "closed",
+		"actor": null,
+		"created_at": "2026-07-01T00:00:00Z",
+		"state_reason": "not_planned"
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.ClosureEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a ClosureEvent: %#v", entries[0])
+	}
+	if got.Attribution().Author() != "ghost" {
+		t.Fatalf("Attribution().Author() = %q, want %q", got.Attribution().Author(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsAClosureEventThatFailsToUnmarshal(t *testing.T) {
+	raw := json.RawMessage(`{"event": "closed", "created_at": 12345}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "unmarshal") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the unmarshal failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsADuplicateClosedEventSharingAnAlreadySeenID(t *testing.T) {
+	raw := closureEventRaw(1, "closed", "octocat", "completed")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil, testIssueURL)
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the duplicate should be skipped)", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func renameEventRaw(id int64, login, from, to string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{
+		"id": %d,
+		"event": "renamed",
+		"actor": {"login": %q},
+		"created_at": "2026-07-01T10:00:00Z",
+		"rename": {"from": %q, "to": %q}
+	}`, id, login, from, to))
+}
+
+func TestBuildEntries_ClassifiesARenamedEventIntoARenameEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "renamed_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.RenameEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a RenameEvent: %#v", entries[0])
+	}
+
+	attribution, err := valueobjects.NewAttribution(
+		"tierninho",
+		time.Date(2020, 2, 4, 18, 5, 0, 0, time.UTC),
+		testIssueURL,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error building expected attribution: %v", err)
+	}
+	want, err := valueobjects.NewRenameEvent(attribution, "Old title", "New title")
+	if err != nil {
+		t.Fatalf("unexpected error building expected rename event: %v", err)
+	}
+
+	if !got.Equals(want) {
+		t.Fatalf("entries[0] = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildEntries_AttributesARenameEventToTheIssuesOwnURLNotAPerEventURL(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{renameEventRaw(1, "octocat", "Old title", "New title")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.RenameEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a RenameEvent: %#v", entries[0])
+	}
+	if got.Attribution().URL().String() != testIssueURL {
+		t.Fatalf("Attribution().URL() = %q, want the issue's own URL %q", got.Attribution().URL().String(), testIssueURL)
+	}
+}
+
+func TestBuildEntries_AttributesARenameEventFromADeletedActorToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1,
+		"event": "renamed",
+		"actor": null,
+		"created_at": "2026-07-01T00:00:00Z",
+		"rename": {"from": "Old title", "to": "New title"}
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.RenameEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a RenameEvent: %#v", entries[0])
+	}
+	if got.Attribution().Author() != "ghost" {
+		t.Fatalf("Attribution().Author() = %q, want %q", got.Attribution().Author(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsARenamedEventThatFailsToUnmarshal(t *testing.T) {
+	raw := json.RawMessage(`{"event": "renamed", "created_at": 12345}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "unmarshal") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the unmarshal failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsARenamedEventWithAnEmptyToTitle(t *testing.T) {
+	raw := renameEventRaw(1, "octocat", "Old title", "")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func TestBuildEntries_SkipsADuplicateRenamedEventSharingAnAlreadySeenID(t *testing.T) {
+	raw := renameEventRaw(1, "octocat", "Old title", "New title")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil, testIssueURL)
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the duplicate should be skipped)", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func milestoneEventRaw(id int64, event, login, title string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{
+		"id": %d,
+		"event": %q,
+		"actor": {"login": %q},
+		"created_at": "2026-07-01T10:00:00Z",
+		"milestone": {"title": %q}
+	}`, id, event, login, title))
+}
+
+func TestBuildEntries_ClassifiesAMilestonedEventIntoAMilestoneEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "milestoned_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.MilestoneEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a MilestoneEvent: %#v", entries[0])
+	}
+
+	attribution, err := valueobjects.NewAttribution(
+		"tierninho",
+		time.Date(2020, 2, 4, 18, 10, 0, 0, time.UTC),
+		testIssueURL,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error building expected attribution: %v", err)
+	}
+	want, err := valueobjects.NewMilestoneEvent(attribution, valueobjects.MilestoneActionMilestoned, "v1.0")
+	if err != nil {
+		t.Fatalf("unexpected error building expected milestone event: %v", err)
+	}
+
+	if !got.Equals(want) {
+		t.Fatalf("entries[0] = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildEntries_ClassifiesADemilestonedEventIntoAMilestoneEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "demilestoned_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.MilestoneEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a MilestoneEvent: %#v", entries[0])
+	}
+	if got.Action() != valueobjects.MilestoneActionDemilestoned {
+		t.Fatalf("Action() = %v, want %v", got.Action(), valueobjects.MilestoneActionDemilestoned)
+	}
+	if got.Title() != "v0.9" {
+		t.Fatalf("Title() = %q, want %q", got.Title(), "v0.9")
+	}
+}
+
+func TestBuildEntries_AttributesAMilestoneEventToTheIssuesOwnURLNotAPerEventURL(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{milestoneEventRaw(1, "milestoned", "octocat", "v1.0")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.MilestoneEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a MilestoneEvent: %#v", entries[0])
+	}
+	if got.Attribution().URL().String() != testIssueURL {
+		t.Fatalf("Attribution().URL() = %q, want the issue's own URL %q", got.Attribution().URL().String(), testIssueURL)
+	}
+}
+
+func TestBuildEntries_AttributesAMilestoneEventFromADeletedActorToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1,
+		"event": "milestoned",
+		"actor": null,
+		"created_at": "2026-07-01T00:00:00Z",
+		"milestone": {"title": "v1.0"}
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.MilestoneEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not a MilestoneEvent: %#v", entries[0])
+	}
+	if got.Attribution().Author() != "ghost" {
+		t.Fatalf("Attribution().Author() = %q, want %q", got.Attribution().Author(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsAMilestoneEventThatFailsToUnmarshal(t *testing.T) {
+	raw := json.RawMessage(`{"event": "milestoned", "created_at": 12345}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "unmarshal") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the unmarshal failure", skipped[0].Reason)
+	}
+}
+
+func TestBuildEntries_SkipsAMilestoneEventWithAnEmptyTitle(t *testing.T) {
+	raw := milestoneEventRaw(1, "milestoned", "octocat", "")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func TestBuildEntries_SkipsADuplicateMilestonedEventSharingAnAlreadySeenID(t *testing.T) {
+	raw := milestoneEventRaw(1, "milestoned", "octocat", "v1.0")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil, testIssueURL)
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the duplicate should be skipped)", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func assignmentEventRaw(id int64, event, actorLogin, assigneeLogin string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{
+		"id": %d,
+		"event": %q,
+		"actor": {"login": %q},
+		"assignee": {"login": %q},
+		"created_at": "2026-07-01T10:00:00Z"
+	}`, id, event, actorLogin, assigneeLogin))
+}
+
+func TestBuildEntries_ClassifiesAnAssignedEventIntoAnAssignmentEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "assigned_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.AssignmentEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not an AssignmentEvent: %#v", entries[0])
+	}
+
+	attribution, err := valueobjects.NewAttribution(
+		"tierninho",
+		time.Date(2020, 2, 4, 18, 15, 0, 0, time.UTC),
+		testIssueURL,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error building expected attribution: %v", err)
+	}
+	want, err := valueobjects.NewAssignmentEvent(attribution, valueobjects.AssignmentActionAssigned, "billygriffin")
+	if err != nil {
+		t.Fatalf("unexpected error building expected assignment event: %v", err)
+	}
+
+	if !got.Equals(want) {
+		t.Fatalf("entries[0] = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildEntries_ClassifiesAnUnassignedEventIntoAnAssignmentEvent(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{loadTestdata(t, "unassigned_event.json")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.AssignmentEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not an AssignmentEvent: %#v", entries[0])
+	}
+	if got.Action() != valueobjects.AssignmentActionUnassigned {
+		t.Fatalf("Action() = %v, want %v", got.Action(), valueobjects.AssignmentActionUnassigned)
+	}
+	if got.Assignee() != "tierninho" {
+		t.Fatalf("Assignee() = %q, want %q", got.Assignee(), "tierninho")
+	}
+}
+
+func TestBuildEntries_AttributesAnAssignmentEventToTheIssuesOwnURLNotAPerEventURL(t *testing.T) {
+	entries, skipped := services.BuildEntries([]json.RawMessage{assignmentEventRaw(1, "assigned", "octocat", "hubot")}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.AssignmentEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not an AssignmentEvent: %#v", entries[0])
+	}
+	if got.Attribution().URL().String() != testIssueURL {
+		t.Fatalf("Attribution().URL() = %q, want the issue's own URL %q", got.Attribution().URL().String(), testIssueURL)
+	}
+}
+
+func TestBuildEntries_AttributesAnAssignmentEventFromADeletedActorToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1,
+		"event": "assigned",
+		"actor": null,
+		"assignee": {"login": "hubot"},
+		"created_at": "2026-07-01T00:00:00Z"
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.AssignmentEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not an AssignmentEvent: %#v", entries[0])
+	}
+	if got.Attribution().Author() != "ghost" {
+		t.Fatalf("Attribution().Author() = %q, want %q", got.Attribution().Author(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsAnAssignmentEventThatFailsToUnmarshal(t *testing.T) {
+	raw := json.RawMessage(`{"event": "assigned", "created_at": 12345}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(entries) != 0 {
+		t.Fatalf("got %d entries, want 0", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "unmarshal") {
+		t.Fatalf("skipped[0].Reason = %q, want it to mention the unmarshal failure", skipped[0].Reason)
+	}
+}
+
+// TestBuildEntries_AttributesAnAssignmentEventFromADeletedAssigneeToGhost
+// guards the same deleted-account case classifyLabelEvent/
+// classifyClosureEvent/etc. already guard for their actor field: GitHub
+// nulls out any user reference (not just the actor who performed an
+// action) once that account is deleted, so the assignee itself must fall
+// back to "ghost" the same way the acting actor already does, rather than
+// being treated as malformed input.
+func TestBuildEntries_AttributesAnAssignmentEventFromADeletedAssigneeToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1,
+		"event": "assigned",
+		"actor": {"login": "octocat"},
+		"assignee": null,
+		"created_at": "2026-07-01T00:00:00Z"
+	}`)
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.AssignmentEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not an AssignmentEvent: %#v", entries[0])
+	}
+	if got.Assignee() != "ghost" {
+		t.Fatalf("Assignee() = %q, want %q", got.Assignee(), "ghost")
+	}
+}
+
+func TestBuildEntries_SkipsADuplicateAssignedEventSharingAnAlreadySeenID(t *testing.T) {
+	raw := assignmentEventRaw(1, "assigned", "octocat", "hubot")
+
+	entries, skipped := services.BuildEntries([]json.RawMessage{raw, raw}, nil, testIssueURL)
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1 (the duplicate should be skipped)", len(entries))
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	}
+}
+
+func TestBuildEntries_PreservesChronologicalOrderOfClosureEventsAmongOtherTimelineItems(t *testing.T) {
+	rawTimeline := []json.RawMessage{
+		commentedEventRaw("alice", "First comment.", "https://github.com/example/repo/issues/1#issuecomment-1"),
+		closureEventRaw(1, "closed", "octocat", "completed"),
+		closureEventRaw(2, "reopened", "octocat", ""),
+		commentedEventRaw("bob", "Second comment.", "https://github.com/example/repo/issues/1#issuecomment-2"),
+	}
+
+	entries, skipped := services.BuildEntries(rawTimeline, nil, testIssueURL)
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
+	}
+	if len(entries) != 4 {
+		t.Fatalf("got %d entries, want 4", len(entries))
+	}
+
+	if _, ok := entries[0].(valueobjects.IssueComment); !ok {
+		t.Fatalf("entries[0] = %#v, want IssueComment", entries[0])
+	}
+	closed, ok := entries[1].(valueobjects.ClosureEvent)
+	if !ok || closed.Action() != valueobjects.ClosureActionClosed {
+		t.Fatalf("entries[1] = %#v, want a closed ClosureEvent", entries[1])
+	}
+	reopened, ok := entries[2].(valueobjects.ClosureEvent)
+	if !ok || reopened.Action() != valueobjects.ClosureActionReopened {
+		t.Fatalf("entries[2] = %#v, want a reopened ClosureEvent", entries[2])
+	}
+	if _, ok := entries[3].(valueobjects.IssueComment); !ok {
+		t.Fatalf("entries[3] = %#v, want IssueComment", entries[3])
+	}
+}

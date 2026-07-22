@@ -48,6 +48,53 @@ type labelEventWire struct {
 	} `json:"label"`
 }
 
+// closureEventWire is the shape of a "closed"/"reopened" timeline event.
+// Like labelEventWire, its actor field is "actor" (not "user"), and it
+// carries no html_url of its own. state_reason mirrors GitHub's own field
+// name and is only ever populated on a "closed" event.
+type closureEventWire struct {
+	ID          int64     `json:"id"`
+	Actor       actorWire `json:"actor"`
+	CreatedAt   time.Time `json:"created_at"`
+	StateReason string    `json:"state_reason"`
+}
+
+// renameEventWire is the shape of a "renamed" timeline event. Like
+// labelEventWire, its actor field is "actor" (not "user"), and it carries
+// no html_url of its own.
+type renameEventWire struct {
+	ID        int64     `json:"id"`
+	Actor     actorWire `json:"actor"`
+	CreatedAt time.Time `json:"created_at"`
+	Rename    struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	} `json:"rename"`
+}
+
+// milestoneEventWire is the shape of a "milestoned"/"demilestoned" timeline
+// event. Like labelEventWire, its actor field is "actor" (not "user"), and
+// it carries no html_url of its own.
+type milestoneEventWire struct {
+	ID        int64     `json:"id"`
+	Actor     actorWire `json:"actor"`
+	CreatedAt time.Time `json:"created_at"`
+	Milestone struct {
+		Title string `json:"title"`
+	} `json:"milestone"`
+}
+
+// assignmentEventWire is the shape of an "assigned"/"unassigned" timeline
+// event. Like labelEventWire, it carries no html_url of its own. Unlike the
+// other actor-only events, it also carries an assignee distinct from the
+// actor who performed the assignment.
+type assignmentEventWire struct {
+	ID        int64     `json:"id"`
+	Actor     actorWire `json:"actor"`
+	Assignee  actorWire `json:"assignee"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type reviewCommentWire struct {
 	ID                  int64     `json:"id"`
 	PullRequestReviewID int64     `json:"pull_request_review_id"`
