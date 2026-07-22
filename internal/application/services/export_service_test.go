@@ -361,6 +361,78 @@ func TestExportService_Export_IncludesAPullRequestDiffEntryForAPullRequest(t *te
 	}
 }
 
+const commitJSON = `{"sha":"abc1234567","commit":{"author":{"name":"octocat","date":"2026-07-01T00:00:00Z"},"committer":{"name":"octocat","date":"2026-07-01T00:00:00Z"},"message":"feat: add retry backoff"}}`
+
+func TestExportService_Export_IncludesAPullRequestCommitsEntryForAPullRequest(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:              json.RawMessage(pullRequestIssueJSON),
+		pullRequest:        json.RawMessage(mergedPullRequestJSON),
+		pullRequestCommits: []json.RawMessage{json.RawMessage(commitJSON)},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if !repo.fetchPullRequestCommitsCalled {
+		t.Fatal("FetchPullRequestCommits was not called for a pull request")
+	}
+	if !writer.writePullRequestCommitsCalled {
+		t.Fatal("WritePullRequestCommits was not called for a pull request")
+	}
+	if string(writer.wrotePullRequestCommits[0]) != commitJSON {
+		t.Fatalf("WritePullRequestCommits got %q, want the raw commit JSON verbatim", writer.wrotePullRequestCommits)
+	}
+
+	rendered := string(docs.written)
+	if !strings.Contains(rendered, `"commits":1`) {
+		t.Fatalf("rendered document = %q, want a PullRequestCommits entry reporting 1 commit", rendered)
+	}
+	if !strings.Contains(rendered, "feat: add retry backoff") {
+		t.Fatalf("rendered document = %q, want it to contain the commit's message", rendered)
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenFetchPullRequestCommitsFails(t *testing.T) {
+	wantErr := errors.New("fetch pull request commits failed")
+	repo := &fakeEvidenceFetcher{
+		issue:                 json.RawMessage(pullRequestIssueJSON),
+		pullRequest:           json.RawMessage(mergedPullRequestJSON),
+		pullRequestCommitsErr: wantErr,
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenWritePullRequestCommitsFails(t *testing.T) {
+	wantErr := errors.New("write pull request commits failed")
+	repo := &fakeEvidenceFetcher{
+		issue:       json.RawMessage(pullRequestIssueJSON),
+		pullRequest: json.RawMessage(mergedPullRequestJSON),
+	}
+	writer := &fakeEvidenceWriter{pullRequestCommitsErr: wantErr}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
+	}
+}
+
 func TestExportService_Export_PropagatesAnErrorWhenFetchPullRequestFilesFails(t *testing.T) {
 	wantErr := errors.New("fetch pull request files failed")
 	repo := &fakeEvidenceFetcher{
