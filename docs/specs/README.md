@@ -63,7 +63,7 @@ gh exhibit --version
 
 ### Tier 1 entries
 
-The rendered Markdown's content is drawn from ten entry types, all Value
+The rendered Markdown's content is drawn from eleven entry types, all Value
 Objects (no identity-based tracking — re-fetch diffing is git's job in the
 separate repository the evidence is copied into, not gh-exhibit's):
 
@@ -97,9 +97,13 @@ separate repository the evidence is copied into, not gh-exhibit's):
   (filename, optional previous filename for a rename, `FileStatus`,
   additions, deletions, and an optional unified diff patch) plus the pull
   request's total additions/deletions and a `truncated` flag. See
-  "Pull request diff rendering" below.
+  "Pull request diff and commit list rendering" below.
+- `PullRequestCommits` — a pull request's commit list (PRs only), sourced
+  from `GET /pulls/{number}/commits`, carrying a list of `Commit` (sha, git
+  author name and authored time, git committer name and committed time, and
+  full message). See "Pull request diff and commit list rendering" below.
 
-All ten implement the sealed `valueobjects.Entry` interface
+All eleven implement the sealed `valueobjects.Entry` interface
 (`Render(io.Writer) error` plus an unexported marker method) — the closest
 Go analogue to a closed sum type. Supporting Value Objects: `Attribution`
 (author, created, url — the common `<!-- {"meta":...} -->` fields), `Url`
@@ -117,7 +121,7 @@ guaranteed by its constructor to be a single path-safe segment — see
 
 ### Timeline classification
 
-Seven of the nine Tier 1 types (`IssueComment`, `PullRequestReview`,
+Seven of the eleven Tier 1 types (`IssueComment`, `PullRequestReview`,
 `LabelEvent`, `ClosureEvent`, `RenameEvent`, `MilestoneEvent`, and
 `AssignmentEvent`) are classified from `GET .../issues/{number}/timeline`'s
 heterogeneous array via a two-pass unmarshal (discriminator peek, then
@@ -176,20 +180,24 @@ therefore falls back to the issue/PR's own `html_url` (already available
 from the issue/PR resource fetched alongside the timeline) rather than a
 link to the specific historical event.
 
-### Pull request diff rendering
+### Pull request diff and commit list rendering
 
-Unlike the other nine Tier 1 types, `PullRequestDiff` has no timeline event
-or per-event actor of its own — it is a snapshot of the pull request's
-current changed files, not something that happened at a point in time. Its
-`Attribution` therefore reuses the pull request's own (author, created,
-url) — the same `Attribution` `Body` was built from — rather than a
-per-event one, the same "fall back to the resource's own attribution"
+Unlike the other nine Tier 1 types, `PullRequestDiff` and
+`PullRequestCommits` have no timeline event or per-event actor of their
+own — each is a snapshot of the pull request's current state (its changed
+files, or its commit list), not something that happened at a point in
+time. Both therefore reuse the pull request's own `Attribution` (author,
+created, url) — the same `Attribution` `Body` was built from — rather than
+a per-event one, the same "fall back to the resource's own attribution"
 precedent `LabelEvent`/`ClosureEvent`/`RenameEvent`/`MilestoneEvent`/
 `AssignmentEvent` already established for a different reason (their event
-payload's missing `html_url`). Because it is a snapshot rather than a
-chronological event, it is placed once, immediately after `Body`, rather
-than interleaved by timeline position; it is present only when the
-exported ref is a pull request.
+payload's missing `html_url`). Because they are snapshots rather than
+chronological events, both are placed once, immediately after `Body` —
+`PullRequestDiff` first, then `PullRequestCommits` — rather than
+interleaved by timeline position; both are present only when the exported
+ref is a pull request. This shared placement and attribution-reuse
+decision is deliberately made once and applied to both entries, rather
+than each choosing its own convention.
 
 The pull request resource's own `additions`/`deletions` fields (already
 fetched as part of building `Body`, no extra request needed) decide
@@ -202,6 +210,18 @@ omits `patch` for an individually oversized file; `PullRequestDiff`'s
 render logic does not distinguish the two cases (it renders a diff block
 only when a file's `Patch()` is non-empty), but its `truncated` flag,
 carried in the meta line, records only the threshold case.
+
+`PullRequestCommits` carries one `Commit` per element of `GET
+/pulls/{number}/commits`: its git-level author name and authored timestamp
+(`commit.author`), its git-level committer name and committed timestamp
+(`commit.committer`), and its full message. Author and committer are kept
+as two distinct identities because they can genuinely differ — for
+example, GitHub's web UI or a rebase/squash operation re-commits an
+existing author's work under a different committer. Unlike
+`PullRequestDiff`'s patch, no size threshold suppresses a commit's message:
+every commit's full message is always rendered in full under a
+"**Commit `sha`**" label, the same per-item expansion shape
+`PullRequestDiff` uses for a file's diff hunk.
 
 ## On-disk layout
 
@@ -220,6 +240,7 @@ directory holding its own assets:
     ├── pull.json                     pull request resource (PRs only)
     ├── review-comments.json          inline review comments (PRs only)
     ├── pull-files.json               changed files, from GET /pulls/{number}/files (PRs only)
+    ├── pull-commits.json             commit list, from GET /pulls/{number}/commits (PRs only)
     ├── provenance.json               which gh-exhibit tool/version/commit produced this export
     └── fetch-errors.log              this run's attachment fetch failures, if any
 ```
@@ -240,7 +261,7 @@ grouping is "final rendered exhibit" (`index.md` + `assets/`) vs.
 "everything else supporting it," so gh-exhibit-generated artifacts about
 the export itself — a failed fetch's log, or which tool/version/commit
 produced the export — belong with the other non-presentation artifacts.
-Unlike its four siblings, `provenance.json`'s content is not a verbatim
+Unlike its six siblings, `provenance.json`'s content is not a verbatim
 external REST response — it is gh-exhibit's own self-reported
 `{"tool":...,"version":...,"commit":...}`, written by a distinct
 `ProvenanceWriter` port rather than `EvidenceWriter`, which is scoped to
@@ -330,7 +351,8 @@ is mandatory, to keep the exported directory offline-verifiable. After a
 ## Rate limiting and retry
 
 REST API calls (issue/PR resource, timeline, pull request resource, review
-comments, pull request files) retry on a 429, or a 403 whose headers
+comments, pull request files, pull request commits) retry on a 429, or a
+403 whose headers
 identify it as rate limiting (`Retry-After` present, or
 `X-RateLimit-Remaining: 0` — a 403 without either is a permission error and
 is not retried). Wait duration
@@ -390,8 +412,9 @@ expected origin is treated as a mismatch rather than trusted.
 
 `ExportService.Export` runs `FetchTimeline` concurrently with the
 pull-request chain (`FetchPullRequest`, then, only on success,
-`FetchReviewComments`, then `FetchPullRequestFiles`) — the chain's own
-internal short-circuit is unaffected. Both share a cancellable context: whichever branch fails first
+`FetchReviewComments`, then `FetchPullRequestFiles`, then
+`FetchPullRequestCommits`) — the chain's own internal short-circuit is
+unaffected. Both share a cancellable context: whichever branch fails first
 cancels it, so the other branch's in-flight fetch (possibly blocked in a
 rate-limit wait up to an hour long) is interrupted rather than waited out.
 The first genuine failure to occur is what `Export` reports, not whichever
@@ -404,7 +427,7 @@ Attachment fetches run concurrently, bounded at 4 in flight
 
 Onion architecture, following this project's own reference layout:
 
-- `internal/domain/valueobjects` — the nine Tier 1 entry types and their
+- `internal/domain/valueobjects` — the eleven Tier 1 entry types and their
   supporting Value Objects (`Attribution`, `Url`, `ReviewState`,
   `InlineContext`, `IssueRef`, `Document`, `Provenance`, `AssetFilename`).
   No I/O.
