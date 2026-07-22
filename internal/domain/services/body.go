@@ -62,6 +62,11 @@ func (r IssueResource) HTMLURL() string {
 	return r.wire.HTMLURL
 }
 
+// Title returns the issue/PR resource's own title.
+func (r IssueResource) Title() string {
+	return r.wire.Title
+}
+
 // ParentIssueRef reports the ref this issue is a sub-issue of, resolved
 // from the issue resource's own parent_issue_url. ok is false when
 // parent_issue_url is absent — an issue with no parent, or any pull
