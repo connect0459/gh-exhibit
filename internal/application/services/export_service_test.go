@@ -47,9 +47,30 @@ type fakeEvidenceFetcher struct {
 	// starts), so only a second call — made, if at all, from within the
 	// concurrent sub-issues/parent-issue branch — can be for the parent.
 	issueCalls int
+
+	// issueReferences/issueReferenceErrs serve a FetchIssue call made to
+	// resolve a bare/cross-repo issue reference detected in the rendered
+	// document, keyed by the referenced ref itself and checked before the
+	// call-count-based logic above (which exists only to serve ref's own
+	// fetch and, on a second call, its parent issue — an issue-reference
+	// fetch is for neither, so it must not be confused with either by that
+	// counter). issueReferenceCalls records how many times each such ref
+	// was actually fetched, so a test can assert a repeated reference to
+	// the same target is only fetched once.
+	issueReferences     map[valueobjects.IssueRef]json.RawMessage
+	issueReferenceErrs  map[valueobjects.IssueRef]error
+	issueReferenceCalls map[valueobjects.IssueRef]int
 }
 
-func (f *fakeEvidenceFetcher) FetchIssue(context.Context, valueobjects.IssueRef) (json.RawMessage, error) {
+func (f *fakeEvidenceFetcher) FetchIssue(_ context.Context, ref valueobjects.IssueRef) (json.RawMessage, error) {
+	if _, ok := f.issueReferences[ref]; ok || f.issueReferenceErrs[ref] != nil {
+		if f.issueReferenceCalls == nil {
+			f.issueReferenceCalls = make(map[valueobjects.IssueRef]int)
+		}
+		f.issueReferenceCalls[ref]++
+		return f.issueReferences[ref], f.issueReferenceErrs[ref]
+	}
+
 	f.issueCalls++
 	if f.issueCalls == 1 {
 		return f.issue, f.issueErr
@@ -255,6 +276,15 @@ func testRef(t *testing.T) valueobjects.IssueRef {
 	ref, err := valueobjects.NewIssueRef("octocat", "hello-world", 1)
 	if err != nil {
 		t.Fatalf("NewIssueRef() error = %v", err)
+	}
+	return ref
+}
+
+func refFor(t *testing.T, owner, repo string, number int) valueobjects.IssueRef {
+	t.Helper()
+	ref, err := valueobjects.NewIssueRef(owner, repo, number)
+	if err != nil {
+		t.Fatalf("NewIssueRef(%q, %q, %d) error = %v", owner, repo, number, err)
 	}
 	return ref
 }
@@ -1543,5 +1573,189 @@ func TestExportService_Export_AbortsWhenAnAttachmentFetchExceedsItsDeadline(t *t
 	}
 	if docs.written != nil {
 		t.Fatal("WriteDocument was called despite the attachment fetch exceeding its deadline")
+	}
+}
+
+const issueWithBareReferenceJSON = `{
+	"title": "Something is broken",
+	"body": "See #42 for context",
+	"user": {"login": "octocat"},
+	"created_at": "2026-07-01T00:00:00Z",
+	"html_url": "https://github.com/example/repo/issues/1"
+}`
+
+const issueWithRepeatedBareReferenceJSON = `{
+	"title": "Something is broken",
+	"body": "See #42, and again #42 for context",
+	"user": {"login": "octocat"},
+	"created_at": "2026-07-01T00:00:00Z",
+	"html_url": "https://github.com/example/repo/issues/1"
+}`
+
+const issueWithCrossRepoReferenceJSON = `{
+	"title": "Something is broken",
+	"body": "See other-owner/other-repo#7 for context",
+	"user": {"login": "octocat"},
+	"created_at": "2026-07-01T00:00:00Z",
+	"html_url": "https://github.com/example/repo/issues/1"
+}`
+
+const referencedIssueJSON = `{
+	"title": "The referenced issue",
+	"body": "",
+	"user": {"login": "octocat"},
+	"created_at": "2026-06-01T00:00:00Z",
+	"html_url": "https://github.com/octocat/hello-world/issues/42"
+}`
+
+const crossRepoReferencedIssueJSON = `{
+	"title": "Cross repo issue",
+	"body": "",
+	"user": {"login": "someone"},
+	"created_at": "2026-06-01T00:00:00Z",
+	"html_url": "https://github.com/other-owner/other-repo/issues/7"
+}`
+
+func TestExportService_Export_LinksABareIssueReferenceWithItsResolvedTitle(t *testing.T) {
+	ref42 := refFor(t, "octocat", "hello-world", 42)
+	repo := &fakeEvidenceFetcher{
+		issue: json.RawMessage(issueWithBareReferenceJSON),
+		issueReferences: map[valueobjects.IssueRef]json.RawMessage{
+			ref42: json.RawMessage(referencedIssueJSON),
+		},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t), fakeClock{})
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	rendered := string(docs.written)
+	want := "The referenced issue [#42](https://github.com/octocat/hello-world/issues/42)"
+	if !strings.Contains(rendered, want) {
+		t.Fatalf("rendered document = %q, want it to contain %q", rendered, want)
+	}
+}
+
+func TestExportService_Export_LinksACrossRepoIssueReferenceWithItsResolvedTitle(t *testing.T) {
+	ref7 := refFor(t, "other-owner", "other-repo", 7)
+	repo := &fakeEvidenceFetcher{
+		issue: json.RawMessage(issueWithCrossRepoReferenceJSON),
+		issueReferences: map[valueobjects.IssueRef]json.RawMessage{
+			ref7: json.RawMessage(crossRepoReferencedIssueJSON),
+		},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t), fakeClock{})
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	rendered := string(docs.written)
+	want := "Cross repo issue [other-owner/other-repo#7](https://github.com/other-owner/other-repo/issues/7)"
+	if !strings.Contains(rendered, want) {
+		t.Fatalf("rendered document = %q, want it to contain %q", rendered, want)
+	}
+}
+
+func TestExportService_Export_LeavesAnUnresolvableIssueReferenceUnchanged(t *testing.T) {
+	ref42 := refFor(t, "octocat", "hello-world", 42)
+	repo := &fakeEvidenceFetcher{
+		issue: json.RawMessage(issueWithBareReferenceJSON),
+		issueReferenceErrs: map[valueobjects.IssueRef]error{
+			ref42: errors.New("404 Not Found"),
+		},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t), fakeClock{})
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v, want nil (an unresolvable issue reference should not fail the export)", err)
+	}
+
+	rendered := string(docs.written)
+	if !strings.Contains(rendered, "See #42 for context") {
+		t.Fatalf("rendered document = %q, want the original reference text left untouched", rendered)
+	}
+}
+
+func TestExportService_Export_FetchesARepeatedIssueReferenceOnlyOnce(t *testing.T) {
+	ref42 := refFor(t, "octocat", "hello-world", 42)
+	repo := &fakeEvidenceFetcher{
+		issue: json.RawMessage(issueWithRepeatedBareReferenceJSON),
+		issueReferences: map[valueobjects.IssueRef]json.RawMessage{
+			ref42: json.RawMessage(referencedIssueJSON),
+		},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t), fakeClock{})
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if repo.issueReferenceCalls[ref42] != 1 {
+		t.Fatalf("FetchIssue was called %d times for the same reference, want 1", repo.issueReferenceCalls[ref42])
+	}
+
+	rendered := string(docs.written)
+	if strings.Count(rendered, "The referenced issue [#42]") != 2 {
+		t.Fatalf("rendered document = %q, want both occurrences linked", rendered)
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenIssueReferenceResolutionIsCancelled(t *testing.T) {
+	ref42 := refFor(t, "octocat", "hello-world", 42)
+	repo := &fakeEvidenceFetcher{
+		issue: json.RawMessage(issueWithBareReferenceJSON),
+		issueReferenceErrs: map[valueobjects.IssueRef]error{
+			ref42: context.Canceled,
+		},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t), fakeClock{})
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Export() error = %v, want it to wrap context.Canceled", err)
+	}
+	if docs.written != nil {
+		t.Fatal("WriteDocument was called despite issue-reference resolution being cancelled")
+	}
+}
+
+func TestExportService_Export_DoesNotFetchAnythingExtraWhenNoIssueReferencesArePresent(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:    json.RawMessage(plainIssueJSON),
+		timeline: []json.RawMessage{json.RawMessage(commentedEventJSON)},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t), fakeClock{})
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if repo.issueCalls != 1 {
+		t.Fatalf("FetchIssue was called %d times, want 1 (no reference to resolve)", repo.issueCalls)
 	}
 }

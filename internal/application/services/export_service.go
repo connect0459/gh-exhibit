@@ -132,7 +132,12 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		return nil, fmt.Errorf("could not render the document to Markdown: %w", err)
 	}
 
-	rendered, downloads, failureLog, err := s.resolveAttachments(ctx, ref, buf.Bytes())
+	linked, err := s.resolveIssueReferences(ctx, ref, buf.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("could not resolve one or more issue/PR references: %w", err)
+	}
+
+	rendered, downloads, failureLog, err := s.resolveAttachments(ctx, ref, linked)
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve one or more attachments: %w", err)
 	}
@@ -341,6 +346,81 @@ func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, re
 		return fetchedPullRequestAndTimeline{}, firstErr
 	}
 	return result, nil
+}
+
+// issueReferenceLookup caches the outcome of resolving a single issue/PR
+// reference's target: its title and url on success, or ok=false when its
+// target could not be fetched or parsed.
+type issueReferenceLookup struct {
+	title string
+	url   valueobjects.Url
+	ok    bool
+}
+
+// resolveIssueReferences links every bare ("#123") or cross-repository
+// ("owner/repo#123") issue/PR reference in rendered with its target's own
+// title, fetching each distinct target at most once even when the same
+// reference occurs multiple times. A target that cannot be fetched or
+// parsed is left exactly as originally written (services.Unresolved) —
+// unlike a failed attachment fetch, no placeholder is substituted, since
+// the reference was already valid, readable text before this feature
+// existed.
+func (s *ExportService) resolveIssueReferences(ctx context.Context, ref valueobjects.IssueRef, rendered []byte) ([]byte, error) {
+	references := services.DetectIssueReferences(rendered, ref)
+	if len(references) == 0 {
+		return rendered, nil
+	}
+
+	cache := make(map[valueobjects.IssueRef]issueReferenceLookup)
+	resolutions := make([]services.ResolvedIssueReference, len(references))
+	for i, r := range references {
+		target := r.Ref()
+		lookup, cached := cache[target]
+		if !cached {
+			var err error
+			lookup, err = s.lookupIssueReference(ctx, target)
+			if err != nil {
+				return nil, fmt.Errorf("could not resolve the issue/PR reference %s/%s#%d: %w", target.Owner(), target.Repo(), target.Number(), err)
+			}
+			cache[target] = lookup
+		}
+
+		if lookup.ok {
+			resolutions[i] = services.Resolved(r, lookup.title, lookup.url)
+		} else {
+			resolutions[i] = services.Unresolved(r)
+		}
+	}
+
+	return services.RewriteIssueReferences(rendered, resolutions), nil
+}
+
+// lookupIssueReference fetches target's title and url, reporting ok=false
+// (not an error) for an ordinary fetch/parse failure — a single
+// unresolvable reference must not abort the whole export. A context
+// cancellation/deadline is returned as an error instead, matching
+// FetchIssue/FetchTimeline and resolveAttachments' own distinction between
+// the two.
+func (s *ExportService) lookupIssueReference(ctx context.Context, target valueobjects.IssueRef) (issueReferenceLookup, error) {
+	raw, err := s.fetcher.FetchIssue(ctx, target)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return issueReferenceLookup{}, err
+		}
+		return issueReferenceLookup{}, nil
+	}
+
+	issue, err := services.ParseIssueResource(raw)
+	if err != nil {
+		return issueReferenceLookup{}, nil
+	}
+
+	url, err := valueobjects.NewUrl(issue.HTMLURL())
+	if err != nil {
+		return issueReferenceLookup{}, nil
+	}
+
+	return issueReferenceLookup{title: issue.Title(), url: url, ok: true}, nil
 }
 
 // downloadedAsset pairs an attachment's local filename with its fetched
