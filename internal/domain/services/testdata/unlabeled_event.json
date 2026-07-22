@@ -1,0 +1,12 @@
+{
+  "id": 3083635176,
+  "event": "unlabeled",
+  "actor": {
+    "login": "billygriffin"
+  },
+  "created_at": "2020-02-28T21:47:14Z",
+  "label": {
+    "name": "epic: repo",
+    "color": "fef2c0"
+  }
+}

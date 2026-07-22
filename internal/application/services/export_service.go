@@ -70,7 +70,7 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		return nil, fmt.Errorf("could not derive a title and body from the issue/PR resource: %w", err)
 	}
 
-	classified, skipped := services.BuildEntries(fetched.timeline, fetched.reviewComments)
+	classified, skipped := services.BuildEntries(fetched.timeline, fetched.reviewComments, issue.HTMLURL())
 	entries := append([]valueobjects.Entry{body}, classified...)
 
 	doc, err := valueobjects.NewDocument(title, entries)
