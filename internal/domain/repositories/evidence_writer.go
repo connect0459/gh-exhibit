@@ -40,4 +40,7 @@ type EvidenceWriter interface {
 	// an earlier run (from when ref did have one) is removed instead, so a
 	// rerun stays a self-healing view of ref's current state.
 	WriteParentIssue(ctx context.Context, ref valueobjects.IssueRef, raw json.RawMessage) error
+	// WriteCheckRuns persists ref's check-run items, concatenated into a
+	// single JSON array.
+	WriteCheckRuns(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error
 }

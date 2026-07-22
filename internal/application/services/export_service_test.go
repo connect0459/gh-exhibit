@@ -103,6 +103,7 @@ type fakeEvidenceWriter struct {
 	pullRequestCommitsErr error
 	subIssuesErr          error
 	parentIssueErr        error
+	checkRunsErr          error
 
 	wroteIssue                    json.RawMessage
 	wroteTimeline                 []json.RawMessage
@@ -112,12 +113,14 @@ type fakeEvidenceWriter struct {
 	wrotePullRequestCommits       []json.RawMessage
 	wroteSubIssues                []json.RawMessage
 	wroteParentIssue              json.RawMessage
+	wroteCheckRuns                []json.RawMessage
 	writePullRequestCalled        bool
 	writeReviewCommentsCalled     bool
 	writePullRequestFilesCalled   bool
 	writePullRequestCommitsCalled bool
 	writeSubIssuesCalled          bool
 	writeParentIssueCalled        bool
+	writeCheckRunsCalled          bool
 }
 
 func (f *fakeEvidenceWriter) WriteIssue(_ context.Context, _ valueobjects.IssueRef, raw json.RawMessage) error {
@@ -164,6 +167,13 @@ func (f *fakeEvidenceWriter) WriteParentIssue(_ context.Context, _ valueobjects.
 	f.writeParentIssueCalled = true
 	f.wroteParentIssue = raw
 	return f.parentIssueErr
+}
+
+// WriteCheckRuns is not yet called from ExportService.
+func (f *fakeEvidenceWriter) WriteCheckRuns(_ context.Context, _ valueobjects.IssueRef, items []json.RawMessage) error {
+	f.writeCheckRunsCalled = true
+	f.wroteCheckRuns = items
+	return f.checkRunsErr
 }
 
 type fakeDocumentWriter struct {
