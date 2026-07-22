@@ -30,8 +30,38 @@ func TestPullRequestChecks_Render_ListsEachCheckRunAlongsideTheCapturedTimestamp
 
 	want := "<!-- {\"meta\":{\"author\":\"octocat\",\"created\":\"2026-07-02T14:19:40Z\",\"head_sha\":\"abc1234567\",\"captured_at\":\"2026-07-22T09:30:00Z\",\"checks\":2,\"url\":\"https://github.com/example/repo/pull/1\"}} -->\n" +
 		"\n" +
-		"- [build](https://github.com/example/repo/runs/1): success\n" +
-		"- [test](https://github.com/example/repo/runs/2): failure\n"
+		"- `build`: success\n" +
+		"- `test`: failure\n"
+	if buf.String() != want {
+		t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
+	}
+}
+
+func TestPullRequestChecks_Render_DoesNotLetACheckRunNameInjectMarkdownLinkSyntax(t *testing.T) {
+	// A check run's name is arbitrary, attacker-influenceable text (a CI
+	// job name, or a third-party Checks app's own naming) — the same
+	// untrusted-string handling changedFileLine/commitLine/issueSummaryLine
+	// already apply, none of which embed untrusted text inside a
+	// "[text](url)" markdown link construct. A name shaped like
+	// "click here](https://attacker.example)" would, if embedded that
+	// way, close the real link early and splice in an attacker-chosen
+	// URL; rendered verbatim inside a backtick span (this test's exact
+	// expectation), it stays inert literal text instead.
+	maliciousName := "click here](https://attacker.example)"
+	runs := []valueobjects.CheckRun{
+		mustNewCheckRun(t, maliciousName, valueobjects.CheckOutcomeSuccess, "https://github.com/example/repo/runs/1"),
+	}
+	capturedAt := time.Date(2026, 7, 22, 9, 30, 0, 0, time.UTC)
+	pc := valueobjects.NewPullRequestChecks(newPullRequestChecksAttribution(t), "abc1234567", capturedAt, runs)
+
+	var buf strings.Builder
+	if err := pc.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering pull request checks: %v", err)
+	}
+
+	want := "<!-- {\"meta\":{\"author\":\"octocat\",\"created\":\"2026-07-02T14:19:40Z\",\"head_sha\":\"abc1234567\",\"captured_at\":\"2026-07-22T09:30:00Z\",\"checks\":1,\"url\":\"https://github.com/example/repo/pull/1\"}} -->\n" +
+		"\n" +
+		"- `click here](https://attacker.example)`: success\n"
 	if buf.String() != want {
 		t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
 	}

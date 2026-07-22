@@ -506,7 +506,7 @@ func TestExportService_Export_IncludesAPullRequestChecksEntryForAPullRequest(t *
 	if !strings.Contains(rendered, `"captured_at":"2026-07-22T09:30:00Z"`) {
 		t.Fatalf("rendered document = %q, want it to record the clock's captured-at time", rendered)
 	}
-	if !strings.Contains(rendered, "[build](https://github.com/example/repo/runs/1): success") {
+	if !strings.Contains(rendered, "`build`: success") {
 		t.Fatalf("rendered document = %q, want it to list the check run's name and outcome", rendered)
 	}
 }

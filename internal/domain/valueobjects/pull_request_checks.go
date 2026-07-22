@@ -95,10 +95,16 @@ func (c PullRequestChecks) Render(w io.Writer) error {
 	return writeMetaLine(w, meta, strings.TrimRight(list.String(), "\n"))
 }
 
-// checkRunLine formats one CheckRun as a single bullet-list line, linking
-// its name to its own url.
+// checkRunLine formats one CheckRun as a single bullet-list line. Unlike an
+// earlier version of this function, it does not embed r.Name() (arbitrary,
+// attacker-influenceable text — a CI job name, or a third-party Checks
+// app's own naming) inside a "[text](url)" markdown link construct: a name
+// containing "]" or "(" could otherwise close the link early and splice
+// in an attacker-chosen URL. This matches changedFileLine/commitLine/
+// issueSummaryLine, none of which embed untrusted text as markdown link
+// syntax either.
 func checkRunLine(r CheckRun) string {
-	return fmt.Sprintf("[%s](%s): %s", r.Name(), r.URL().String(), r.Outcome().String())
+	return fmt.Sprintf("`%s`: %s", r.Name(), r.Outcome().String())
 }
 
 func (PullRequestChecks) entryNode() {}

@@ -341,8 +341,18 @@ completed reports its status (`queued`, `in_progress`); a completed one
 reports its conclusion (`success`, `failure`, `neutral`, `cancelled`,
 `skipped`, `timed_out`, `action_required`, `stale`). `PullRequestChecks`
 renders a `checks` count, the head sha, and the captured-at timestamp in
-its meta line, plus a bullet list of every check run's name (linked to its
-own url) and outcome.
+its meta line, plus a bullet list of every check run's name and outcome.
+A check run's name is arbitrary, attacker-influenceable text (a CI job
+name, or a third-party Checks app's own naming), so — unlike this entry's
+own meta line, whose fields are safe by construction (`encoding/json`
+escaping; see "Markdown dialect" above) — it is rendered as plain
+backtick-wrapped text rather than as a `[name](url)` markdown link: a name
+containing `]` or `(` embedded in link syntax could otherwise close the
+link early and splice in an attacker-chosen URL, the same untrusted-string
+handling `changedFileLine`/`commitLine`/`issueSummaryLine` already apply
+to a filename/commit-identity/issue-title of their own. Each run's own
+`html_url` is therefore not rendered inline — it is still available
+verbatim in `evidence/check-runs.json`.
 
 ## On-disk layout
 
