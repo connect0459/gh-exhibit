@@ -29,4 +29,8 @@ type EvidenceFetcher interface {
 	// element per item across all pages. Callers should only call this
 	// once ref is known to be a pull request.
 	FetchPullRequestFiles(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error)
+	// FetchPullRequestCommits fetches ref's commit list, one raw JSON
+	// element per item across all pages. Callers should only call this
+	// once ref is known to be a pull request.
+	FetchPullRequestCommits(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error)
 }

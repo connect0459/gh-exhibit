@@ -77,6 +77,18 @@ func (w *evidenceWriter) WritePullRequestFiles(ctx context.Context, ref valueobj
 	return writeFile(evidencePath(w.baseDir, ref, "pull-files.json"), joined)
 }
 
+// WritePullRequestCommits implements repositories.EvidenceWriter.
+func (w *evidenceWriter) WritePullRequestCommits(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	joined, err := joinRawArray(items)
+	if err != nil {
+		return fmt.Errorf("could not combine the pull request commit pages into one array for %s/%d: %w", ref.Repo(), ref.Number(), err)
+	}
+	return writeFile(evidencePath(w.baseDir, ref, "pull-commits.json"), joined)
+}
+
 // evidencePath builds the on-disk path for one of ref's raw evidence files
 // named filename, under {repo}/{number}/evidence/ (owner is deliberately
 // not part of the path).

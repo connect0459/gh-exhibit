@@ -79,6 +79,13 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		}
 		skipped = append(skipped, diffSkipped...)
 		entries = append(entries, diff)
+
+		commits, commitsSkipped, err := services.BuildPullRequestCommits(body.Attribution(), fetched.pullRequestCommits)
+		if err != nil {
+			return nil, fmt.Errorf("could not build the pull request commits: %w", err)
+		}
+		skipped = append(skipped, commitsSkipped...)
+		entries = append(entries, commits)
 	}
 	entries = append(entries, classified...)
 
@@ -120,6 +127,9 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		if err := s.writer.WritePullRequestFiles(ctx, ref, fetched.pullRequestFiles); err != nil {
 			return nil, fmt.Errorf("could not persist the raw pull request files: %w", err)
 		}
+		if err := s.writer.WritePullRequestCommits(ctx, ref, fetched.pullRequestCommits); err != nil {
+			return nil, fmt.Errorf("could not persist the raw pull request commits: %w", err)
+		}
 	}
 	if err := s.writer.WriteTimeline(ctx, ref, fetched.timeline); err != nil {
 		return nil, fmt.Errorf("could not persist the raw timeline: %w", err)
@@ -147,17 +157,18 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 // positional return gives the compiler nothing to catch a transposed
 // assignment at either call site.
 type fetchedPullRequestAndTimeline struct {
-	pullRequest      json.RawMessage
-	reviewComments   []json.RawMessage
-	pullRequestFiles []json.RawMessage
-	timeline         []json.RawMessage
+	pullRequest        json.RawMessage
+	reviewComments     []json.RawMessage
+	pullRequestFiles   []json.RawMessage
+	pullRequestCommits []json.RawMessage
+	timeline           []json.RawMessage
 }
 
 // fetchPullRequestChainAndTimeline runs the pull-request chain
 // (FetchPullRequest, then FetchReviewComments, then FetchPullRequestFiles,
-// when issue is a pull request) concurrently with FetchTimeline, since
-// neither depends on the other's result — overlapping their round trips
-// shortens Export's overall latency.
+// then FetchPullRequestCommits, when issue is a pull request) concurrently
+// with FetchTimeline, since neither depends on the other's result —
+// overlapping their round trips shortens Export's overall latency.
 func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, ref valueobjects.IssueRef, issue services.IssueResource) (fetchedPullRequestAndTimeline, error) {
 	fetchCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -220,6 +231,13 @@ func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, re
 				return
 			}
 			result.pullRequestFiles = pullRequestFiles
+
+			pullRequestCommits, err := s.fetcher.FetchPullRequestCommits(fetchCtx, ref)
+			if err != nil {
+				fail(fmt.Errorf("could not retrieve the pull request commits: %w", err))
+				return
+			}
+			result.pullRequestCommits = pullRequestCommits
 		}()
 	}
 	wg.Wait()

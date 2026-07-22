@@ -29,4 +29,7 @@ type EvidenceWriter interface {
 	// WritePullRequestFiles persists ref's changed-file items, concatenated
 	// into a single JSON array.
 	WritePullRequestFiles(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error
+	// WritePullRequestCommits persists ref's commit items, concatenated
+	// into a single JSON array.
+	WritePullRequestCommits(ctx context.Context, ref valueobjects.IssueRef, items []json.RawMessage) error
 }

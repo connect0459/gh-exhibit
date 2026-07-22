@@ -14,20 +14,23 @@ import (
 )
 
 type fakeEvidenceFetcher struct {
-	issue               json.RawMessage
-	issueErr            error
-	timeline            []json.RawMessage
-	timelineErr         error
-	pullRequest         json.RawMessage
-	pullRequestErr      error
-	reviewComments      []json.RawMessage
-	reviewCommentsErr   error
-	pullRequestFiles    []json.RawMessage
-	pullRequestFilesErr error
+	issue                 json.RawMessage
+	issueErr              error
+	timeline              []json.RawMessage
+	timelineErr           error
+	pullRequest           json.RawMessage
+	pullRequestErr        error
+	reviewComments        []json.RawMessage
+	reviewCommentsErr     error
+	pullRequestFiles      []json.RawMessage
+	pullRequestFilesErr   error
+	pullRequestCommits    []json.RawMessage
+	pullRequestCommitsErr error
 
-	fetchPullRequestCalled      bool
-	fetchReviewCommentsCalled   bool
-	fetchPullRequestFilesCalled bool
+	fetchPullRequestCalled        bool
+	fetchReviewCommentsCalled     bool
+	fetchPullRequestFilesCalled   bool
+	fetchPullRequestCommitsCalled bool
 }
 
 func (f *fakeEvidenceFetcher) FetchIssue(context.Context, valueobjects.IssueRef) (json.RawMessage, error) {
@@ -53,21 +56,29 @@ func (f *fakeEvidenceFetcher) FetchPullRequestFiles(context.Context, valueobject
 	return f.pullRequestFiles, f.pullRequestFilesErr
 }
 
-type fakeEvidenceWriter struct {
-	issueErr            error
-	timelineErr         error
-	pullRequestErr      error
-	reviewCommentsErr   error
-	pullRequestFilesErr error
+func (f *fakeEvidenceFetcher) FetchPullRequestCommits(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
+	f.fetchPullRequestCommitsCalled = true
+	return f.pullRequestCommits, f.pullRequestCommitsErr
+}
 
-	wroteIssue                  json.RawMessage
-	wroteTimeline               []json.RawMessage
-	wrotePullRequest            json.RawMessage
-	wroteReviewComments         []json.RawMessage
-	wrotePullRequestFiles       []json.RawMessage
-	writePullRequestCalled      bool
-	writeReviewCommentsCalled   bool
-	writePullRequestFilesCalled bool
+type fakeEvidenceWriter struct {
+	issueErr              error
+	timelineErr           error
+	pullRequestErr        error
+	reviewCommentsErr     error
+	pullRequestFilesErr   error
+	pullRequestCommitsErr error
+
+	wroteIssue                    json.RawMessage
+	wroteTimeline                 []json.RawMessage
+	wrotePullRequest              json.RawMessage
+	wroteReviewComments           []json.RawMessage
+	wrotePullRequestFiles         []json.RawMessage
+	wrotePullRequestCommits       []json.RawMessage
+	writePullRequestCalled        bool
+	writeReviewCommentsCalled     bool
+	writePullRequestFilesCalled   bool
+	writePullRequestCommitsCalled bool
 }
 
 func (f *fakeEvidenceWriter) WriteIssue(_ context.Context, _ valueobjects.IssueRef, raw json.RawMessage) error {
@@ -96,6 +107,12 @@ func (f *fakeEvidenceWriter) WritePullRequestFiles(_ context.Context, _ valueobj
 	f.writePullRequestFilesCalled = true
 	f.wrotePullRequestFiles = items
 	return f.pullRequestFilesErr
+}
+
+func (f *fakeEvidenceWriter) WritePullRequestCommits(_ context.Context, _ valueobjects.IssueRef, items []json.RawMessage) error {
+	f.writePullRequestCommitsCalled = true
+	f.wrotePullRequestCommits = items
+	return f.pullRequestCommitsErr
 }
 
 type fakeDocumentWriter struct {
@@ -341,6 +358,78 @@ func TestExportService_Export_IncludesAPullRequestDiffEntryForAPullRequest(t *te
 	}
 	if !strings.Contains(rendered, "internal/foo.go") {
 		t.Fatalf("rendered document = %q, want it to list the changed file's name", rendered)
+	}
+}
+
+const commitJSON = `{"sha":"abc1234567","commit":{"author":{"name":"octocat","date":"2026-07-01T00:00:00Z"},"committer":{"name":"octocat","date":"2026-07-01T00:00:00Z"},"message":"feat: add retry backoff"}}`
+
+func TestExportService_Export_IncludesAPullRequestCommitsEntryForAPullRequest(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:              json.RawMessage(pullRequestIssueJSON),
+		pullRequest:        json.RawMessage(mergedPullRequestJSON),
+		pullRequestCommits: []json.RawMessage{json.RawMessage(commitJSON)},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if !repo.fetchPullRequestCommitsCalled {
+		t.Fatal("FetchPullRequestCommits was not called for a pull request")
+	}
+	if !writer.writePullRequestCommitsCalled {
+		t.Fatal("WritePullRequestCommits was not called for a pull request")
+	}
+	if string(writer.wrotePullRequestCommits[0]) != commitJSON {
+		t.Fatalf("WritePullRequestCommits got %q, want the raw commit JSON verbatim", writer.wrotePullRequestCommits)
+	}
+
+	rendered := string(docs.written)
+	if !strings.Contains(rendered, `"commits":1`) {
+		t.Fatalf("rendered document = %q, want a PullRequestCommits entry reporting 1 commit", rendered)
+	}
+	if !strings.Contains(rendered, "feat: add retry backoff") {
+		t.Fatalf("rendered document = %q, want it to contain the commit's message", rendered)
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenFetchPullRequestCommitsFails(t *testing.T) {
+	wantErr := errors.New("fetch pull request commits failed")
+	repo := &fakeEvidenceFetcher{
+		issue:                 json.RawMessage(pullRequestIssueJSON),
+		pullRequest:           json.RawMessage(mergedPullRequestJSON),
+		pullRequestCommitsErr: wantErr,
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestExportService_Export_PropagatesAnErrorWhenWritePullRequestCommitsFails(t *testing.T) {
+	wantErr := errors.New("write pull request commits failed")
+	repo := &fakeEvidenceFetcher{
+		issue:       json.RawMessage(pullRequestIssueJSON),
+		pullRequest: json.RawMessage(mergedPullRequestJSON),
+	}
+	writer := &fakeEvidenceWriter{pullRequestCommitsErr: wantErr}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, &fakeAttachmentFetcher{}, &fakeAttachmentWriter{}, "github.com", testProvenance(t))
+
+	_, err := svc.Export(context.Background(), testRef(t))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Export() error = %v, want %v", err, wantErr)
 	}
 }
 
