@@ -1,6 +1,9 @@
 package valueobjects
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // IssueSummary is a lightweight reference to an issue related to the one
 // being exported — either its parent or one of its sub-issues, sourced from
@@ -56,4 +59,10 @@ func (s IssueSummary) Equals(other IssueSummary) bool {
 		s.title == other.title &&
 		s.state == other.state &&
 		s.url.Equals(other.url)
+}
+
+// issueSummaryLine formats s as a single bullet-list line, used by
+// SubIssues' Render.
+func issueSummaryLine(s IssueSummary) string {
+	return fmt.Sprintf("`#%d` %s (%s)", s.number, s.title, s.state.String())
 }
