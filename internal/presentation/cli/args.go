@@ -105,10 +105,11 @@ func parseExportArgs(args []string) (Args, error) {
 var valueFlags = map[string]bool{"repo": true, "output": true, "o": true}
 
 // splitFlagsAndPositional separates args into the tokens flag.FlagSet.Parse
-// should see and the tokens that are gh-exhibit's own positional argument.
-// This exists because flag.Parse stops scanning for flags at the first
-// non-flag token, so without this split "gh-exhibit 123 --repo x" would
-// misread "--repo" and "x" as extra positional arguments instead of a flag.
+// should see and the tokens that are the "export" subcommand's own
+// positional argument. This exists because flag.Parse stops scanning for
+// flags at the first non-flag token, so without this split
+// "gh-exhibit export 123 --repo x" would misread "--repo" and "x" as extra
+// positional arguments instead of a flag.
 // A token shaped like a negative number or comma-separated list of them
 // (e.g. "-1") is treated as positional rather than an unrecognized flag,
 // since gh-exhibit's own numbers are the only thing that would ever look
