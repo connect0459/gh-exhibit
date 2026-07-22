@@ -236,6 +236,34 @@ func TestMergeSearchResults_ReportsExceededLimitWhenAResultsTotalCountExceedsIts
 	}
 }
 
+func TestMergeSearchResults_ReportsTheResultsOwnTotalCountAsMatchedCountWhenItExceedsTheReturnedMatches(t *testing.T) {
+	now := time.Now()
+	a := testSearchMatch(t, 1, now, now, 0)
+	criteria := testSearchCriteria(t, nil, nil)
+
+	_, matchedCount, _ := services.MergeSearchResults([]valueobjects.SearchResult{testSearchResult(t, 250, a)}, criteria)
+
+	if matchedCount != 250 {
+		t.Fatalf("matchedCount = %d, want 250 (the query's own reported total, a truer lower bound than the single returned match)", matchedCount)
+	}
+}
+
+func TestMergeSearchResults_MatchedCountIsTheMaxTotalCountAcrossMultipleResults(t *testing.T) {
+	now := time.Now()
+	a := testSearchMatch(t, 1, now, now, 0)
+	b := testSearchMatch(t, 2, now, now, 0)
+	criteria := testSearchCriteria(t, nil, nil)
+
+	_, matchedCount, _ := services.MergeSearchResults(
+		[]valueobjects.SearchResult{testSearchResult(t, 30, a), testSearchResult(t, 250, b)},
+		criteria,
+	)
+
+	if matchedCount != 250 {
+		t.Fatalf("matchedCount = %d, want 250 (the larger of the two results' own reported totals)", matchedCount)
+	}
+}
+
 func TestMergeSearchResults_ReturnsNoNumbersForNoResults(t *testing.T) {
 	criteria := testSearchCriteria(t, nil, nil)
 

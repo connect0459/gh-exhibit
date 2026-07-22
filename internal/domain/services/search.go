@@ -45,22 +45,29 @@ func BuildSearchQueries(owner, repo string, criteria valueobjects.SearchCriteria
 
 // MergeSearchResults merges results (one per BuildSearchQueries query, run
 // against the same criteria) into the final ordered, deduplicated,
-// limit-truncated issue/PR number list. matchedCount is the true number of
-// distinct matches found, before truncation. exceededLimit is true when
-// there is reason to believe more matches exist than numbers reflects —
-// either a result's own TotalCount exceeded the matches it returned (that
-// query's own results are already incomplete), or the deduplicated match
-// count itself exceeded criteria.Limit() (truncated to fit) — both mean
-// there is more real data than what is being returned, which must be
-// surfaced rather than silently dropped.
+// limit-truncated issue/PR number list. matchedCount is the best known
+// lower bound on the true number of distinct matches, before truncation:
+// the deduplicated match count, or — when larger — a single result's own
+// GitHub-reported TotalCount (a query returning fewer items than its own
+// TotalCount means the true count for that query alone already exceeds
+// what was deduplicated from every query combined, so reporting only the
+// smaller deduplicated figure would understate the shortfall). exceededLimit
+// is true when there is reason to believe more matches exist than numbers
+// reflects — either a result's own TotalCount exceeded the matches it
+// returned (that query's own results are already incomplete), or the
+// deduplicated match count itself exceeded criteria.Limit() (truncated to
+// fit) — both mean there is more real data than what is being returned,
+// which must be surfaced rather than silently dropped.
 func MergeSearchResults(results []valueobjects.SearchResult, criteria valueobjects.SearchCriteria) (numbers []int, matchedCount int, exceededLimit bool) {
 	seen := make(map[int]bool)
 	var matches []valueobjects.SearchMatch
+	maxTotalCount := 0
 
 	for _, result := range results {
 		if result.TotalCount() > len(result.Matches()) {
 			exceededLimit = true
 		}
+		maxTotalCount = max(maxTotalCount, result.TotalCount())
 		for _, match := range result.Matches() {
 			if seen[match.Number()] {
 				continue
@@ -74,8 +81,8 @@ func MergeSearchResults(results []valueobjects.SearchResult, criteria valueobjec
 		return lessSearchMatch(matches[i], matches[j], criteria.Sort(), criteria.Order())
 	})
 
-	matchedCount = len(matches)
-	if matchedCount > criteria.Limit() {
+	matchedCount = max(len(matches), maxTotalCount)
+	if len(matches) > criteria.Limit() {
 		exceededLimit = true
 		matches = matches[:criteria.Limit()]
 	}
