@@ -159,6 +159,26 @@ func TestWritePullRequestFiles_ConcatenatesItemsIntoOneArrayFileWithPullFilesSuf
 	}
 }
 
+func TestWritePullRequestCommits_ConcatenatesItemsIntoOneArrayFileWithPullCommitsSuffix(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewEvidenceWriter(baseDir)
+	items := []json.RawMessage{
+		json.RawMessage(`{"sha":"aaa"}`),
+		json.RawMessage(`{"sha":"bbb"}`),
+	}
+
+	err := writer.WritePullRequestCommits(context.Background(), testIssueRef(t), items)
+	if err != nil {
+		t.Fatalf("WritePullRequestCommits() error = %v", err)
+	}
+
+	want := `[{"sha":"aaa"},{"sha":"bbb"}]`
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "pull-commits.json"))
+	if got != want {
+		t.Fatalf("WritePullRequestCommits() wrote %q, want %q", got, want)
+	}
+}
+
 func TestWriteTimeline_ReturnsAnErrorInsteadOfWritingAMalformedArrayForAnEmptyElement(t *testing.T) {
 	baseDir := t.TempDir()
 	writer := NewEvidenceWriter(baseDir)

@@ -62,20 +62,23 @@ func (f *fakeEvidenceFetcher) FetchPullRequestCommits(context.Context, valueobje
 }
 
 type fakeEvidenceWriter struct {
-	issueErr            error
-	timelineErr         error
-	pullRequestErr      error
-	reviewCommentsErr   error
-	pullRequestFilesErr error
+	issueErr              error
+	timelineErr           error
+	pullRequestErr        error
+	reviewCommentsErr     error
+	pullRequestFilesErr   error
+	pullRequestCommitsErr error
 
-	wroteIssue                  json.RawMessage
-	wroteTimeline               []json.RawMessage
-	wrotePullRequest            json.RawMessage
-	wroteReviewComments         []json.RawMessage
-	wrotePullRequestFiles       []json.RawMessage
-	writePullRequestCalled      bool
-	writeReviewCommentsCalled   bool
-	writePullRequestFilesCalled bool
+	wroteIssue                    json.RawMessage
+	wroteTimeline                 []json.RawMessage
+	wrotePullRequest              json.RawMessage
+	wroteReviewComments           []json.RawMessage
+	wrotePullRequestFiles         []json.RawMessage
+	wrotePullRequestCommits       []json.RawMessage
+	writePullRequestCalled        bool
+	writeReviewCommentsCalled     bool
+	writePullRequestFilesCalled   bool
+	writePullRequestCommitsCalled bool
 }
 
 func (f *fakeEvidenceWriter) WriteIssue(_ context.Context, _ valueobjects.IssueRef, raw json.RawMessage) error {
@@ -104,6 +107,12 @@ func (f *fakeEvidenceWriter) WritePullRequestFiles(_ context.Context, _ valueobj
 	f.writePullRequestFilesCalled = true
 	f.wrotePullRequestFiles = items
 	return f.pullRequestFilesErr
+}
+
+func (f *fakeEvidenceWriter) WritePullRequestCommits(_ context.Context, _ valueobjects.IssueRef, items []json.RawMessage) error {
+	f.writePullRequestCommitsCalled = true
+	f.wrotePullRequestCommits = items
+	return f.pullRequestCommitsErr
 }
 
 type fakeDocumentWriter struct {
