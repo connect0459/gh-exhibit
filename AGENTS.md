@@ -29,17 +29,8 @@ This project may be released publicly. All of the following must be written in *
 ### Evergreen Tests
 
 - Test names describe WHAT business rule is being verified, not HOW
-- A test names the exported (public) unit it exercises as its prefix
-  (`Test<ExportedUnit>_<BehaviorDescription>`); it does not name an
-  unexported function or method directly, since an unexported unit's
-  correctness should be demonstrated through the exported entry point
-  that calls it, not by naming the unexported unit itself. A test that
-  targets an unexported unit directly is permitted only as an explicitly
-  documented exception (a comment stating why the exported entry point
-  cannot reach the behavior being verified), not silently
-- Error messages describe a concrete operation or state, not the name
-  of the function/method that produced them; renaming that function
-  must never obligate an error-string edit
+- A test names the exported (public) unit it exercises as its prefix (`Test<ExportedUnit>_<BehaviorDescription>`); it does not name an unexported function or method directly, since an unexported unit's correctness should be demonstrated through the exported entry point that calls it, not by naming the unexported unit itself. A test that targets an unexported unit directly is permitted only as an explicitly documented exception (a comment stating why the exported entry point cannot reach the behavior being verified), not silently
+- Error messages describe a concrete operation or state, not the name of the function/method that produced them; renaming that function must never obligate an error-string edit
 - Test code serves as living documentation of the system's behavior
 
 ### Code Comments
