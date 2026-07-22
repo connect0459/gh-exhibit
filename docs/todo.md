@@ -87,6 +87,15 @@ why.
       resolved the same day. See "Output layout flattened: issues/
       segment removed (2026-07-20)" below for what was decided and
       built.
+- [ ] Decide whether to broaden attachment/image fetching beyond the
+      target repository's own `user-attachments` host — **flagged
+      (2026-07-22)** while scoping export enhancements. Left undecided
+      rather than filed as an ordinary public feature request: widening
+      the fetch target beyond the current single-host guarantee touches
+      the credential/host-exposure scope `SECURITY.md` already
+      documents, so this should go through a private security discussion
+      first (see `SECURITY.md`'s reporting process), not be designed in
+      the open ahead of that conversation.
 
 ## Spike
 
