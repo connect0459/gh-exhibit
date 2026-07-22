@@ -17,10 +17,6 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
-// searchDateLayout is the calendar-day precision GitHub's search API date
-// qualifiers (e.g. "created:2024-01-01..2024-06-01") expect.
-const searchDateLayout = "2006-01-02"
-
 // issueSearcher implements repositories.IssueSearcher against GitHub's
 // REST search API via go-gh.
 type issueSearcher struct {
@@ -106,11 +102,11 @@ func buildSearchQueryString(query valueobjects.SearchQuery) string {
 	after, before := query.CreatedAfter(), query.CreatedBefore()
 	switch {
 	case after != nil && before != nil:
-		parts = append(parts, fmt.Sprintf("created:%s..%s", after.Format(searchDateLayout), before.Format(searchDateLayout)))
+		parts = append(parts, fmt.Sprintf("created:%s..%s", after.Format(valueobjects.SearchDateLayout), before.Format(valueobjects.SearchDateLayout)))
 	case after != nil:
-		parts = append(parts, "created:>="+after.Format(searchDateLayout))
+		parts = append(parts, "created:>="+after.Format(valueobjects.SearchDateLayout))
 	case before != nil:
-		parts = append(parts, "created:<="+before.Format(searchDateLayout))
+		parts = append(parts, "created:<="+before.Format(valueobjects.SearchDateLayout))
 	}
 
 	return strings.Join(parts, " ")

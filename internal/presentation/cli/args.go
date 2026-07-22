@@ -255,10 +255,6 @@ func parseKinds(raw string) ([]valueobjects.IssueKind, error) {
 	return kinds, nil
 }
 
-// searchDateLayout is the calendar-day precision --created-after/
-// --created-before accept.
-const searchDateLayout = "2006-01-02"
-
 // parseSearchDate parses raw as a YYYY-MM-DD date; "" (the flag's unset
 // default) returns nil, meaning that bound is unset.
 func parseSearchDate(raw string) (*time.Time, error) {
@@ -266,7 +262,7 @@ func parseSearchDate(raw string) (*time.Time, error) {
 		return nil, nil
 	}
 
-	parsed, err := time.Parse(searchDateLayout, raw)
+	parsed, err := time.Parse(valueobjects.SearchDateLayout, raw)
 	if err != nil {
 		return nil, fmt.Errorf("%q is not a valid date (want YYYY-MM-DD): %w", raw, err)
 	}

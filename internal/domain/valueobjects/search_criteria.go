@@ -19,6 +19,14 @@ const MaxSearchLimit = 100
 // size ceiling means there is no smaller "natural" default to prefer.
 const DefaultSearchLimit = MaxSearchLimit
 
+// SearchDateLayout is the calendar-day precision filter mode's created-date
+// bounds use throughout: presentation/cli parses --created-after/
+// --created-before with it, and infrastructure/github formats the same
+// bounds into GitHub search's own "created:" qualifier with it — one
+// shared constant rather than two independently-defined copies of the same
+// layout string for two unrelated reasons that happen to agree today.
+const SearchDateLayout = "2006-01-02"
+
 // SearchCriteria is the validated, immutable shape of a criteria-based
 // export selection: which issues/PRs to resolve via GitHub's search API
 // rather than an explicit number list. Authors, assignees, and kinds may
