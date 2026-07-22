@@ -80,6 +80,11 @@ func (r *evidenceFetcher) FetchPullRequestFiles(ctx context.Context, ref valueob
 	return r.fetchPaginated(ctx, pullPath(ref)+"/files")
 }
 
+// FetchPullRequestCommits implements repositories.EvidenceFetcher.
+func (r *evidenceFetcher) FetchPullRequestCommits(ctx context.Context, ref valueobjects.IssueRef) ([]json.RawMessage, error) {
+	return r.fetchPaginated(ctx, pullPath(ref)+"/commits")
+}
+
 func issuePath(ref valueobjects.IssueRef) string {
 	return fmt.Sprintf("repos/%s/%s/issues/%d", ref.Owner(), ref.Repo(), ref.Number())
 }

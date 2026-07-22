@@ -185,6 +185,33 @@ func TestFetchPullRequestFiles_FollowsLinkHeaderAndConcatenatesPages(t *testing.
 	}
 }
 
+func TestFetchPullRequestCommits_FollowsLinkHeaderAndConcatenatesPages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/octocat/hello-world/pulls/42/commits" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		switch r.URL.Query().Get("page") {
+		case "", "1":
+			w.Header().Set("Link", fmt.Sprintf(`<http://%s/repos/octocat/hello-world/pulls/42/commits?page=2>; rel="next"`, r.Host))
+			_, _ = w.Write([]byte(`[{"sha":"aaa"}]`))
+		case "2":
+			_, _ = w.Write([]byte(`[{"sha":"bbb"}]`))
+		default:
+			t.Errorf("unexpected page: %s", r.URL.Query().Get("page"))
+		}
+	}))
+	defer server.Close()
+
+	fetcher := newTestFetcher(t, server)
+	got, err := fetcher.FetchPullRequestCommits(context.Background(), testIssueRef(t))
+	if err != nil {
+		t.Fatalf("FetchPullRequestCommits() error = %v", err)
+	}
+	if len(got) != 2 || string(got[0]) != `{"sha":"aaa"}` || string(got[1]) != `{"sha":"bbb"}` {
+		t.Fatalf("FetchPullRequestCommits() = %v, want [{\"sha\":\"aaa\"} {\"sha\":\"bbb\"}]", got)
+	}
+}
+
 func TestFetchIssue_RetriesAfterRateLimitedResponseThenSucceeds(t *testing.T) {
 	const body = `{"number":42,"title":"Some issue"}`
 	calls := 0

@@ -14,20 +14,23 @@ import (
 )
 
 type fakeEvidenceFetcher struct {
-	issue               json.RawMessage
-	issueErr            error
-	timeline            []json.RawMessage
-	timelineErr         error
-	pullRequest         json.RawMessage
-	pullRequestErr      error
-	reviewComments      []json.RawMessage
-	reviewCommentsErr   error
-	pullRequestFiles    []json.RawMessage
-	pullRequestFilesErr error
+	issue                 json.RawMessage
+	issueErr              error
+	timeline              []json.RawMessage
+	timelineErr           error
+	pullRequest           json.RawMessage
+	pullRequestErr        error
+	reviewComments        []json.RawMessage
+	reviewCommentsErr     error
+	pullRequestFiles      []json.RawMessage
+	pullRequestFilesErr   error
+	pullRequestCommits    []json.RawMessage
+	pullRequestCommitsErr error
 
-	fetchPullRequestCalled      bool
-	fetchReviewCommentsCalled   bool
-	fetchPullRequestFilesCalled bool
+	fetchPullRequestCalled        bool
+	fetchReviewCommentsCalled     bool
+	fetchPullRequestFilesCalled   bool
+	fetchPullRequestCommitsCalled bool
 }
 
 func (f *fakeEvidenceFetcher) FetchIssue(context.Context, valueobjects.IssueRef) (json.RawMessage, error) {
@@ -51,6 +54,11 @@ func (f *fakeEvidenceFetcher) FetchReviewComments(context.Context, valueobjects.
 func (f *fakeEvidenceFetcher) FetchPullRequestFiles(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
 	f.fetchPullRequestFilesCalled = true
 	return f.pullRequestFiles, f.pullRequestFilesErr
+}
+
+func (f *fakeEvidenceFetcher) FetchPullRequestCommits(context.Context, valueobjects.IssueRef) ([]json.RawMessage, error) {
+	f.fetchPullRequestCommitsCalled = true
+	return f.pullRequestCommits, f.pullRequestCommitsErr
 }
 
 type fakeEvidenceWriter struct {
