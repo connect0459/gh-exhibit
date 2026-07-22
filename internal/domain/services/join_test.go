@@ -1406,15 +1406,36 @@ func TestBuildEntries_SkipsAnAssignmentEventThatFailsToUnmarshal(t *testing.T) {
 	}
 }
 
-func TestBuildEntries_SkipsAnAssignmentEventWithAnEmptyAssignee(t *testing.T) {
-	raw := assignmentEventRaw(1, "assigned", "octocat", "")
+// TestBuildEntries_AttributesAnAssignmentEventFromADeletedAssigneeToGhost
+// guards the same deleted-account case classifyLabelEvent/
+// classifyClosureEvent/etc. already guard for their actor field: GitHub
+// nulls out any user reference (not just the actor who performed an
+// action) once that account is deleted, so the assignee itself must fall
+// back to "ghost" the same way the acting actor already does, rather than
+// being treated as malformed input.
+func TestBuildEntries_AttributesAnAssignmentEventFromADeletedAssigneeToGhost(t *testing.T) {
+	raw := json.RawMessage(`{
+		"id": 1,
+		"event": "assigned",
+		"actor": {"login": "octocat"},
+		"assignee": null,
+		"created_at": "2026-07-01T00:00:00Z"
+	}`)
 
 	entries, skipped := services.BuildEntries([]json.RawMessage{raw}, nil, testIssueURL)
-	if len(entries) != 0 {
-		t.Fatalf("got %d entries, want 0", len(entries))
+	if len(skipped) != 0 {
+		t.Fatalf("got %d skipped items, want 0: %#v", len(skipped), skipped)
 	}
-	if len(skipped) != 1 {
-		t.Fatalf("got %d skipped items, want 1", len(skipped))
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+
+	got, ok := entries[0].(valueobjects.AssignmentEvent)
+	if !ok {
+		t.Fatalf("entries[0] is not an AssignmentEvent: %#v", entries[0])
+	}
+	if got.Assignee() != "ghost" {
+		t.Fatalf("Assignee() = %q, want %q", got.Assignee(), "ghost")
 	}
 }
 

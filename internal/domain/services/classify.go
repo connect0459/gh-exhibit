@@ -311,10 +311,11 @@ func classifyMilestoneEvent(raw json.RawMessage, rawEvent string, issueURL strin
 // classifyAssignmentEvent classifies an "assigned"/"unassigned" timeline
 // event into an AssignmentEvent, attributed to issueURL (the issue/PR's own
 // html_url) since GitHub's payload for this event kind carries no per-event
-// permalink of its own, the same as classifyLabelEvent. Unlike the actor,
-// the assignee is not defaulted to "ghost": an empty assignee is treated as
-// malformed input rather than a deleted account, since GitHub always
-// populates this field for a genuine assigned/unassigned event.
+// permalink of its own, the same as classifyLabelEvent. The assignee is a
+// GitHub user reference like the actor, so it falls back to "ghost" the
+// same way (see actorWire.resolvedLogin): a deleted account is nulled out
+// wherever it's referenced in a timeline event, not only when it's the
+// actor who performed the action.
 func classifyAssignmentEvent(raw json.RawMessage, rawEvent string, issueURL string) (classifiedItem, int64, error) {
 	var w assignmentEventWire
 	if err := json.Unmarshal(raw, &w); err != nil {
@@ -331,7 +332,7 @@ func classifyAssignmentEvent(raw json.RawMessage, rawEvent string, issueURL stri
 		return classifiedItem{}, 0, fmt.Errorf("%s event attribution: %w", rawEvent, err)
 	}
 
-	event, err := valueobjects.NewAssignmentEvent(attribution, action, w.Assignee.Login)
+	event, err := valueobjects.NewAssignmentEvent(attribution, action, w.Assignee.resolvedLogin())
 	if err != nil {
 		return classifiedItem{}, 0, fmt.Errorf("%s event: %w", rawEvent, err)
 	}
