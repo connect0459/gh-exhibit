@@ -264,7 +264,13 @@ plain issue export would be pure noise.
 value — that field only names the parent's API URL — but a second
 `FetchIssue` call against the `IssueRef` parsed out of it, giving
 `ParentIssue` the parent's title, state, and URL the same way `Body`
-itself is built. `SubIssues`' children need no such second fetch: `GET
+itself is built. Parsing that URL only checks the path's trailing
+`repos/{owner}/{repo}/issues/{number}` segments rather than the path's
+whole shape, since a GitHub Enterprise Server host serves its REST API
+under an additional `/api/v3/` prefix (matching `go-gh`'s own outgoing
+request routing), giving a GHES-origin `parent_issue_url` two more leading
+path segments than a `github.com`-origin one. `SubIssues`' children need
+no such second fetch: `GET
 /issues/{number}/sub_issues` already returns each child's full resource
 (number, title, state, `html_url`), the same shape `ParentIssue`'s second
 fetch produces. Both are modeled as `IssueSummary` (number, title,
