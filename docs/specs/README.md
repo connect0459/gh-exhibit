@@ -40,20 +40,26 @@ evidence: the file itself, not a live link back to GitHub, is the record.
 `cli.RunExports`.
 
 ```sh
-gh exhibit <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
+gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
 gh exhibit --version
 ```
 
-- Positional argument: a single issue/PR number, or a comma-separated list
-  of them (deduplicated, first-seen order). No range or `--all` syntax.
-  Flags may appear before, after, or interleaved around it.
-- `--repo owner/repo`: target repository; defaults to the current
+- Root level: only `--version` and the automatic `-h`/`--help` are
+  recognized. A missing or unrecognized subcommand is an error (`export` is
+  currently the only one defined). This grammar separates verbs — operations
+  on data, expressed as bare subcommands — from meta-queries about the tool
+  itself, following the convention `git`/`docker`/`kubectl`/`gh` already use,
+  ahead of a second subcommand being added later.
+- `export`'s positional argument: a single issue/PR number, or a
+  comma-separated list of them (deduplicated, first-seen order). No range or
+  `--all` syntax. Flags may appear before, after, or interleaved around it.
+- `export --repo owner/repo`: target repository; defaults to the current
   directory's repository context (`go-gh`'s `repository.Current`) when
   omitted.
-- `-o`, `--output`: output directory the evidence is written under; defaults
-  to `.`.
+- `export -o`, `export --output`: output directory the evidence is written
+  under; defaults to `.`.
 - `--version`: prints `gh-exhibit {version} (commit {commit}, built {date})`
-  and exits, without requiring a positional number.
+  and exits, without requiring a subcommand.
 - A failing ref in a list does not stop the remaining ones in the same
   invocation. Each ref's success or failure is reported on its own line to
   stdout/stderr respectively. Process exit code is `0` only if every ref
