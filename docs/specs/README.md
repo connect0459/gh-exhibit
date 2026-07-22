@@ -487,11 +487,66 @@ is mandatory, to keep the exported directory offline-verifiable. After a
    treated as a per-attachment failure — it aborts the whole export, the
    same as any other fetch step.
 
+## Issue/PR reference linking
+
+A bare (not already formatted as a link) `#123` or `owner/repo#123`
+reference appearing anywhere in the rendered document — an issue/PR body,
+a comment, a review, an inline review comment — is rewritten into a link
+carrying its target's own title, once that title is resolved. This runs as
+a post-render pass over the whole rendered `Document`
+(`services.DetectIssueReferences`/`services.RewriteIssueReferences`), the
+same shape the attachment policy above already uses
+(`services.Detect`/`services.Rewrite`), so no Tier 1 entry needs a
+content-mutation path of its own for this either.
+
+Detection excludes: a reference already formatted as a markdown link; one
+inside an HTML comment (a Tier 1 entry's own `<!-- {"meta":...} -->`
+line); one inside a fenced code block (a diff patch's or commit message's
+own verbatim content, which this rewrite must not alter); and one inside
+an inline code span (this project's own backtick-wrapped, deliberately
+non-linked untrusted-text convention — see `issueSummaryLine`/
+`changedFileLine`/`commitLine`/`checkRunLine` above). A reference whose
+owner/repo/number fails `valueobjects.IssueRef`'s own validation (e.g.
+`#0`, a non-positive number) is silently skipped, the same
+skip-and-continue handling this project already applies elsewhere to a
+single malformed item.
+
+Each distinct target is fetched at most once via the same
+`EvidenceFetcher.FetchIssue` port `ParentIssue`'s own second fetch already
+uses, even when the same reference occurs multiple times in the rendered
+document — a repeated reference reuses the first fetch's result rather
+than refetching. A target that cannot be fetched (deleted, made private, a
+transient error) or whose resource fails to parse is left exactly as
+originally written: unlike a failed attachment fetch, no placeholder is
+substituted, since the reference was already valid, readable text before
+this rewrite ran — only the readability improvement is forgone, nothing
+about which issue/PR was referenced is lost. A context
+cancellation/deadline during this resolution is not treated as an
+ordinary per-reference failure — it aborts the whole export, the same as
+any other fetch step.
+
+The substitution places the resolved title *before* the link rather than
+inside its `[...]` text — `{title} [{original text}](url)`, e.g. `Fix the
+thing [#42](https://github.com/owner/repo/issues/42)` — rather than
+`[{title}](url)`. An issue/PR title is arbitrary, attacker-influenceable
+text (anyone can title their own issue), so it is never embedded inside
+this rewrite's own constructed link syntax: the same "untrusted text is
+never placed inside a `[text](url)` span" precedent
+`changedFileLine`/`commitLine`/`issueSummaryLine`/`checkRunLine` already
+establish for a filename/commit identity/issue title/check-run name of
+their own (see "Pull request check-run rendering" above), applied here to
+a link this rewrite constructs itself rather than avoiding a link
+altogether. The original matched text (`#123` or `owner/repo#123`,
+verbatim as the author wrote it) is reused as the link's own label,
+rather than a normalized form.
+
 ## Rate limiting and retry
 
 REST API calls (issue/PR resource, timeline, pull request resource, review
 comments, pull request files, pull request commits, check runs,
-sub-issues, parent issue resource) retry on a 429, or a
+sub-issues, parent issue resource, and a referenced issue/PR resource
+resolved from a bare reference detected in the rendered document) retry
+on a 429, or a
 403 whose headers
 identify it as rate limiting (`Retry-After` present, or
 `X-RateLimit-Remaining: 0` — a 403 without either is a permission error and
@@ -578,9 +633,11 @@ Onion architecture, following this project's own reference layout:
   `CheckOutcome`, `Document`, `Provenance`, `AssetFilename`).
   No I/O.
 - `internal/domain/services` — stateless domain transformations: timeline
-  classification/joining (`classify.go`, `join.go`, `body.go`), and
-  attachment detection/rewriting (`attachment.go`, `resolution.go`,
-  `filename.go`, `rewrite.go`). No I/O.
+  classification/joining (`classify.go`, `join.go`, `body.go`), attachment
+  detection/rewriting (`attachment.go`, `resolution.go`, `filename.go`,
+  `rewrite.go`), and issue/PR reference detection/rewriting
+  (`issue_reference.go`, `issue_reference_protected.go`,
+  `issue_reference_resolution.go`, `issue_reference_rewrite.go`). No I/O.
 - `internal/domain/repositories` — abstract ports the application layer
   depends on: `EvidenceFetcher`, `EvidenceWriter`, `ProvenanceWriter`,
   `DocumentWriter`, `AttachmentFetcher`, `AttachmentWriter`, `Clock`.
