@@ -84,6 +84,17 @@ type milestoneEventWire struct {
 	} `json:"milestone"`
 }
 
+// assignmentEventWire is the shape of an "assigned"/"unassigned" timeline
+// event. Like labelEventWire, it carries no html_url of its own. Unlike the
+// other actor-only events, it also carries an assignee distinct from the
+// actor who performed the assignment.
+type assignmentEventWire struct {
+	ID        int64     `json:"id"`
+	Actor     actorWire `json:"actor"`
+	Assignee  actorWire `json:"assignee"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type reviewCommentWire struct {
 	ID                  int64     `json:"id"`
 	PullRequestReviewID int64     `json:"pull_request_review_id"`

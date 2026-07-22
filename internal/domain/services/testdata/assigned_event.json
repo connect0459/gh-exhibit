@@ -1,0 +1,11 @@
+{
+  "id": 6430295006,
+  "event": "assigned",
+  "actor": {
+    "login": "tierninho"
+  },
+  "assignee": {
+    "login": "billygriffin"
+  },
+  "created_at": "2020-02-04T18:15:00Z"
+}

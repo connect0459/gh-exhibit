@@ -24,4 +24,6 @@ const (
 	eventKindRenamed      eventKind = "renamed"
 	eventKindMilestoned   eventKind = "milestoned"
 	eventKindDemilestoned eventKind = "demilestoned"
+	eventKindAssigned     eventKind = "assigned"
+	eventKindUnassigned   eventKind = "unassigned"
 )
