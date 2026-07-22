@@ -86,6 +86,23 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		}
 		skipped = append(skipped, commitsSkipped...)
 		entries = append(entries, commits)
+	} else {
+		if len(fetched.parentIssue) > 0 {
+			parent, err := services.BuildParentIssue(body.Attribution(), fetched.parentIssue)
+			if err != nil {
+				return nil, fmt.Errorf("could not build the parent issue: %w", err)
+			}
+			entries = append(entries, parent)
+		}
+
+		subIssues, subIssuesSkipped, err := services.BuildSubIssues(body.Attribution(), fetched.subIssues)
+		if err != nil {
+			return nil, fmt.Errorf("could not build the sub-issues: %w", err)
+		}
+		skipped = append(skipped, subIssuesSkipped...)
+		if len(subIssues.Children()) > 0 {
+			entries = append(entries, subIssues)
+		}
 	}
 	entries = append(entries, classified...)
 
@@ -130,6 +147,13 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 		if err := s.writer.WritePullRequestCommits(ctx, ref, fetched.pullRequestCommits); err != nil {
 			return nil, fmt.Errorf("could not persist the raw pull request commits: %w", err)
 		}
+	} else {
+		if err := s.writer.WriteSubIssues(ctx, ref, fetched.subIssues); err != nil {
+			return nil, fmt.Errorf("could not persist the raw sub-issues: %w", err)
+		}
+		if err := s.writer.WriteParentIssue(ctx, ref, fetched.parentIssue); err != nil {
+			return nil, fmt.Errorf("could not persist the raw parent issue: %w", err)
+		}
 	}
 	if err := s.writer.WriteTimeline(ctx, ref, fetched.timeline); err != nil {
 		return nil, fmt.Errorf("could not persist the raw timeline: %w", err)
@@ -161,14 +185,18 @@ type fetchedPullRequestAndTimeline struct {
 	reviewComments     []json.RawMessage
 	pullRequestFiles   []json.RawMessage
 	pullRequestCommits []json.RawMessage
+	subIssues          []json.RawMessage
+	parentIssue        json.RawMessage
 	timeline           []json.RawMessage
 }
 
 // fetchPullRequestChainAndTimeline runs the pull-request chain
 // (FetchPullRequest, then FetchReviewComments, then FetchPullRequestFiles,
-// then FetchPullRequestCommits, when issue is a pull request) concurrently
-// with FetchTimeline, since neither depends on the other's result —
-// overlapping their round trips shortens Export's overall latency.
+// then FetchPullRequestCommits, when issue is a pull request) — or, for a
+// plain issue, FetchSubIssues followed by FetchIssue again for its parent
+// when one exists — concurrently with FetchTimeline, since neither depends
+// on the other's result — overlapping their round trips shortens Export's
+// overall latency.
 func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, ref valueobjects.IssueRef, issue services.IssueResource) (fetchedPullRequestAndTimeline, error) {
 	fetchCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -238,6 +266,37 @@ func (s *ExportService) fetchPullRequestChainAndTimeline(ctx context.Context, re
 				return
 			}
 			result.pullRequestCommits = pullRequestCommits
+		}()
+	} else {
+		// FetchIssue is not called a second time (for the parent) when
+		// FetchSubIssues fails: only its result, not its invocation, is
+		// independent of FetchSubIssues' outcome, the same short-circuit
+		// shape as the pull-request chain above.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			subIssues, err := s.fetcher.FetchSubIssues(fetchCtx, ref)
+			if err != nil {
+				fail(fmt.Errorf("could not retrieve the sub-issues: %w", err))
+				return
+			}
+			result.subIssues = subIssues
+
+			parentRef, ok, err := issue.ParentIssueRef()
+			if err != nil {
+				fail(fmt.Errorf("could not resolve the parent issue reference: %w", err))
+				return
+			}
+			if !ok {
+				return
+			}
+
+			parentIssue, err := s.fetcher.FetchIssue(fetchCtx, parentRef)
+			if err != nil {
+				fail(fmt.Errorf("could not retrieve the parent issue: %w", err))
+				return
+			}
+			result.parentIssue = parentIssue
 		}()
 	}
 	wg.Wait()
