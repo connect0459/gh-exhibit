@@ -86,7 +86,7 @@ gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <d
 gh exhibit export 10
 
 # Export multiple issues/PRs from an explicit repository
-gh exhibit export 10,11,12 --repo connect0459/gh-exhibit -o ./issues
+gh exhibit export 10,11,12 --repo connect0459/gh-exhibit -o ./exhibits
 ```
 
 ## Output
@@ -96,7 +96,7 @@ number, named by `{repo}/{number}` (the owner is deliberately not part of
 the path):
 
 ```text
-./issues/gh-exhibit/
+./exhibits/gh-exhibit/
 ├── 10/
 │   ├── index.md          rendered Markdown — the exhibit itself
 │   ├── assets/            downloaded attachments
