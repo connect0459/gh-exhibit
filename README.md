@@ -54,7 +54,7 @@ Or export by filter criteria instead, via the separate `export-search` subcomman
 gh exhibit export-search [--author <login>[,...]] [--assignee <login>[,...]] [--kind issue|pr[,...]] [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>] [--limit <n>] [--sort created|updated|comments] [--order asc|desc] [--dry-run] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
 ```
 
-## Flags and Subcommands
+### Flags and Subcommands
 
 - `export`: exports the given issue/PR(s) by number.
   - `<number>[,<number>...]`: a single issue/PR number, or a comma-separated list of them.
