@@ -43,5 +43,5 @@ func RunSearchExport(ctx context.Context, searcher Searcher, exporter Exporter, 
 		return 0
 	}
 
-	return RunExports(ctx, exporter, owner, repo, outputDir, outcome.Numbers, withStdout, stdout, stderr)
+	return RunExports(ctx, exporter, owner, repo, outputDir, outcome.Numbers, false, withStdout, stdout, stderr)
 }

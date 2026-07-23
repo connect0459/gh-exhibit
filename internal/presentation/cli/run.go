@@ -32,7 +32,16 @@ type Exporter interface {
 // combined stream; the printed bytes are exactly what exporter wrote to
 // disk, byte for byte. A ref that fails has no document printed, since
 // exporter never produced one for it.
-func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir string, numbers []int, withStdout bool, stdout, stderr io.Writer) int {
+//
+// When dryRun is true, exporter.Export is never called: each ref is only
+// validated into a valueobjects.IssueRef and its would-be destination path
+// is reported, entirely offline (unlike export-search's own --dry-run,
+// export has no resolution step to preview — its numbers are already
+// known, so the only meaningful preview is this local, no-I/O one). A ref
+// that fails validation is still reported as a per-ref failure, the same
+// as a real run's export failure. withStdout has no effect combined with
+// dryRun, since no document is ever rendered.
+func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir string, numbers []int, dryRun, withStdout bool, stdout, stderr io.Writer) int {
 	exitCode := 0
 
 	for _, number := range numbers {
@@ -40,6 +49,12 @@ func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir s
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "failed #%d: %v\n", number, err)
 			exitCode = 1
+			continue
+		}
+
+		if dryRun {
+			documentPath := filepath.Join(outputDir, repo, strconv.Itoa(number), "index.md")
+			_, _ = fmt.Fprintf(stdout, "would export #%d -> %s\n", number, documentPath)
 			continue
 		}
 

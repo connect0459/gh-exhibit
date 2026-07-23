@@ -43,7 +43,7 @@ func TestRunExports_ReturnsZeroWhenEveryRefSucceeds(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	got := RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, false, &stdout, &stderr)
+	got := RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, false, false, &stdout, &stderr)
 
 	if got != 0 {
 		t.Errorf("RunExports() = %d, want 0", got)
@@ -60,7 +60,7 @@ func TestRunExports_ReturnsOneWhenAnyRefFails(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	got := RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, false, &stdout, &stderr)
+	got := RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, false, false, &stdout, &stderr)
 
 	if got != 1 {
 		t.Errorf("RunExports() = %d, want 1", got)
@@ -75,7 +75,7 @@ func TestRunExports_ContinuesToTheRemainingRefsAfterAFailure(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2, 3}, false, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2, 3}, false, false, &stdout, &stderr)
 
 	want := []int{1, 2, 3}
 	if !equalInts(exporter.calledNumbers, want) {
@@ -87,7 +87,7 @@ func TestRunExports_ReportsAnInvalidOwnerWithoutCallingExport(t *testing.T) {
 	exporter := &fakeExporter{results: map[int]fakeExportResult{1: {}}}
 	var stdout, stderr bytes.Buffer
 
-	got := RunExports(context.Background(), exporter, "connect_0459", "hello-world", ".", []int{1}, false, &stdout, &stderr)
+	got := RunExports(context.Background(), exporter, "connect_0459", "hello-world", ".", []int{1}, false, false, &stdout, &stderr)
 
 	if got != 1 {
 		t.Errorf("RunExports() = %d, want 1", got)
@@ -106,7 +106,7 @@ func TestRunExports_PrintsAFailureLineToStderr(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1}, false, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1}, false, false, &stdout, &stderr)
 
 	if !strings.Contains(stderr.String(), "1") || !strings.Contains(stderr.String(), "boom") {
 		t.Errorf("stderr = %q, want it to mention the failing ref number and the underlying error", stderr.String())
@@ -119,7 +119,7 @@ func TestRunExports_PrintsASuccessLineToStdout(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, false, &stdout, &stderr)
 
 	if !strings.Contains(stdout.String(), "42") {
 		t.Errorf("stdout = %q, want it to mention the exported ref number", stdout.String())
@@ -132,7 +132,7 @@ func TestRunExports_ReflectsTheOutputDirInTheSuccessMessage(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", "/tmp/gh-exhibit-out", []int{42}, false, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", "/tmp/gh-exhibit-out", []int{42}, false, false, &stdout, &stderr)
 
 	want := filepath.Join("/tmp/gh-exhibit-out", "hello-world", "42", "index.md")
 	if !strings.Contains(stdout.String(), want) {
@@ -146,7 +146,7 @@ func TestRunExports_ReportsTheSkipNoteCountForARef(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, false, &stdout, &stderr)
 
 	if !strings.Contains(stdout.String(), "2") {
 		t.Errorf("stdout = %q, want it to mention the skip note count (2)", stdout.String())
@@ -159,7 +159,7 @@ func TestRunExports_PrintsTheRenderedDocumentToStdoutWhenWithStdoutIsEnabled(t *
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, true, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, true, &stdout, &stderr)
 
 	if !strings.Contains(stdout.String(), "# Title\n\nBody") {
 		t.Errorf("stdout = %q, want it to contain the rendered document", stdout.String())
@@ -172,7 +172,7 @@ func TestRunExports_DoesNotPrintTheRenderedDocumentWhenWithStdoutIsDisabled(t *t
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, false, false, &stdout, &stderr)
 
 	if strings.Contains(stdout.String(), "# Title\n\nBody") {
 		t.Errorf("stdout = %q, want it to not contain the rendered document when --with-stdout was not given", stdout.String())
@@ -186,7 +186,7 @@ func TestRunExports_PrintsAHeaderNamingEachRefBeforeItsDocument(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, true, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, false, true, &stdout, &stderr)
 
 	out := stdout.String()
 	header1 := strings.Index(out, "=== octocat/hello-world#1 ===")
@@ -207,9 +207,76 @@ func TestRunExports_PrintsNoDocumentForARefThatFails(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1}, true, &stdout, &stderr)
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1}, false, true, &stdout, &stderr)
 
 	if strings.Contains(stdout.String(), "===") {
 		t.Errorf("stdout = %q, want no document header for a ref that failed to export", stdout.String())
+	}
+}
+
+func TestRunExports_DryRunDoesNotCallExport(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{
+		1: {}, 2: {},
+	}}
+	var stdout, stderr bytes.Buffer
+
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, true, false, &stdout, &stderr)
+
+	if len(exporter.calledNumbers) != 0 {
+		t.Errorf("Export was called %v times, want 0 (--dry-run must never call Export)", exporter.calledNumbers)
+	}
+}
+
+func TestRunExports_DryRunPrintsTheWouldBeDestinationPathForEachRef(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{42: {}}}
+	var stdout, stderr bytes.Buffer
+
+	RunExports(context.Background(), exporter, "octocat", "hello-world", "/tmp/gh-exhibit-out", []int{42}, true, false, &stdout, &stderr)
+
+	want := filepath.Join("/tmp/gh-exhibit-out", "hello-world", "42", "index.md")
+	if !strings.Contains(stdout.String(), want) {
+		t.Errorf("stdout = %q, want it to mention the would-be write path %q", stdout.String(), want)
+	}
+}
+
+func TestRunExports_DryRunReturnsZeroWhenEveryRefIsValid(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{1: {}, 2: {}}}
+	var stdout, stderr bytes.Buffer
+
+	got := RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{1, 2}, true, false, &stdout, &stderr)
+
+	if got != 0 {
+		t.Errorf("RunExports() = %d, want 0", got)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunExports_DryRunReportsAnInvalidOwnerAsAFailureWithoutCallingExport(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{1: {}}}
+	var stdout, stderr bytes.Buffer
+
+	got := RunExports(context.Background(), exporter, "connect_0459", "hello-world", ".", []int{1}, true, false, &stdout, &stderr)
+
+	if got != 1 {
+		t.Errorf("RunExports() = %d, want 1", got)
+	}
+	if len(exporter.calledNumbers) != 0 {
+		t.Errorf("Export was called %v times, want 0 (an invalid owner must be rejected before previewing)", exporter.calledNumbers)
+	}
+	if !strings.Contains(stderr.String(), "1") {
+		t.Errorf("stderr = %q, want it to mention the failing ref number", stderr.String())
+	}
+}
+
+func TestRunExports_DryRunDoesNotPrintASuccessOrDocumentLine(t *testing.T) {
+	exporter := &fakeExporter{results: map[int]fakeExportResult{42: {rendered: []byte("# Title")}}}
+	var stdout, stderr bytes.Buffer
+
+	RunExports(context.Background(), exporter, "octocat", "hello-world", ".", []int{42}, true, true, &stdout, &stderr)
+
+	if strings.Contains(stdout.String(), "exported") || strings.Contains(stdout.String(), "===") {
+		t.Errorf("stdout = %q, want no exported-success line or document header during a dry run", stdout.String())
 	}
 }

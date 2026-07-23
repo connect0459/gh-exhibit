@@ -65,5 +65,5 @@ func run() int {
 		return cli.RunSearchExport(context.Background(), searcher, exporter, repo.Owner, repo.Name, args.OutputDir, *args.Criteria, args.DryRun, args.WithStdout, os.Stdout, os.Stderr)
 	}
 
-	return cli.RunExports(context.Background(), exporter, repo.Owner, repo.Name, args.OutputDir, args.Numbers, args.WithStdout, os.Stdout, os.Stderr)
+	return cli.RunExports(context.Background(), exporter, repo.Owner, repo.Name, args.OutputDir, args.Numbers, args.DryRun, args.WithStdout, os.Stdout, os.Stderr)
 }

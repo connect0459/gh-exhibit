@@ -204,6 +204,28 @@ func TestParseArgs_ReadsTheWithStdoutFlag(t *testing.T) {
 	}
 }
 
+func TestParseArgs_DefaultsExportDryRunToFalse(t *testing.T) {
+	got, err := ParseArgs([]string{"export", "123"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	if got.DryRun {
+		t.Errorf("DryRun = true, want false")
+	}
+}
+
+func TestParseArgs_ReadsTheExportDryRunFlag(t *testing.T) {
+	got, err := ParseArgs([]string{"export", "--dry-run", "123"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	if !got.DryRun {
+		t.Errorf("DryRun = false, want true")
+	}
+}
+
 func TestParseArgs_ReadsTheOutputShorthandFlag(t *testing.T) {
 	got, err := ParseArgs([]string{"export", "-o", "/tmp/out", "123"})
 	if err != nil {
