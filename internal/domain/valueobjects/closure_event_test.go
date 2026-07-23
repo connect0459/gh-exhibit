@@ -52,6 +52,22 @@ Reopened
 	}
 }
 
+func TestClosureEvent_Render_FallsBackToTheActionsStringForAnUnrecognizedClosureAction(t *testing.T) {
+	event := valueobjects.NewClosureEvent(newClosureEventAttribution(t), valueobjects.ClosureAction(99), "completed")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering closure event: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "ClosureAction(99)") {
+		t.Fatalf("Render() = %q, want it to contain %q", buf.String(), "ClosureAction(99)")
+	}
+	if strings.Contains(buf.String(), "\nClosed\n") {
+		t.Fatalf("Render() = %q, want the body to not silently claim \"Closed\" for an unrecognized action", buf.String())
+	}
+}
+
 func TestNewClosureEvent_NormalizesReasonToEmptyForAReopenedAction(t *testing.T) {
 	event := valueobjects.NewClosureEvent(newClosureEventAttribution(t), valueobjects.ClosureActionReopened, "completed")
 

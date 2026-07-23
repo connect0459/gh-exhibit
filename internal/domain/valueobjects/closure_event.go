@@ -76,6 +76,8 @@ func (e ClosureEvent) Render(w io.Writer) error {
 	switch {
 	case e.action == ClosureActionReopened:
 		body = "Reopened"
+	case e.action != ClosureActionClosed:
+		body = e.action.String()
 	case e.reason != "":
 		body = fmt.Sprintf("Closed (%s)", e.reason)
 	default:
