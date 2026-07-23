@@ -18,6 +18,13 @@ func TestParseArgs_ExportSubcommand_LeavesCriteriaNil(t *testing.T) {
 	}
 }
 
+func TestParseArgs_ExportSubcommand_RejectsAFilterFlag(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "--author", "octocat"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since export no longer defines filter flags")
+	}
+}
+
 func TestParseArgs_ExportSearchSubcommand_ReadsTheAuthorFlag(t *testing.T) {
 	got, err := ParseArgs([]string{"export-search", "--author", "octocat"})
 	if err != nil {
