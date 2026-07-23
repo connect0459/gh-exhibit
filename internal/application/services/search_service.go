@@ -11,9 +11,10 @@ import (
 
 // SearchOutcome is Search's result: Numbers is the final, ordered,
 // deduplicated, limit-truncated issue/PR number list; MatchedCount is the
-// true number of distinct matches found before truncation; ExceededLimit
-// is true when there is reason to believe more matches exist than Numbers
-// reflects (see domain/services.MergeSearchResults).
+// best known lower bound on the true number of distinct matches before
+// truncation, not a guaranteed exact count; ExceededLimit is true when
+// there is reason to believe more matches exist than Numbers reflects (see
+// domain/services.MergeSearchResults).
 type SearchOutcome struct {
 	Numbers       []int
 	MatchedCount  int
