@@ -4,18 +4,35 @@
 package cli
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
 // Args is the parsed, validated shape of gh-exhibit's process arguments.
 type Args struct {
 	// Numbers is the ordered, de-duplicated-by-input-order list of issue/PR
 	// numbers to export, parsed from a single positional argument that is
-	// either one number or a comma-separated list of them.
+	// either one number or a comma-separated list of them. Populated only
+	// in explicit-number mode; nil in filter mode (see Criteria).
 	Numbers []int
+
+	// Criteria is non-nil when any filter flag (--author, --assignee,
+	// --kind, --after, --before, --limit, --sort, --order,
+	// --dry-run) was given instead of an explicit issue/PR number list —
+	// filter mode and explicit-number mode are mutually exclusive (see
+	// parseExportArgs).
+	Criteria *valueobjects.SearchCriteria
+
+	// DryRun is true when --dry-run was given: the caller should report
+	// Criteria's resolved match count and numbers without exporting
+	// anything. Only meaningful when Criteria is non-nil.
+	DryRun bool
 
 	// Repo is the explicit --repo owner/repo override; empty when omitted,
 	// in which case the caller resolves it from the current repository
@@ -73,10 +90,34 @@ func ParseArgs(args []string) (Args, error) {
 	}
 }
 
+// filterFlagNames are parseExportArgs' filter-mode flags: giving any one of
+// them, instead of the positional issue/PR number list, selects filter
+// mode (see parseExportArgs).
+var filterFlagNames = map[string]bool{
+	"author": true, "assignee": true, "kind": true,
+	"after": true, "before": true,
+	"limit": true, "sort": true, "order": true, "dry-run": true,
+}
+
+// stringFilterFlagNames are filterFlagNames' string-valued members — the
+// ones flag.FlagSet cannot itself distinguish "omitted" from "given as an
+// explicit empty string" for (an int-valued flag like --limit already
+// rejects an empty value as an invalid integer; --sort/--order already
+// reject "" as an unrecognized value). An explicit "--author=" would
+// otherwise parse as "", the same sentinel parseLogins/parseKinds/
+// parseSearchDate use for "omitted", and silently fall back to that
+// dimension being unfiltered instead of erroring.
+var stringFilterFlagNames = map[string]bool{
+	"author": true, "assignee": true, "kind": true,
+	"after": true, "before": true,
+}
+
 // parseExportArgs parses and validates the "export" subcommand's own
-// arguments (everything after the "export" token) into an Args value. It
-// fails on a missing or malformed issue/PR number, or on any number of
-// positional arguments other than exactly one. Flags may appear before,
+// arguments (everything after the "export" token) into an Args value.
+// Supplying the positional issue/PR number (or comma-separated list)
+// selects explicit-number mode; supplying any filter flag (see
+// filterFlagNames) instead selects filter mode. Supplying both is a parse
+// error — the two modes are mutually exclusive. Flags may appear before,
 // after, or interleaved around the positional argument.
 func parseExportArgs(args []string) (Args, error) {
 	fs := flag.NewFlagSet("gh-exhibit export", flag.ContinueOnError)
@@ -84,6 +125,16 @@ func parseExportArgs(args []string) (Args, error) {
 	output := fs.String("output", ".", "output directory the evidence is written under")
 	fs.StringVar(output, "o", ".", "shorthand for --output")
 	withStdout := fs.Bool("with-stdout", false, "also print each exported ref's rendered document to standard output")
+
+	author := fs.String("author", "", "filter mode: comma-separated GitHub login(s) to match as author")
+	assignee := fs.String("assignee", "", "filter mode: comma-separated GitHub login(s) to match as assignee")
+	kind := fs.String("kind", "", "filter mode: comma-separated issue,pr to restrict the ref kind (default: both)")
+	createdAfter := fs.String("after", "", "filter mode: only match refs created on or after this date (YYYY-MM-DD)")
+	createdBefore := fs.String("before", "", "filter mode: only match refs created on or before this date (YYYY-MM-DD)")
+	limit := fs.Int("limit", valueobjects.DefaultSearchLimit, fmt.Sprintf("filter mode: maximum number of matches to resolve (1-%d)", valueobjects.MaxSearchLimit))
+	sortFlag := fs.String("sort", "created", "filter mode: sort matches by created, updated, or comments")
+	order := fs.String("order", "desc", "filter mode: sort order, asc or desc")
+	dryRun := fs.Bool("dry-run", false, "filter mode: report the resolved match count and numbers without exporting anything")
 
 	flagArgs, positional, err := splitFlagsAndPositional(args)
 	if err != nil {
@@ -94,8 +145,38 @@ func parseExportArgs(args []string) (Args, error) {
 		return Args{}, fmt.Errorf("parse flags: %w", err)
 	}
 
+	filterFlagGiven := false
+	var emptyValueFlags []string
+	fs.Visit(func(f *flag.Flag) {
+		if filterFlagNames[f.Name] {
+			filterFlagGiven = true
+		}
+		if stringFilterFlagNames[f.Name] && f.Value.String() == "" {
+			emptyValueFlags = append(emptyValueFlags, f.Name)
+		}
+	})
+
+	if len(emptyValueFlags) > 0 {
+		names := make([]string, len(emptyValueFlags))
+		for i, name := range emptyValueFlags {
+			names[i] = "--" + name
+		}
+		return Args{}, fmt.Errorf("%s: value must not be empty", strings.Join(names, ", "))
+	}
+
+	if filterFlagGiven {
+		if len(positional) > 0 {
+			return Args{}, errors.New("cannot combine an explicit issue/PR number list with filter flags")
+		}
+		criteria, err := parseSearchCriteria(*author, *assignee, *kind, *createdAfter, *createdBefore, *limit, *sortFlag, *order)
+		if err != nil {
+			return Args{}, err
+		}
+		return Args{Criteria: &criteria, DryRun: *dryRun, Repo: *repo, OutputDir: *output, WithStdout: *withStdout}, nil
+	}
+
 	if len(positional) != 1 {
-		return Args{}, fmt.Errorf("expected exactly one issue/PR number argument (a single number or a comma-separated list), got %d", len(positional))
+		return Args{}, fmt.Errorf("expected exactly one issue/PR number argument (a single number or a comma-separated list), or a filter flag (--author, --assignee, --kind, --after, --before, --limit, --sort, --order, --dry-run); got %d positional argument(s) and no filter flag", len(positional))
 	}
 
 	numbers, err := parseNumbers(positional[0])
@@ -106,9 +187,121 @@ func parseExportArgs(args []string) (Args, error) {
 	return Args{Numbers: numbers, Repo: *repo, OutputDir: *output, WithStdout: *withStdout}, nil
 }
 
+// parseSearchCriteria builds a valueobjects.SearchCriteria from
+// parseExportArgs' own raw filter-flag values.
+func parseSearchCriteria(rawAuthor, rawAssignee, rawKind, rawCreatedAfter, rawCreatedBefore string, limit int, rawSort, rawOrder string) (valueobjects.SearchCriteria, error) {
+	authors, err := parseLogins(rawAuthor)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--author: %w", err)
+	}
+	assignees, err := parseLogins(rawAssignee)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--assignee: %w", err)
+	}
+	kinds, err := parseKinds(rawKind)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--kind: %w", err)
+	}
+	createdAfter, err := parseSearchDate(rawCreatedAfter)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--after: %w", err)
+	}
+	createdBefore, err := parseSearchDate(rawCreatedBefore)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--before: %w", err)
+	}
+	sortField, err := valueobjects.ParseSearchSortField(rawSort)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--sort: %w", err)
+	}
+	order, err := valueobjects.ParseSearchSortOrder(rawOrder)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--order: %w", err)
+	}
+
+	criteria, err := valueobjects.NewSearchCriteria(authors, assignees, kinds, createdAfter, createdBefore, limit, sortField, order)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, err
+	}
+	return criteria, nil
+}
+
+// parseLogins splits raw on "," and trims each part, deduplicating repeats
+// in first-seen order; "" (the flag's unset default) returns nil, meaning
+// unfiltered by that dimension.
+func parseLogins(raw string) ([]string, error) {
+	if raw == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(raw, ",")
+	logins := make([]string, 0, len(parts))
+	seen := make(map[string]bool, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			return nil, fmt.Errorf("empty login in list %q", raw)
+		}
+		if seen[trimmed] {
+			continue
+		}
+		seen[trimmed] = true
+		logins = append(logins, trimmed)
+	}
+	return logins, nil
+}
+
+// parseKinds splits raw on "," and parses each trimmed part as an
+// valueobjects.IssueKind, deduplicating repeats in first-seen order; "" (the
+// flag's unset default) returns nil, meaning both kinds.
+func parseKinds(raw string) ([]valueobjects.IssueKind, error) {
+	if raw == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(raw, ",")
+	kinds := make([]valueobjects.IssueKind, 0, len(parts))
+	seen := make(map[valueobjects.IssueKind]bool, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			return nil, fmt.Errorf("empty kind in list %q", raw)
+		}
+		kind, err := valueobjects.ParseIssueKind(trimmed)
+		if err != nil {
+			return nil, err
+		}
+		if seen[kind] {
+			continue
+		}
+		seen[kind] = true
+		kinds = append(kinds, kind)
+	}
+	return kinds, nil
+}
+
+// parseSearchDate parses raw as a YYYY-MM-DD date; "" (the flag's unset
+// default) returns nil, meaning that bound is unset.
+func parseSearchDate(raw string) (*time.Time, error) {
+	if raw == "" {
+		return nil, nil
+	}
+
+	parsed, err := time.Parse(valueobjects.SearchDateLayout, raw)
+	if err != nil {
+		return nil, fmt.Errorf("%q is not a valid date (want YYYY-MM-DD): %w", raw, err)
+	}
+	return &parsed, nil
+}
+
 // valueFlags are gh-exhibit's flags that consume a following token as their
 // value when not given in the attached "--flag=value" form.
-var valueFlags = map[string]bool{"repo": true, "output": true, "o": true}
+var valueFlags = map[string]bool{
+	"repo": true, "output": true, "o": true,
+	"author": true, "assignee": true, "kind": true,
+	"after": true, "before": true,
+	"limit": true, "sort": true, "order": true,
+}
 
 // splitFlagsAndPositional separates args into the tokens flag.FlagSet.Parse
 // should see and the tokens that are the "export" subcommand's own

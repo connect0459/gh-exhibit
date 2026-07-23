@@ -80,3 +80,16 @@ func NewExportService(cfg Config) (*services.ExportService, error) {
 
 	return services.NewExportService(fetcher, writer, provenanceWriter, docs, attachments, assets, cfg.Host, provenance, clock.NewClock()), nil
 }
+
+// NewSearchService builds a SearchService backed by a go-gh REST client
+// scoped to cfg.Host — filter mode's counterpart to NewExportService.
+// Only cfg.Host, cfg.AuthToken, and cfg.Transport are relevant here;
+// cfg.OutputDir/Version/Commit (export-only concerns) are simply unused.
+func NewSearchService(cfg Config) (*services.SearchService, error) {
+	searcher, err := github.NewIssueSearcher(api.ClientOptions{Host: cfg.Host, AuthToken: cfg.AuthToken, Transport: cfg.Transport})
+	if err != nil {
+		return nil, fmt.Errorf("could not create the GitHub search client: %w", err)
+	}
+
+	return services.NewSearchService(searcher), nil
+}

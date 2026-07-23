@@ -56,5 +56,14 @@ func run() int {
 		return 2
 	}
 
+	if args.Criteria != nil {
+		searcher, err := registry.NewSearchService(registry.Config{Host: repo.Host})
+		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		return cli.RunSearchExport(context.Background(), searcher, exporter, repo.Owner, repo.Name, args.OutputDir, *args.Criteria, args.DryRun, args.WithStdout, os.Stdout, os.Stderr)
+	}
+
 	return cli.RunExports(context.Background(), exporter, repo.Owner, repo.Name, args.OutputDir, args.Numbers, args.WithStdout, os.Stdout, os.Stderr)
 }
