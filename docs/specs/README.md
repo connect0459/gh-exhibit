@@ -19,7 +19,7 @@ gh-exhibit is a `gh` CLI extension that exports a GitHub issue or pull request's
 
 ```sh
 gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
-gh exhibit export [--author <login>[,<login>...]] [--assignee <login>[,<login>...]] [--kind <issue|pr>[,...]] [--created-after <YYYY-MM-DD>] [--created-before <YYYY-MM-DD>] [--limit <n>] [--sort created|updated|comments] [--order asc|desc] [--dry-run] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
+gh exhibit export [--author <login>[,<login>...]] [--assignee <login>[,<login>...]] [--kind <issue|pr>[,...]] [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>] [--limit <n>] [--sort created|updated|comments] [--order asc|desc] [--dry-run] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
 gh exhibit --version
 ```
 
@@ -28,7 +28,7 @@ gh exhibit --version
 - `export`'s positional argument (explicit-number mode): a single issue/PR number, or a comma-separated list of them (deduplicated, first-seen order). No range or `--all` syntax. Flags may appear before, after, or interleaved around it.
 - `export --author <login>[,<login>...]`, `export --assignee <login>[,<login>...]` (filter mode): comma-separated GitHub login(s), deduplicated in first-seen order, matched as OR within each dimension — any named author, and any named assignee. Omitted means unfiltered by that dimension.
 - `export --kind <issue|pr>[,...]` (filter mode): comma-separated, deduplicated `issue`/`pr` values restricting which ref kind matches; omitted, or naming both, means both (named `--kind` rather than `--type` to avoid colliding with GitHub's own "issue type" feature, an unrelated per-issue classification).
-- `export --created-after <YYYY-MM-DD>`, `export --created-before <YYYY-MM-DD>` (filter mode): an inclusive bound on the ref's own `created_at` date (not `updated_at` — the date-range filter always targets creation date). Either, both, or neither may be given; `--created-after` must not be later than `--created-before`.
+- `export --after <YYYY-MM-DD>`, `export --before <YYYY-MM-DD>` (filter mode): an inclusive bound on the ref's own `created_at` date (not `updated_at` — the date-range filter always targets creation date; named generically rather than `--created-after`/`--created-before` so that a later `created`/`updated` date-field selector doesn't force a flag rename). Either, both, or neither may be given; `--after` must not be later than `--before`.
 - `export --limit <n>` (filter mode): the maximum number of matches to resolve, `1`–`100` (`101` or above is a parse error); defaults to `100` when omitted. This ceiling is gh-exhibit's own conservative choice, not GitHub search's raw 1000-result cap — see "Filter mode" below.
 - `export --sort created|updated|comments`, `export --order asc|desc` (filter mode): which field matches are ordered by, and the direction, as two independent flags rather than one combined value; default `created`/`desc` (newest first).
 - `export --dry-run` (filter mode): reports the resolved match count and the full matched-number list to stdout, without exporting anything.

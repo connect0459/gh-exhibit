@@ -23,7 +23,7 @@ type Args struct {
 	Numbers []int
 
 	// Criteria is non-nil when any filter flag (--author, --assignee,
-	// --kind, --created-after, --created-before, --limit, --sort, --order,
+	// --kind, --after, --before, --limit, --sort, --order,
 	// --dry-run) was given instead of an explicit issue/PR number list —
 	// filter mode and explicit-number mode are mutually exclusive (see
 	// parseExportArgs).
@@ -95,7 +95,7 @@ func ParseArgs(args []string) (Args, error) {
 // mode (see parseExportArgs).
 var filterFlagNames = map[string]bool{
 	"author": true, "assignee": true, "kind": true,
-	"created-after": true, "created-before": true,
+	"after": true, "before": true,
 	"limit": true, "sort": true, "order": true, "dry-run": true,
 }
 
@@ -116,8 +116,8 @@ func parseExportArgs(args []string) (Args, error) {
 	author := fs.String("author", "", "filter mode: comma-separated GitHub login(s) to match as author")
 	assignee := fs.String("assignee", "", "filter mode: comma-separated GitHub login(s) to match as assignee")
 	kind := fs.String("kind", "", "filter mode: comma-separated issue,pr to restrict the ref kind (default: both)")
-	createdAfter := fs.String("created-after", "", "filter mode: only match refs created on or after this date (YYYY-MM-DD)")
-	createdBefore := fs.String("created-before", "", "filter mode: only match refs created on or before this date (YYYY-MM-DD)")
+	createdAfter := fs.String("after", "", "filter mode: only match refs created on or after this date (YYYY-MM-DD)")
+	createdBefore := fs.String("before", "", "filter mode: only match refs created on or before this date (YYYY-MM-DD)")
 	limit := fs.Int("limit", valueobjects.DefaultSearchLimit, fmt.Sprintf("filter mode: maximum number of matches to resolve (1-%d)", valueobjects.MaxSearchLimit))
 	sortFlag := fs.String("sort", "created", "filter mode: sort matches by created, updated, or comments")
 	order := fs.String("order", "desc", "filter mode: sort order, asc or desc")
@@ -151,7 +151,7 @@ func parseExportArgs(args []string) (Args, error) {
 	}
 
 	if len(positional) != 1 {
-		return Args{}, fmt.Errorf("expected exactly one issue/PR number argument (a single number or a comma-separated list), or a filter flag (--author, --assignee, --kind, --created-after, --created-before, --limit, --sort, --order, --dry-run); got %d positional argument(s) and no filter flag", len(positional))
+		return Args{}, fmt.Errorf("expected exactly one issue/PR number argument (a single number or a comma-separated list), or a filter flag (--author, --assignee, --kind, --after, --before, --limit, --sort, --order, --dry-run); got %d positional argument(s) and no filter flag", len(positional))
 	}
 
 	numbers, err := parseNumbers(positional[0])
@@ -179,11 +179,11 @@ func parseSearchCriteria(rawAuthor, rawAssignee, rawKind, rawCreatedAfter, rawCr
 	}
 	createdAfter, err := parseSearchDate(rawCreatedAfter)
 	if err != nil {
-		return valueobjects.SearchCriteria{}, fmt.Errorf("--created-after: %w", err)
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--after: %w", err)
 	}
 	createdBefore, err := parseSearchDate(rawCreatedBefore)
 	if err != nil {
-		return valueobjects.SearchCriteria{}, fmt.Errorf("--created-before: %w", err)
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--before: %w", err)
 	}
 	sortField, err := valueobjects.ParseSearchSortField(rawSort)
 	if err != nil {
@@ -274,7 +274,7 @@ func parseSearchDate(raw string) (*time.Time, error) {
 var valueFlags = map[string]bool{
 	"repo": true, "output": true, "o": true,
 	"author": true, "assignee": true, "kind": true,
-	"created-after": true, "created-before": true,
+	"after": true, "before": true,
 	"limit": true, "sort": true, "order": true,
 }
 

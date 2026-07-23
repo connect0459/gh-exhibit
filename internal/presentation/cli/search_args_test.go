@@ -94,10 +94,10 @@ func TestParseArgs_FilterMode_DeduplicatesTheKindListInFirstSeenOrder(t *testing
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsCreatedAfterLaterThanCreatedBefore(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--created-after", "2024-06-01", "--created-before", "2024-01-01"})
+func TestParseArgs_FilterMode_RejectsAfterLaterThanBefore(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "--after", "2024-06-01", "--before", "2024-01-01"})
 	if err == nil {
-		t.Fatal("ParseArgs() error = nil, want an error when --created-after is later than --created-before")
+		t.Fatal("ParseArgs() error = nil, want an error when --after is later than --before")
 	}
 }
 
@@ -143,8 +143,8 @@ func TestParseArgs_FilterMode_RejectsAnInvalidKind(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_ParsesCreatedAfterAndBefore(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--created-after", "2024-01-01", "--created-before", "2024-06-01"})
+func TestParseArgs_FilterMode_ParsesAfterAndBefore(t *testing.T) {
+	got, err := ParseArgs([]string{"export", "--after", "2024-01-01", "--before", "2024-06-01"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -158,7 +158,7 @@ func TestParseArgs_FilterMode_ParsesCreatedAfterAndBefore(t *testing.T) {
 }
 
 func TestParseArgs_FilterMode_RejectsAMalformedDate(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--created-after", "01/01/2024"})
+	_, err := ParseArgs([]string{"export", "--after", "01/01/2024"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for a malformed date")
 	}
