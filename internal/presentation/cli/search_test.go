@@ -84,6 +84,19 @@ func TestRunSearchExport_DryRun_PrintsTheMatchedCountAndNumbers(t *testing.T) {
 	}
 }
 
+func TestRunSearchExport_DryRun_PrintsTheTrueMatchedCountEvenWhenTruncated(t *testing.T) {
+	searcher := &fakeSearcher{outcome: services.SearchOutcome{Numbers: []int{1}, MatchedCount: 5, ExceededLimit: true}}
+	exporter := &fakeExporter{}
+	var stdout, stderr bytes.Buffer
+
+	RunSearchExport(context.Background(), searcher, exporter, "octocat", "hello-world", ".", testCriteriaWithLimit(t, 1), true, false, &stdout, &stderr)
+
+	out := stdout.String()
+	if !strings.Contains(out, "matched 5 issue/PR number(s)") {
+		t.Errorf("stdout = %q, want the headline to report the true matched count 5, not the truncated list length 1", out)
+	}
+}
+
 func TestRunSearchExport_NonDryRun_DelegatesTheResolvedNumbersToRunExports(t *testing.T) {
 	searcher := &fakeSearcher{outcome: services.SearchOutcome{Numbers: []int{1, 2}, MatchedCount: 2}}
 	exporter := &fakeExporter{results: map[int]fakeExportResult{1: {}, 2: {}}}

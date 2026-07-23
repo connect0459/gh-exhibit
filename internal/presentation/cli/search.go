@@ -36,7 +36,7 @@ func RunSearchExport(ctx context.Context, searcher Searcher, exporter Exporter, 
 	}
 
 	if dryRun {
-		_, _ = fmt.Fprintf(stdout, "matched %d issue/PR number(s):\n", len(outcome.Numbers))
+		_, _ = fmt.Fprintf(stdout, "matched %d issue/PR number(s):\n", outcome.MatchedCount)
 		for _, number := range outcome.Numbers {
 			_, _ = fmt.Fprintf(stdout, "  #%d\n", number)
 		}
