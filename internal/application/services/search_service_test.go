@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,5 +133,20 @@ func TestSearchService_Search_ReturnsAWrappedErrorWhenTheSearcherFails(t *testin
 
 	if err == nil {
 		t.Fatal("expected an error when the searcher fails, got nil")
+	}
+}
+
+func TestSearchService_Search_ErrorNamesTheFailingQuerysAuthorAndAssignee(t *testing.T) {
+	searcher := &fakeIssueSearcher{err: errors.New("network failure")}
+	service := NewSearchService(searcher)
+	criteria := testSearchCriteria(t, []string{"octocat"}, nil, 100)
+
+	_, err := service.Search(context.Background(), "connect0459", "gh-exhibit", criteria)
+
+	if err == nil {
+		t.Fatal("expected an error when the searcher fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "octocat") {
+		t.Errorf("error = %v, want it to name which author/assignee combination failed, unlike infrastructure/github's own generic wrap", err)
 	}
 }

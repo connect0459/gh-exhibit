@@ -51,7 +51,7 @@ func (s *SearchService) Search(ctx context.Context, owner, repo string, criteria
 	for _, query := range queries {
 		result, err := s.searcher.Search(ctx, query)
 		if err != nil {
-			return SearchOutcome{}, fmt.Errorf("search GitHub issues/PRs: %w", err)
+			return SearchOutcome{}, fmt.Errorf("search GitHub issues/PRs for author %q assignee %q: %w", query.Author(), query.Assignee(), err)
 		}
 		results = append(results, result)
 	}
