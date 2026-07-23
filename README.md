@@ -37,8 +37,9 @@ Get help:
 ```sh
 gh exhibit --help
 
-# Print usage for the export subcommand
+# Print usage for a subcommand
 gh exhibit export --help
+gh exhibit export-search --help
 ```
 
 Export GitHub issues or pull requests by number:
@@ -47,26 +48,28 @@ Export GitHub issues or pull requests by number:
 gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
 ```
 
-Or export by filter criteria instead (mutually exclusive with the number list above):
+Or export by filter criteria instead, via the separate `export-search` subcommand:
 
 ```sh
-gh exhibit export [--author <login>[,...]] [--assignee <login>[,...]] [--kind issue|pr[,...]] [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>] [--limit <n>] [--sort created|updated|comments] [--order asc|desc] [--dry-run] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
+gh exhibit export-search [--author <login>[,...]] [--assignee <login>[,...]] [--kind issue|pr[,...]] [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>] [--limit <n>] [--sort created|updated|comments] [--order asc|desc] [--dry-run] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
 ```
 
 ## Flags and Subcommands
 
-- `export`: exports the matching issue/PR(s), selected either by an explicit number list or by filter criteria (never both in the same invocation).
-  - `<number>[,<number>...]`: a single issue/PR number, or a comma-separated list of them. Selects explicit-number mode.
-  - `--author`, `--assignee`: comma-separated GitHub login(s) to filter by; giving any of these (or any other filter flag below) selects filter mode instead.
-  - `--kind`: comma-separated `issue`,`pr` to restrict which ref kind matches; omitted (or both) means both.
-  - `--after`, `--before`: an inclusive `YYYY-MM-DD` bound on the ref's creation date.
-  - `--limit`: maximum number of matches to resolve, `1`-`100` (default `100`) — gh-exhibit's own conservative cap, well below GitHub search's raw 1000-result ceiling, so a filter-mode call with no other narrowing can't turn into a de facto whole-repository export.
-  - `--sort`, `--order`: which field (`created`/`updated`/`comments`) and direction (`asc`/`desc`) matches are ordered by; default `created`/`desc`.
-  - `--dry-run`: report the resolved match count and number list to stdout without exporting anything.
+- `export`: exports the given issue/PR(s) by number.
+  - `<number>[,<number>...]`: a single issue/PR number, or a comma-separated list of them.
   - `--repo`: target repository as `owner/repo`; defaults to the current repository's context when omitted.
   - `-o`, `--output`: output directory the evidence is written under; defaults to `.`.
   - `--with-stdout`: in addition to the usual on-disk writes, also print each exported ref's rendered document to standard output. When multiple refs are exported, each document is preceded by a `=== owner/repo#N ===` header line; the printed bytes are exactly what gets written to `index.md`.
-- `-h`, `--help`: print usage and exit. Run at the root for the root-level flags, or `gh exhibit export -h` for `export`'s own flags.
+- `export-search`: resolves a set of filter criteria into an issue/PR number list via GitHub's search API, then exports every match. Takes no positional argument.
+  - `--author`, `--assignee`: comma-separated GitHub login(s) to filter by.
+  - `--kind`: comma-separated `issue`,`pr` to restrict which ref kind matches; omitted (or both) means both.
+  - `--after`, `--before`: an inclusive `YYYY-MM-DD` bound on the ref's creation date.
+  - `--limit`: maximum number of matches to resolve, `1`-`100` (default `100`) — gh-exhibit's own conservative cap, well below GitHub search's raw 1000-result ceiling, so a call with no other narrowing can't turn into a de facto whole-repository export.
+  - `--sort`, `--order`: which field (`created`/`updated`/`comments`) and direction (`asc`/`desc`) matches are ordered by; default `created`/`desc`.
+  - `--dry-run`: report the resolved match count and number list to stdout without exporting anything.
+  - `--repo`, `-o`/`--output`, `--with-stdout`: same as `export`'s flags above.
+- `-h`, `--help`: print usage and exit. Run at the root for the root-level flags, or `gh exhibit export -h`/`gh exhibit export-search -h` for a subcommand's own flags.
 - `--version`: print the version, commit, and build date, then exit.
 
 > [!NOTE]
@@ -82,10 +85,10 @@ gh exhibit export 10
 gh exhibit export 10,11,12 --repo connect0459/gh-exhibit -o ./exhibits
 
 # Preview every issue/PR a given author opened this year, without exporting anything
-gh exhibit export --author octocat --after 2026-01-01 --dry-run
+gh exhibit export-search --author octocat --after 2026-01-01 --dry-run
 
 # Export every open pull request assigned to a given user
-gh exhibit export --assignee octocat --kind pr --repo connect0459/gh-exhibit -o ./exhibits
+gh exhibit export-search --assignee octocat --kind pr --repo connect0459/gh-exhibit -o ./exhibits
 ```
 
 ## Output
