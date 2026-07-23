@@ -137,8 +137,8 @@ type dialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 // A target that is already a literal IP address skips resolution
 // entirely. Any resolved (or literal) address that is loopback,
 // link-local, or private-network (see isDisallowedRedirectIP) refuses
-// the dial outright; otherwise the first address dial succeeds against
-// is used.
+// the dial outright; otherwise, each remaining address is dialed in
+// turn until one succeeds.
 func newAttachmentDialContext(resolver ipAddrResolver, dial dialFunc) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	if dial == nil {
 		dial = (&net.Dialer{}).DialContext
