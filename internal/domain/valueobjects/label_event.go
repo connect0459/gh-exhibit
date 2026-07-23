@@ -85,7 +85,7 @@ func (e LabelEvent) Render(w io.Writer) error {
 		verb = "Unlabeled"
 	}
 
-	return writeMetaLine(w, meta, fmt.Sprintf("%s `%s`", verb, e.name))
+	return writeMetaLine(w, meta, fmt.Sprintf("%s %s", verb, titleCodeSpan(e.name)))
 }
 
 func (LabelEvent) entryNode() {}

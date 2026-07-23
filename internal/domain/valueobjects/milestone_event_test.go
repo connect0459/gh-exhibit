@@ -63,6 +63,23 @@ func TestMilestoneEvent_Render_IncludesTheActionAndTitleInTheMetaLine(t *testing
 	}
 }
 
+func TestMilestoneEvent_Render_FencesATitleContainingABacktick(t *testing.T) {
+	event := mustNewMilestoneEvent(t, newMilestoneEventAttribution(t), valueobjects.MilestoneActionMilestoned, "v1`0")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering milestone event: %v", err)
+	}
+
+	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"milestoned","milestone":"v1` + "`" + `0","url":"https://github.com/example/repo/issues/1"}} -->
+
+Milestoned ` + "``v1`0``" + `
+`
+	if buf.String() != want {
+		t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
+	}
+}
+
 func TestMilestoneEvent_ExposesTheAttributionActionAndTitleItWasConstructedWith(t *testing.T) {
 	attribution := newMilestoneEventAttribution(t)
 	event := mustNewMilestoneEvent(t, attribution, valueobjects.MilestoneActionMilestoned, "v1.0")

@@ -75,7 +75,7 @@ func (e MilestoneEvent) Render(w io.Writer) error {
 		verb = "Demilestoned"
 	}
 
-	return writeMetaLine(w, meta, fmt.Sprintf("%s `%s`", verb, e.title))
+	return writeMetaLine(w, meta, fmt.Sprintf("%s %s", verb, titleCodeSpan(e.title)))
 }
 
 func (MilestoneEvent) entryNode() {}
