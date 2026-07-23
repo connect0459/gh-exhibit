@@ -117,6 +117,16 @@ func TestParseArgs_FilterMode_RejectsAnExplicitEmptyBeforeValue(t *testing.T) {
 	}
 }
 
+func TestParseArgs_FilterMode_RejectsAllExplicitEmptyValuesGivenTogether(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "--after=", "--before="})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for explicit empty --after and --before values")
+	}
+	if !strings.Contains(err.Error(), "after") || !strings.Contains(err.Error(), "before") {
+		t.Errorf("ParseArgs() error = %v, want it to name both --after and --before, not just the last one visited", err)
+	}
+}
+
 func TestParseArgs_FilterMode_DeduplicatesTheKindListInFirstSeenOrder(t *testing.T) {
 	got, err := ParseArgs([]string{"export", "--kind", "issue,issue,pr"})
 	if err != nil {

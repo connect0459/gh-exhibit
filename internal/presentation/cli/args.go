@@ -146,18 +146,22 @@ func parseExportArgs(args []string) (Args, error) {
 	}
 
 	filterFlagGiven := false
-	var emptyValueFlag string
+	var emptyValueFlags []string
 	fs.Visit(func(f *flag.Flag) {
 		if filterFlagNames[f.Name] {
 			filterFlagGiven = true
 		}
 		if stringFilterFlagNames[f.Name] && f.Value.String() == "" {
-			emptyValueFlag = f.Name
+			emptyValueFlags = append(emptyValueFlags, f.Name)
 		}
 	})
 
-	if emptyValueFlag != "" {
-		return Args{}, fmt.Errorf("--%s: value must not be empty", emptyValueFlag)
+	if len(emptyValueFlags) > 0 {
+		names := make([]string, len(emptyValueFlags))
+		for i, name := range emptyValueFlags {
+			names[i] = "--" + name
+		}
+		return Args{}, fmt.Errorf("%s: value must not be empty", strings.Join(names, ", "))
 	}
 
 	if filterFlagGiven {
