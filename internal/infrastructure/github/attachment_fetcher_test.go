@@ -34,6 +34,25 @@ func newTestAttachmentFetcher(t *testing.T, server *httptest.Server) repositorie
 	return fetcher
 }
 
+// TestNewAttachmentFetcher_SucceedsWhenNoTransportIsSupplied covers
+// NewAttachmentFetcher's opts.Transport == nil branch, which installs
+// newAttachmentGuardTransport() — always the case in real usage, since
+// neither cmd/gh-exhibit nor internal/registry ever sets
+// api.ClientOptions.Transport. api.NewHTTPClient wraps whatever
+// Transport it's given in its own unexported header/cache/logging
+// round-trippers, so this only confirms construction succeeds; the
+// guard transport's own dial behavior is covered directly by
+// TestNewAttachmentGuardTransport_DialsAnUnpinnedRequestNormally and
+// attachment_redirect_guard_test.go's other tests.
+func TestNewAttachmentFetcher_SucceedsWhenNoTransportIsSupplied(t *testing.T) {
+	if _, err := NewAttachmentFetcher(api.ClientOptions{
+		Host:      "github.localhost",
+		AuthToken: "test-token",
+	}); err != nil {
+		t.Fatalf("NewAttachmentFetcher() error = %v, want construction to succeed with no Transport override", err)
+	}
+}
+
 func newTestAttachment(t *testing.T, url string) services.Attachment {
 	t.Helper()
 
@@ -140,24 +159,22 @@ func TestFetch_AcceptsAResponseBodyExactlyAtTheSizeLimit(t *testing.T) {
 	}
 }
 
-// hostScopedRewriteTransport rewrites a request whose Host matches one of
-// hosts' keys to the corresponding real test-server address, leaving any
-// other request unrewritten. Unlike rewriteTransport (which rewrites every
-// request unconditionally to one fixed target), this lets a test address
-// multiple distinct fake origins — each named by a placeholder hostname
-// that is not itself a loopback/private-network literal address, so a
-// redirect between them exercises the "different origin" case without
-// tripping rejectRedirectToADisallowedTarget's own address check — that
-// each resolve to a different real local server underneath.
+// hostScopedRewriteTransport rewrites only a request whose Host matches
+// placeholderHost to target's real address. Unlike rewriteTransport (which
+// rewrites every request unconditionally), a later hop born from a redirect
+// Location that already names a second real test server's address passes
+// through unrewritten instead of being routed back to the first server —
+// letting a test genuinely reach two distinct origins.
 type hostScopedRewriteTransport struct {
-	hosts map[string]string
+	placeholderHost string
+	target          string
 }
 
 func (t *hostScopedRewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = req.Clone(req.Context())
-	if target, ok := t.hosts[req.URL.Host]; ok {
-		req.URL.Host = target
-		req.Host = target
+	if req.URL.Host == t.placeholderHost {
+		req.URL.Host = t.target
+		req.Host = t.target
 	}
 	return http.DefaultTransport.RoundTrip(req)
 }
@@ -173,9 +190,8 @@ func TestFetch_FollowsARedirectToADifferentOriginFromTheAttachmentHost(t *testin
 	}))
 	defer secondHop.Close()
 
-	const secondHopPlaceholderHost = "cdn.example.test"
 	firstHop := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "http://"+secondHopPlaceholderHost+"/user-attachments/assets/redirected", http.StatusFound)
+		http.Redirect(w, r, secondHop.URL+"/user-attachments/assets/redirected", http.StatusFound)
 	}))
 	defer firstHop.Close()
 
@@ -183,18 +199,11 @@ func TestFetch_FollowsARedirectToADifferentOriginFromTheAttachmentHost(t *testin
 	if err != nil {
 		t.Fatalf("url.Parse(%q) error = %v", firstHop.URL, err)
 	}
-	secondHopURL, err := url.Parse(secondHop.URL)
-	if err != nil {
-		t.Fatalf("url.Parse(%q) error = %v", secondHop.URL, err)
-	}
 
 	fetcher, err := NewAttachmentFetcher(api.ClientOptions{
 		Host:      "github.localhost",
 		AuthToken: "test-token",
-		Transport: &hostScopedRewriteTransport{hosts: map[string]string{
-			"github.localhost":       firstHopURL.Host,
-			secondHopPlaceholderHost: secondHopURL.Host,
-		}},
+		Transport: &hostScopedRewriteTransport{placeholderHost: "github.localhost", target: firstHopURL.Host},
 	})
 	if err != nil {
 		t.Fatalf("NewAttachmentFetcher() error = %v", err)

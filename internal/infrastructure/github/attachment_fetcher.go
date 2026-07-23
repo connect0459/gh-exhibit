@@ -51,21 +51,25 @@ const maxAttachmentBytes = 100 * 1024 * 1024
 // on a redirect whose host differs from the original request's, so the
 // credential this client attaches never reaches the redirect target.
 //
-// The client's CheckRedirect is instead set to
-// rejectRedirectToADisallowedTarget (attachment_redirect_guard.go), a
-// narrower guard that refuses only a redirect into a loopback,
-// link-local, or private-network address (including a cloud-metadata
-// endpoint) — closing the SSRF-into-internal-network edge of this gap
-// while still allowing the legitimate cross-origin case above. A
-// redirect to an arbitrary external, attacker-controlled host remains
-// possible and is documented as an accepted, unmitigated risk in
+// When opts.Transport is left nil (always true in real usage), the
+// client's Transport is instead set to newAttachmentGuardTransport(), a
+// narrower guard (attachment_redirect_guard.go) that resolves and
+// refuses, at the exact point of dialing, any redirect hop whose address
+// is loopback, link-local, or private-network (including a
+// cloud-metadata endpoint) — closing the SSRF-into-internal-network edge
+// of this gap while still allowing the legitimate cross-origin case
+// above. A redirect to an arbitrary external, attacker-controlled host
+// remains possible and is documented as an accepted, unmitigated risk in
 // SECURITY.md.
 func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetcher, error) {
+	if opts.Transport == nil {
+		opts.Transport = newAttachmentGuardTransport()
+	}
+
 	client, err := api.NewHTTPClient(opts)
 	if err != nil {
 		return nil, fmt.Errorf("create the GitHub-authenticated HTTP client: %w", err)
 	}
-	client.CheckRedirect = rejectRedirectToADisallowedTarget
 
 	return &attachmentFetcher{client: client, maxBytes: maxAttachmentBytes}, nil
 }
@@ -73,7 +77,7 @@ func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetche
 // Fetch implements repositories.AttachmentFetcher.
 func (f *attachmentFetcher) Fetch(ctx context.Context, attachment services.Attachment) ([]byte, string, error) {
 	url := attachment.URL().String()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(pinAttachmentRedirectHops(ctx), http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("build request for %s: %w", url, err)
 	}

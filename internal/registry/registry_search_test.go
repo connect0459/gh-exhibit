@@ -39,10 +39,11 @@ func TestNewSearchService_ResolvesMatchesViaTheRealGitHubSearchAPI(t *testing.T)
 		Host:      "github.localhost",
 		AuthToken: "test-token",
 		Transport: &hostScopedRewriteTransport{
-			hosts: map[string]string{
-				"github.localhost":     githubAPIURL.Host,
-				"api.github.localhost": githubAPIURL.Host,
+			placeholderHosts: map[string]bool{
+				"github.localhost":     true,
+				"api.github.localhost": true,
 			},
+			target: githubAPIURL.Host,
 		},
 	})
 	if err != nil {
