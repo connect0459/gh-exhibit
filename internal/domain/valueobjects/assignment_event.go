@@ -74,6 +74,8 @@ func (e AssignmentEvent) Render(w io.Writer) error {
 		verb = "Assigned"
 	case AssignmentActionUnassigned:
 		verb = "Unassigned"
+	default:
+		verb = e.action.String()
 	}
 
 	return writeMetaLine(w, meta, fmt.Sprintf("%s @%s", verb, e.assignee))

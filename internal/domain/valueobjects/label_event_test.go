@@ -80,6 +80,19 @@ Labeled ` + "``foo`bar``" + `
 	}
 }
 
+func TestLabelEvent_Render_FallsBackToTheActionsStringForAnUnrecognizedLabelAction(t *testing.T) {
+	event := mustNewLabelEvent(t, newLabelEventAttribution(t), valueobjects.LabelAction(99), "bug", "d73a4a")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering label event: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "LabelAction(99) `bug`") {
+		t.Fatalf("Render() = %q, want it to contain %q", buf.String(), "LabelAction(99) `bug`")
+	}
+}
+
 func TestLabelEvent_ExposesTheAttributionActionNameAndColorItWasConstructedWith(t *testing.T) {
 	attribution := newLabelEventAttribution(t)
 	event := mustNewLabelEvent(t, attribution, valueobjects.LabelActionLabeled, "bug", "d73a4a")

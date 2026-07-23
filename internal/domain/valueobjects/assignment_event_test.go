@@ -63,6 +63,19 @@ func TestAssignmentEvent_Render_IncludesTheActionAndAssigneeInTheMetaLine(t *tes
 	}
 }
 
+func TestAssignmentEvent_Render_FallsBackToTheActionsStringForAnUnrecognizedAssignmentAction(t *testing.T) {
+	event := mustNewAssignmentEvent(t, newAssignmentEventAttribution(t), valueobjects.AssignmentAction(99), "hubot")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering assignment event: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "AssignmentAction(99) @hubot") {
+		t.Fatalf("Render() = %q, want it to contain %q", buf.String(), "AssignmentAction(99) @hubot")
+	}
+}
+
 func TestAssignmentEvent_ExposesTheAttributionActionAndAssigneeItWasConstructedWith(t *testing.T) {
 	attribution := newAssignmentEventAttribution(t)
 	event := mustNewAssignmentEvent(t, attribution, valueobjects.AssignmentActionAssigned, "hubot")

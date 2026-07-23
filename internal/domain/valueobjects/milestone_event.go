@@ -73,6 +73,8 @@ func (e MilestoneEvent) Render(w io.Writer) error {
 		verb = "Milestoned"
 	case MilestoneActionDemilestoned:
 		verb = "Demilestoned"
+	default:
+		verb = e.action.String()
 	}
 
 	return writeMetaLine(w, meta, fmt.Sprintf("%s %s", verb, titleCodeSpan(e.title)))

@@ -83,6 +83,8 @@ func (e LabelEvent) Render(w io.Writer) error {
 		verb = "Labeled"
 	case LabelActionUnlabeled:
 		verb = "Unlabeled"
+	default:
+		verb = e.action.String()
 	}
 
 	return writeMetaLine(w, meta, fmt.Sprintf("%s %s", verb, titleCodeSpan(e.name)))

@@ -80,6 +80,19 @@ Milestoned ` + "``v1`0``" + `
 	}
 }
 
+func TestMilestoneEvent_Render_FallsBackToTheActionsStringForAnUnrecognizedMilestoneAction(t *testing.T) {
+	event := mustNewMilestoneEvent(t, newMilestoneEventAttribution(t), valueobjects.MilestoneAction(99), "v1.0")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering milestone event: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "MilestoneAction(99) `v1.0`") {
+		t.Fatalf("Render() = %q, want it to contain %q", buf.String(), "MilestoneAction(99) `v1.0`")
+	}
+}
+
 func TestMilestoneEvent_ExposesTheAttributionActionAndTitleItWasConstructedWith(t *testing.T) {
 	attribution := newMilestoneEventAttribution(t)
 	event := mustNewMilestoneEvent(t, attribution, valueobjects.MilestoneActionMilestoned, "v1.0")
