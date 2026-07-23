@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -134,19 +135,6 @@ func TestDialAttachmentRedirectHop_SkipsResolutionForALiteralPublicIP(t *testing
 	}
 }
 
-func TestDialAttachmentRedirectHop_RejectsWhenResolutionFails(t *testing.T) {
-	resolver := &fakeIPAddrResolver{err: errors.New("no such host")}
-	dial := &recordingDial{}
-
-	_, err := dialAttachmentRedirectHop(context.Background(), "tcp", "unresolvable.example:443", resolver, dial.dial)
-	if err == nil {
-		t.Fatal("dialAttachmentRedirectHop() error = nil, want an error when resolution fails")
-	}
-	if len(dial.dialed) != 0 {
-		t.Fatalf("dial called with %v, want no dial attempt when resolution fails", dial.dialed)
-	}
-}
-
 func TestDialAttachmentRedirectHop_RejectsAMalformedDialAddress(t *testing.T) {
 	dial := &recordingDial{}
 	_, err := dialAttachmentRedirectHop(context.Background(), "tcp", "no-port-here", &fakeIPAddrResolver{}, dial.dial)
@@ -175,6 +163,19 @@ func TestDialAttachmentRedirectHop_ReturnsTheUnderlyingErrorWhenEveryResolvedAdd
 	}
 }
 
+func TestDialAttachmentRedirectHop_RejectsWhenResolutionFails(t *testing.T) {
+	resolver := &fakeIPAddrResolver{err: errors.New("no such host")}
+	dial := &recordingDial{}
+
+	_, err := dialAttachmentRedirectHop(context.Background(), "tcp", "unresolvable.example:443", resolver, dial.dial)
+	if err == nil {
+		t.Fatal("dialAttachmentRedirectHop() error = nil, want an error when resolution fails")
+	}
+	if len(dial.dialed) != 0 {
+		t.Fatalf("dial called with %v, want no dial attempt when resolution fails", dial.dialed)
+	}
+}
+
 func TestDialAttachmentRedirectHop_RejectsWhenResolutionReturnsNoAddresses(t *testing.T) {
 	resolver := &fakeIPAddrResolver{ips: map[string][]net.IPAddr{}}
 	dial := &recordingDial{}
@@ -188,69 +189,186 @@ func TestDialAttachmentRedirectHop_RejectsWhenResolutionReturnsNoAddresses(t *te
 	}
 }
 
-func TestNewAttachmentDialContext_DialsTheFirstHopUnvalidated(t *testing.T) {
-	resolver := &fakeIPAddrResolver{err: errors.New("resolver must not be called for the first, unpinned-as-seen hop")}
+func TestNewAttachmentDialContext_DialsUnvalidatedWhenContextIsNotMarkedAsARedirectHop(t *testing.T) {
+	resolver := &fakeIPAddrResolver{err: errors.New("resolver must not be called for an unmarked dial")}
 	dial := &recordingDial{}
 	dialContext := newAttachmentDialContext(resolver, dial.dial)
 
-	ctx := pinAttachmentRedirectHops(context.Background())
-	// A loopback target would be rejected on a redirect hop, but the
-	// first dial within a pinned call is never validated: it always
-	// targets the configured, trusted GitHub/GHES host, which may
-	// legitimately be a private-network address for a self-hosted GHES
-	// instance.
-	if _, err := dialContext(ctx, "tcp", "127.0.0.1:443"); err != nil {
-		t.Fatalf("dialContext() error = %v, want the first hop to be dialed unvalidated", err)
+	// An address that would be rejected on a marked redirect hop dials
+	// fine when the context carries no attachmentRedirectHopContextKey
+	// marker — matching a call's first hop, which may legitimately be a
+	// private-network address for a self-hosted GHES instance.
+	if _, err := dialContext(context.Background(), "tcp", "127.0.0.1:443"); err != nil {
+		t.Fatalf("dialContext() error = %v, want an unmarked dial to proceed unvalidated", err)
 	}
 	if want := []string{"127.0.0.1:443"}; len(dial.dialed) != 1 || dial.dialed[0] != want[0] {
 		t.Fatalf("dial called with %v, want %v", dial.dialed, want)
 	}
 }
 
-func TestNewAttachmentDialContext_ValidatesEveryDialAfterTheFirst(t *testing.T) {
+func TestNewAttachmentDialContext_ValidatesWhenContextIsMarkedAsARedirectHop(t *testing.T) {
 	resolver := &fakeIPAddrResolver{ips: map[string][]net.IPAddr{
 		"evil.example": ipAddrs("169.254.169.254"),
 	}}
 	dial := &recordingDial{}
 	dialContext := newAttachmentDialContext(resolver, dial.dial)
 
-	ctx := pinAttachmentRedirectHops(context.Background())
-	if _, err := dialContext(ctx, "tcp", "github.localhost:443"); err != nil {
-		t.Fatalf("dialContext() first hop error = %v, want nil", err)
-	}
+	ctx := context.WithValue(context.Background(), attachmentRedirectHopContextKey{}, true)
 	if _, err := dialContext(ctx, "tcp", "evil.example:443"); err == nil {
-		t.Fatal("dialContext() second hop error = nil, want a rejection for a redirect resolving to a cloud-metadata address")
+		t.Fatal("dialContext() error = nil, want a marked redirect hop resolving to a cloud-metadata address to be refused")
 	}
-	if want := []string{"github.localhost:443"}; len(dial.dialed) != 1 || dial.dialed[0] != want[0] {
-		t.Fatalf("dial calls = %v, want only the first hop to have been dialed", dial.dialed)
+	if len(dial.dialed) != 0 {
+		t.Fatalf("dial called with %v, want no dial attempt for a rejected marked hop", dial.dialed)
+	}
+}
+
+// fakeRoundTripper is a test-only http.RoundTripper: it records the last
+// request it received (specifically, whether attachmentGuardRoundTripper
+// marked its context) and returns a canned response.
+type fakeRoundTripper struct {
+	lastReqMarked bool
+	calls         int
+}
+
+func (f *fakeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	f.calls++
+	f.lastReqMarked, _ = req.Context().Value(attachmentRedirectHopContextKey{}).(bool)
+	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: http.Header{}}, nil
+}
+
+func TestAttachmentGuardRoundTripper_DoesNotMarkAPinnedCallsFirstHop(t *testing.T) {
+	next := &fakeRoundTripper{}
+	guard := &attachmentGuardRoundTripper{next: next}
+
+	req, _ := http.NewRequestWithContext(pinAttachmentRedirectHops(context.Background()), http.MethodGet, "http://example.test", nil)
+	if _, err := guard.RoundTrip(req); err != nil {
+		t.Fatalf("RoundTrip() error = %v", err)
+	}
+	if next.lastReqMarked {
+		t.Fatal("first hop was marked as a redirect hop, want it left unmarked")
+	}
+}
+
+func TestAttachmentGuardRoundTripper_MarksEveryHopAfterThePinnedCallsFirst(t *testing.T) {
+	next := &fakeRoundTripper{}
+	guard := &attachmentGuardRoundTripper{next: next}
+
+	ctx := pinAttachmentRedirectHops(context.Background())
+	firstReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.test", nil)
+	if _, err := guard.RoundTrip(firstReq); err != nil {
+		t.Fatalf("RoundTrip() first hop error = %v", err)
+	}
+	if next.lastReqMarked {
+		t.Fatal("first hop was marked as a redirect hop, want it left unmarked")
+	}
+
+	secondReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.test/redirected", nil)
+	if _, err := guard.RoundTrip(secondReq); err != nil {
+		t.Fatalf("RoundTrip() second hop error = %v", err)
+	}
+	if !next.lastReqMarked {
+		t.Fatal("second hop was not marked as a redirect hop, want it marked for dial-time validation")
+	}
+}
+
+func TestAttachmentGuardRoundTripper_NeverMarksAnUnpinnedRequest(t *testing.T) {
+	next := &fakeRoundTripper{}
+	guard := &attachmentGuardRoundTripper{next: next}
+
+	for i := 0; i < 2; i++ {
+		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.test", nil)
+		if _, err := guard.RoundTrip(req); err != nil {
+			t.Fatalf("RoundTrip() call %d error = %v", i, err)
+		}
+		if next.lastReqMarked {
+			t.Fatalf("call %d was marked as a redirect hop, want an unpinned request never marked", i)
+		}
+	}
+}
+
+// TestAttachmentGuardTransport_RejectsARedirectOnASecondFetchReusingAPooledConnection
+// reproduces the exact regression a local review found in an earlier
+// version of this guard: net/http.Transport reuses a pooled keep-alive
+// connection for a second request to an already-open host without ever
+// calling DialContext, so tracking "have I seen this pinned call's first
+// hop" by counting DialContext's own invocations wrongly treats a
+// pooled-connection Fetch's own redirect hop as if it were the trusted
+// first hop, skipping validation on exactly the request that most needs
+// it. This test exercises the real production types
+// (attachmentGuardRoundTripper + newAttachmentDialContext) against two
+// sequential requests to one real httptest.Server, draining and closing
+// the first response's body (as attachment_fetcher.go's Fetch always
+// does) so its connection is eligible for reuse, then confirms via an
+// instrumented dial that only one real dial occurred (proving reuse
+// actually happened) while the second request's redirect to a loopback
+// address is still refused.
+func TestAttachmentGuardTransport_RejectsARedirectOnASecondFetchReusingAPooledConnection(t *testing.T) {
+	var evilHits int
+	evil := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		evilHits++
+		_, _ = w.Write([]byte("evil"))
+	}))
+	defer evil.Close()
+
+	redirectOnSecondRequest := false
+	trusted := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if redirectOnSecondRequest {
+			http.Redirect(w, r, evil.URL, http.StatusFound)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer trusted.Close()
+
+	var dialCount int
+	countingDial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		dialCount++
+		return (&net.Dialer{}).DialContext(ctx, network, addr)
+	}
+	baseTransport := http.DefaultTransport.(*http.Transport).Clone()
+	baseTransport.DialContext = newAttachmentDialContext(net.DefaultResolver, countingDial)
+	client := &http.Client{Transport: &attachmentGuardRoundTripper{next: baseTransport}}
+
+	// First Fetch-equivalent call: an ordinary response, its body fully
+	// drained and closed so the connection returns to the pool — exactly
+	// what attachment_fetcher.go's Fetch does via io.ReadAll.
+	ctx1 := pinAttachmentRedirectHops(context.Background())
+	req1, _ := http.NewRequestWithContext(ctx1, http.MethodGet, trusted.URL, nil)
+	resp1, err := client.Do(req1)
+	if err != nil {
+		t.Fatalf("first Fetch-equivalent call error = %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp1.Body)
+	_ = resp1.Body.Close()
+
+	// Second Fetch-equivalent call to the same trusted host: its own
+	// first hop is expected to reuse the pooled connection from above (no
+	// DialContext call), and the trusted host now redirects to evil, a
+	// loopback address that must still be refused.
+	redirectOnSecondRequest = true
+	ctx2 := pinAttachmentRedirectHops(context.Background())
+	req2, _ := http.NewRequestWithContext(ctx2, http.MethodGet, trusted.URL, nil)
+	if _, err := client.Do(req2); err == nil {
+		t.Fatal("second Fetch-equivalent call error = nil, want the redirect to a loopback address to be refused even when the first hop reused a pooled connection")
+	}
+	if evilHits != 0 {
+		t.Fatalf("evil server hit %d times, want 0 — the redirect should have been refused before ever connecting to it", evilHits)
+	}
+	if dialCount != 1 {
+		t.Fatalf("real dials performed = %d, want exactly 1 — this test only proves what it claims if the second call's first hop actually reused a pooled connection", dialCount)
 	}
 }
 
 func TestNewAttachmentGuardTransport_DialsAnUnpinnedRequestNormally(t *testing.T) {
-	transport := newAttachmentGuardTransport()
-	if transport.DialContext == nil {
-		t.Fatal("newAttachmentGuardTransport().DialContext = nil, want the SSRF-safe dial context installed")
-	}
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	}))
 	defer server.Close()
 
-	client := &http.Client{Transport: transport}
+	client := &http.Client{Transport: newAttachmentGuardTransport()}
 	resp, err := client.Get(server.URL)
 	if err != nil {
 		t.Fatalf("client.Get() error = %v, want a request with no redirect-hop pin to dial normally", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-}
-
-func TestNewAttachmentDialContext_DialsUnvalidatedWhenContextCarriesNoPin(t *testing.T) {
-	resolver := &fakeIPAddrResolver{err: errors.New("resolver must not be called without a pin")}
-	dial := &recordingDial{}
-	dialContext := newAttachmentDialContext(resolver, dial.dial)
-
-	if _, err := dialContext(context.Background(), "tcp", "127.0.0.1:443"); err != nil {
-		t.Fatalf("dialContext() error = %v, want an unpinned context to dial unvalidated", err)
-	}
 }
