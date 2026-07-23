@@ -51,8 +51,9 @@ const maxAttachmentBytes = 100 * 1024 * 1024
 // on a redirect whose host differs from the original request's, so the
 // credential this client attaches never reaches the redirect target.
 //
-// When opts.Transport is left nil (always true in real usage), the
-// client's Transport is instead set to newAttachmentGuardTransport(), a
+// When opts.Transport is left nil (the default, production case — see
+// newAttachmentGuardTransport's own Godoc), the client's Transport is
+// instead set to newAttachmentGuardTransport(), a
 // narrower guard (attachment_redirect_guard.go) that resolves and
 // refuses, at the exact point of dialing, any redirect hop whose address
 // is loopback, link-local, or private-network (including a
