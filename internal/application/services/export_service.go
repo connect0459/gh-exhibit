@@ -509,10 +509,12 @@ func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects
 
 		filename, err := r.attachment.Filename(r.contentType)
 		if err != nil {
-			// See services.Filename's own Godoc for why this can't
-			// actually happen; treated as an ordinary per-attachment
-			// failure regardless, consistent with every other fetch-time
-			// failure in this loop.
+			// A malicious or misconfigured GitHub Enterprise Server host
+			// fully controls the id segment Filename derives this from
+			// (see services.Filename's own Godoc), so this is reachable
+			// from untrusted input, not just defensive; treated as an
+			// ordinary per-attachment failure, consistent with every
+			// other fetch-time failure in this loop.
 			resolutions = append(resolutions, services.FetchFailed(r.attachment.URL(), err.Error()))
 			fmt.Fprintf(&failureLog, "%s: %s\n", r.attachment.URL(), err)
 			continue
