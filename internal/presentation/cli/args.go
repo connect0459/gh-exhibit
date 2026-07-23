@@ -121,7 +121,7 @@ func parseExportArgs(args []string) (Args, error) {
 	withStdout := fs.Bool("with-stdout", false, "also print each exported ref's rendered document to standard output")
 	dryRun := fs.Bool("dry-run", false, "report each ref's would-be destination path, offline, without exporting anything")
 
-	flagArgs, positional, err := splitFlagsAndPositional(args)
+	flagArgs, positional, err := splitFlagsAndPositional(args, exportValueFlags)
 	if err != nil {
 		return Args{}, fmt.Errorf("parse flags: %w", err)
 	}
@@ -165,7 +165,7 @@ func parseExportSearchArgs(args []string) (Args, error) {
 	order := fs.String("order", "desc", "sort order, asc or desc")
 	dryRun := fs.Bool("dry-run", false, "report the resolved match count and numbers without exporting anything")
 
-	flagArgs, positional, err := splitFlagsAndPositional(args)
+	flagArgs, positional, err := splitFlagsAndPositional(args, exportSearchValueFlags)
 	if err != nil {
 		return Args{}, fmt.Errorf("parse flags: %w", err)
 	}
@@ -307,9 +307,16 @@ func parseSearchDate(raw string) (*time.Time, error) {
 	return &parsed, nil
 }
 
-// valueFlags are gh-exhibit's flags that consume a following token as their
-// value when not given in the attached "--flag=value" form.
-var valueFlags = map[string]bool{
+// exportValueFlags are "export"'s own flags that consume a following token
+// as their value when not given in the attached "--flag=value" form.
+var exportValueFlags = map[string]bool{
+	"repo": true, "output": true, "o": true,
+}
+
+// exportSearchValueFlags are "export-search"'s own flags that consume a
+// following token as their value when not given in the attached
+// "--flag=value" form.
+var exportSearchValueFlags = map[string]bool{
 	"repo": true, "output": true, "o": true,
 	"author": true, "assignee": true, "kind": true,
 	"after": true, "before": true,
@@ -333,7 +340,13 @@ var valueFlags = map[string]bool{
 // whatever token comes next — including one shaped like another flag — and
 // silently misassign it as the value instead of reporting a missing
 // argument.
-func splitFlagsAndPositional(args []string) (flagArgs, positional []string, err error) {
+//
+// valueFlags is the calling subcommand's own value-taking flags (see
+// exportValueFlags, exportSearchValueFlags) — a flag shaped like one of the
+// other subcommand's value-taking flags, but absent from this set, is left
+// for flag.FlagSet.Parse's own "flag provided but not defined" rejection
+// rather than being misreported here as missing its value.
+func splitFlagsAndPositional(args []string, valueFlags map[string]bool) (flagArgs, positional []string, err error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 

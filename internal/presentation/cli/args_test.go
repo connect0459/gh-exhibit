@@ -365,7 +365,7 @@ func TestParseArgs_RejectsABareNumberWithoutTheExportSubcommand(t *testing.T) {
 // pre-scanner over-consumes the next token. The over-consumption is only
 // observable in what the pre-scanner itself classifies as positional.
 func TestSplitFlagsAndPositional_DoesNotConsumeTheNextTokenForAThreeDashFlag(t *testing.T) {
-	flagArgs, positional, err := splitFlagsAndPositional([]string{"123", "---repo", "456"})
+	flagArgs, positional, err := splitFlagsAndPositional([]string{"123", "---repo", "456"}, exportValueFlags)
 	if err != nil {
 		t.Fatalf("splitFlagsAndPositional() error = %v", err)
 	}

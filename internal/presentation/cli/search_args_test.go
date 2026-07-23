@@ -25,6 +25,29 @@ func TestParseArgs_ExportSubcommand_RejectsAFilterFlag(t *testing.T) {
 	}
 }
 
+// A filter flag's value being omitted must not change which error export
+// reports: it should still be rejected as unrecognized, not misreported as
+// missing a value it was never defined to take in the first place.
+func TestParseArgs_ExportSubcommand_RejectsAFilterFlagWithNoFollowingValueAsUnrecognized(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "123", "--author"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since export does not define --author")
+	}
+	if strings.Contains(err.Error(), "needs an argument") {
+		t.Errorf("ParseArgs() error = %v, want an unrecognized-flag error, not a missing-argument error, since --author is not one of export's own flags", err)
+	}
+}
+
+func TestParseArgs_ExportSubcommand_RejectsAFilterFlagImmediatelyFollowedByAnotherFlagAsUnrecognized(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "123", "--author", "--repo=x"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error since export does not define --author")
+	}
+	if strings.Contains(err.Error(), "needs an argument") {
+		t.Errorf("ParseArgs() error = %v, want an unrecognized-flag error, not a missing-argument error", err)
+	}
+}
+
 func TestParseArgs_ExportSearchSubcommand_AcceptsNoFlagsAtAll(t *testing.T) {
 	got, err := ParseArgs([]string{"export-search"})
 	if err != nil {
