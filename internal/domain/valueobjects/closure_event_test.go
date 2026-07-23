@@ -23,8 +23,16 @@ func TestClosureEvent_Render_IncludesTheActionAndReasonInTheMetaLine(t *testing.
 		want   string
 	}{
 		{"closed with reason", valueobjects.ClosureActionClosed, "completed", `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"closed","reason":"completed","url":"https://github.com/example/repo/issues/1"}} -->
+
+Closed (completed)
+`},
+		{"closed with no reason", valueobjects.ClosureActionClosed, "", `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"closed","reason":"","url":"https://github.com/example/repo/issues/1"}} -->
+
+Closed
 `},
 		{"reopened with no reason", valueobjects.ClosureActionReopened, "", `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"reopened","reason":"","url":"https://github.com/example/repo/issues/1"}} -->
+
+Reopened
 `},
 	}
 
@@ -41,6 +49,22 @@ func TestClosureEvent_Render_IncludesTheActionAndReasonInTheMetaLine(t *testing.
 				t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), c.want)
 			}
 		})
+	}
+}
+
+func TestClosureEvent_Render_FallsBackToTheActionsStringForAnUnrecognizedClosureAction(t *testing.T) {
+	event := valueobjects.NewClosureEvent(newClosureEventAttribution(t), valueobjects.ClosureAction(99), "completed")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering closure event: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "ClosureAction(99)") {
+		t.Fatalf("Render() = %q, want it to contain %q", buf.String(), "ClosureAction(99)")
+	}
+	if strings.Contains(buf.String(), "\nClosed\n") {
+		t.Fatalf("Render() = %q, want the body to not silently claim \"Closed\" for an unrecognized action", buf.String())
 	}
 }
 

@@ -2,6 +2,7 @@ package valueobjects
 
 import (
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -58,8 +59,9 @@ func (e LabelEvent) Equals(other LabelEvent) bool {
 		e.color == other.color
 }
 
-// Render writes e's <!-- {"meta":...} --> line. A LabelEvent has no body
-// content, satisfying Entry.
+// Render writes e's <!-- {"meta":...} --> line, followed by a plain-text
+// description of the label action so it's visible in a rendered Markdown
+// preview, not just in the hidden meta comment.
 func (e LabelEvent) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta
@@ -75,7 +77,17 @@ func (e LabelEvent) Render(w io.Writer) error {
 		URL:             e.attribution.URL(),
 	}
 
-	return writeMetaLine(w, meta, "")
+	var verb string
+	switch e.action {
+	case LabelActionLabeled:
+		verb = "Labeled"
+	case LabelActionUnlabeled:
+		verb = "Unlabeled"
+	default:
+		verb = e.action.String()
+	}
+
+	return writeMetaLine(w, meta, fmt.Sprintf("%s %s", verb, titleCodeSpan(e.name)))
 }
 
 func (LabelEvent) entryNode() {}

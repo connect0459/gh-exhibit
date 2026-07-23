@@ -2,6 +2,7 @@ package valueobjects
 
 import (
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -51,8 +52,9 @@ func (e AssignmentEvent) Equals(other AssignmentEvent) bool {
 		e.assignee == other.assignee
 }
 
-// Render writes e's <!-- {"meta":...} --> line. An AssignmentEvent has no
-// body content, satisfying Entry.
+// Render writes e's <!-- {"meta":...} --> line, followed by a plain-text
+// description of the assignment action so it's visible in a rendered
+// Markdown preview, not just in the hidden meta comment.
 func (e AssignmentEvent) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta
@@ -66,7 +68,17 @@ func (e AssignmentEvent) Render(w io.Writer) error {
 		URL:             e.attribution.URL(),
 	}
 
-	return writeMetaLine(w, meta, "")
+	var verb string
+	switch e.action {
+	case AssignmentActionAssigned:
+		verb = "Assigned"
+	case AssignmentActionUnassigned:
+		verb = "Unassigned"
+	default:
+		verb = e.action.String()
+	}
+
+	return writeMetaLine(w, meta, fmt.Sprintf("%s @%s", verb, e.assignee))
 }
 
 func (AssignmentEvent) entryNode() {}

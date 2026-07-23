@@ -49,6 +49,8 @@ func TestRenameEvent_Render_IncludesFromAndToInTheMetaLine(t *testing.T) {
 	}
 
 	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","from":"Old title","to":"New title","url":"https://github.com/example/repo/issues/1"}} -->
+
+Renamed from "Old title" to "New title"
 `
 	if buf.String() != want {
 		t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)

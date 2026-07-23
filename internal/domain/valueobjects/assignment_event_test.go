@@ -37,9 +37,10 @@ func TestAssignmentEvent_Render_IncludesTheActionAndAssigneeInTheMetaLine(t *tes
 		name   string
 		action valueobjects.AssignmentAction
 		want   string
+		body   string
 	}{
-		{"assigned", valueobjects.AssignmentActionAssigned, "assigned"},
-		{"unassigned", valueobjects.AssignmentActionUnassigned, "unassigned"},
+		{"assigned", valueobjects.AssignmentActionAssigned, "assigned", "Assigned @hubot"},
+		{"unassigned", valueobjects.AssignmentActionUnassigned, "unassigned", "Unassigned @hubot"},
 	}
 
 	for _, c := range cases {
@@ -52,11 +53,26 @@ func TestAssignmentEvent_Render_IncludesTheActionAndAssigneeInTheMetaLine(t *tes
 			}
 
 			want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"` + c.want + `","assignee":"hubot","url":"https://github.com/example/repo/issues/1"}} -->
+
+` + c.body + `
 `
 			if buf.String() != want {
 				t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
 			}
 		})
+	}
+}
+
+func TestAssignmentEvent_Render_FallsBackToTheActionsStringForAnUnrecognizedAssignmentAction(t *testing.T) {
+	event := mustNewAssignmentEvent(t, newAssignmentEventAttribution(t), valueobjects.AssignmentAction(99), "hubot")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering assignment event: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "AssignmentAction(99) @hubot") {
+		t.Fatalf("Render() = %q, want it to contain %q", buf.String(), "AssignmentAction(99) @hubot")
 	}
 }
 

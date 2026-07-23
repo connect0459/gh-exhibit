@@ -37,9 +37,10 @@ func TestMilestoneEvent_Render_IncludesTheActionAndTitleInTheMetaLine(t *testing
 		name   string
 		action valueobjects.MilestoneAction
 		want   string
+		body   string
 	}{
-		{"milestoned", valueobjects.MilestoneActionMilestoned, "milestoned"},
-		{"demilestoned", valueobjects.MilestoneActionDemilestoned, "demilestoned"},
+		{"milestoned", valueobjects.MilestoneActionMilestoned, "milestoned", "Milestoned `v1.0`"},
+		{"demilestoned", valueobjects.MilestoneActionDemilestoned, "demilestoned", "Demilestoned `v1.0`"},
 	}
 
 	for _, c := range cases {
@@ -52,11 +53,43 @@ func TestMilestoneEvent_Render_IncludesTheActionAndTitleInTheMetaLine(t *testing
 			}
 
 			want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"` + c.want + `","milestone":"v1.0","url":"https://github.com/example/repo/issues/1"}} -->
+
+` + c.body + `
 `
 			if buf.String() != want {
 				t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
 			}
 		})
+	}
+}
+
+func TestMilestoneEvent_Render_FencesATitleContainingABacktick(t *testing.T) {
+	event := mustNewMilestoneEvent(t, newMilestoneEventAttribution(t), valueobjects.MilestoneActionMilestoned, "v1`0")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering milestone event: %v", err)
+	}
+
+	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"milestoned","milestone":"v1` + "`" + `0","url":"https://github.com/example/repo/issues/1"}} -->
+
+Milestoned ` + "``v1`0``" + `
+`
+	if buf.String() != want {
+		t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
+	}
+}
+
+func TestMilestoneEvent_Render_FallsBackToTheActionsStringForAnUnrecognizedMilestoneAction(t *testing.T) {
+	event := mustNewMilestoneEvent(t, newMilestoneEventAttribution(t), valueobjects.MilestoneAction(99), "v1.0")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering milestone event: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "MilestoneAction(99) `v1.0`") {
+		t.Fatalf("Render() = %q, want it to contain %q", buf.String(), "MilestoneAction(99) `v1.0`")
 	}
 }
 

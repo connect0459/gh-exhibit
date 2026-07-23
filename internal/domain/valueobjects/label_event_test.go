@@ -37,9 +37,10 @@ func TestLabelEvent_Render_IncludesTheActionLabelAndColorInTheMetaLine(t *testin
 		name   string
 		action valueobjects.LabelAction
 		want   string
+		body   string
 	}{
-		{"labeled", valueobjects.LabelActionLabeled, "labeled"},
-		{"unlabeled", valueobjects.LabelActionUnlabeled, "unlabeled"},
+		{"labeled", valueobjects.LabelActionLabeled, "labeled", "Labeled `bug`"},
+		{"unlabeled", valueobjects.LabelActionUnlabeled, "unlabeled", "Unlabeled `bug`"},
 	}
 
 	for _, c := range cases {
@@ -52,11 +53,43 @@ func TestLabelEvent_Render_IncludesTheActionLabelAndColorInTheMetaLine(t *testin
 			}
 
 			want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"` + c.want + `","label":"bug","color":"d73a4a","url":"https://github.com/example/repo/issues/1"}} -->
+
+` + c.body + `
 `
 			if buf.String() != want {
 				t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
 			}
 		})
+	}
+}
+
+func TestLabelEvent_Render_FencesALabelNameContainingABacktick(t *testing.T) {
+	event := mustNewLabelEvent(t, newLabelEventAttribution(t), valueobjects.LabelActionLabeled, "foo`bar", "d73a4a")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering label event: %v", err)
+	}
+
+	want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"labeled","label":"foo` + "`" + `bar","color":"d73a4a","url":"https://github.com/example/repo/issues/1"}} -->
+
+Labeled ` + "``foo`bar``" + `
+`
+	if buf.String() != want {
+		t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)
+	}
+}
+
+func TestLabelEvent_Render_FallsBackToTheActionsStringForAnUnrecognizedLabelAction(t *testing.T) {
+	event := mustNewLabelEvent(t, newLabelEventAttribution(t), valueobjects.LabelAction(99), "bug", "d73a4a")
+
+	var buf strings.Builder
+	if err := event.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering label event: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "LabelAction(99) `bug`") {
+		t.Fatalf("Render() = %q, want it to contain %q", buf.String(), "LabelAction(99) `bug`")
 	}
 }
 
