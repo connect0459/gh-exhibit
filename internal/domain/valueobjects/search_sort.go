@@ -43,6 +43,18 @@ func (f SearchSortField) String() string {
 	}
 }
 
+// valid reports whether f is one of SearchSortField's own defined
+// constants, guarding against a value built by bypassing
+// ParseSearchSortField (e.g. a raw int conversion).
+func (f SearchSortField) valid() bool {
+	switch f {
+	case SearchSortByCreated, SearchSortByUpdated, SearchSortByComments:
+		return true
+	default:
+		return false
+	}
+}
+
 // SearchSortOrder is the ascending/descending direction a filter-mode
 // search's matches are ordered in, independent of which field
 // (SearchSortField) they are ordered by.
@@ -75,5 +87,17 @@ func (o SearchSortOrder) String() string {
 		return "desc"
 	default:
 		return fmt.Sprintf("SearchSortOrder(%d)", int(o))
+	}
+}
+
+// valid reports whether o is one of SearchSortOrder's own defined
+// constants, guarding against a value built by bypassing
+// ParseSearchSortOrder (e.g. a raw int conversion).
+func (o SearchSortOrder) valid() bool {
+	switch o {
+	case SearchOrderAscending, SearchOrderDescending:
+		return true
+	default:
+		return false
 	}
 }

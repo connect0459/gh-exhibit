@@ -39,6 +39,31 @@ func TestNewSearchQuery_AcceptsAnEmptyAuthorAndAssigneeMeaningUnfiltered(t *test
 	}
 }
 
+func TestNewSearchQuery_RejectsAnOutOfRangeSortField(t *testing.T) {
+	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, nil, nil, valueobjects.SearchSortField(99), valueobjects.SearchOrderDescending, 100)
+
+	if err == nil {
+		t.Fatal("expected an error for a sort field built by bypassing ParseSearchSortField, got nil")
+	}
+}
+
+func TestNewSearchQuery_RejectsAnOutOfRangeOrder(t *testing.T) {
+	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchSortOrder(99), 100)
+
+	if err == nil {
+		t.Fatal("expected an error for an order built by bypassing ParseSearchSortOrder, got nil")
+	}
+}
+
+func TestNewSearchQuery_RejectsAnOutOfRangeKind(t *testing.T) {
+	kinds := []valueobjects.IssueKind{valueobjects.IssueKind(99)}
+	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+
+	if err == nil {
+		t.Fatal("expected an error for a kind built by bypassing ParseIssueKind, got nil")
+	}
+}
+
 func TestSearchQuery_Accessors_ReturnTheConstructedValues(t *testing.T) {
 	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	before := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)

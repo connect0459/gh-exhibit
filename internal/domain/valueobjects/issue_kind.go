@@ -37,3 +37,15 @@ func (k IssueKind) String() string {
 		return fmt.Sprintf("IssueKind(%d)", int(k))
 	}
 }
+
+// valid reports whether k is one of IssueKind's own defined constants,
+// guarding against a value built by bypassing ParseIssueKind (e.g. a raw
+// int conversion).
+func (k IssueKind) valid() bool {
+	switch k {
+	case IssueKindIssue, IssueKindPullRequest:
+		return true
+	default:
+		return false
+	}
+}

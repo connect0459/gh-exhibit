@@ -49,21 +49,36 @@ type SearchCriteria struct {
 // NewSearchCriteria constructs a SearchCriteria from its filter values.
 // authors and assignees, when non-empty, must each be a valid GitHub login
 // (the same rule NewIssueRef applies to an owner). kinds, when non-empty,
-// restricts matches to the named issue/PR kinds; empty means both.
-// createdAfter/createdBefore are inclusive bounds on the created-date
-// range, either or both of which may be nil; when both are given,
-// createdAfter must not be later than createdBefore. limit must be between
-// 1 and MaxSearchLimit inclusive.
+// restricts matches to the named issue/PR kinds; empty means both. sort and
+// order must each be one of their own package-level constants (e.g.
+// SearchSortByCreated, SearchOrderDescending) — this is enforced here, not
+// only by ParseSearchSortField/ParseSearchSortOrder, so an out-of-range
+// value can never reach domain/services.MergeSearchResults regardless of
+// how a SearchCriteria was built. createdAfter/createdBefore are inclusive
+// bounds on the created-date range, either or both of which may be nil;
+// when both are given, createdAfter must not be later than createdBefore.
+// limit must be between 1 and MaxSearchLimit inclusive.
 func NewSearchCriteria(authors, assignees []string, kinds []IssueKind, createdAfter, createdBefore *time.Time, limit int, sort SearchSortField, order SearchSortOrder) (SearchCriteria, error) {
 	for _, author := range authors {
-		if err := validateOwner(author); err != nil {
-			return SearchCriteria{}, fmt.Errorf("search criteria author: %w", err)
+		if err := validateOwner(author, "search criteria author"); err != nil {
+			return SearchCriteria{}, err
 		}
 	}
 	for _, assignee := range assignees {
-		if err := validateOwner(assignee); err != nil {
-			return SearchCriteria{}, fmt.Errorf("search criteria assignee: %w", err)
+		if err := validateOwner(assignee, "search criteria assignee"); err != nil {
+			return SearchCriteria{}, err
 		}
+	}
+	for _, kind := range kinds {
+		if !kind.valid() {
+			return SearchCriteria{}, fmt.Errorf("search criteria kind %s is not a recognized value", kind)
+		}
+	}
+	if !sort.valid() {
+		return SearchCriteria{}, fmt.Errorf("search criteria sort %s is not a recognized value", sort)
+	}
+	if !order.valid() {
+		return SearchCriteria{}, fmt.Errorf("search criteria order %s is not a recognized value", order)
 	}
 	if createdAfter != nil && createdBefore != nil && createdAfter.After(*createdBefore) {
 		return SearchCriteria{}, fmt.Errorf("search criteria created-after %s must not be later than created-before %s", createdAfter, createdBefore)

@@ -30,7 +30,7 @@ type IssueRef struct {
 // repository-name rules (length, character set) or if number is not
 // positive.
 func NewIssueRef(owner, repo string, number int) (IssueRef, error) {
-	if err := validateOwner(owner); err != nil {
+	if err := validateOwner(owner, "issue ref owner"); err != nil {
 		return IssueRef{}, err
 	}
 	if err := validateRepoName(repo); err != nil {
@@ -42,15 +42,20 @@ func NewIssueRef(owner, repo string, number int) (IssueRef, error) {
 	return IssueRef{owner: owner, repo: repo, number: number}, nil
 }
 
-func validateOwner(owner string) error {
+// validateOwner validates owner against GitHub's own username rules. label
+// names the calling type's own field in any returned error (e.g. "issue ref
+// owner", "search criteria author") — every caller names its own field
+// rather than sharing IssueRef's wording, since validateOwner's error is
+// part of each caller's own public contract, not IssueRef's alone.
+func validateOwner(owner, label string) error {
 	if owner == "" {
-		return errors.New("issue ref owner must not be empty")
+		return fmt.Errorf("%s must not be empty", label)
 	}
 	if len(owner) > maxOwnerLength {
-		return fmt.Errorf("issue ref owner must be at most %d characters, got %d", maxOwnerLength, len(owner))
+		return fmt.Errorf("%s must be at most %d characters, got %d", label, maxOwnerLength, len(owner))
 	}
 	if !ownerPattern.MatchString(owner) {
-		return fmt.Errorf("issue ref owner %q is not a valid GitHub username", owner)
+		return fmt.Errorf("%s %q is not a valid GitHub username", label, owner)
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package valueobjects
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -27,13 +28,28 @@ type SearchQuery struct {
 
 // NewSearchQuery constructs a SearchQuery. owner and repo must be
 // non-empty; author and assignee may be empty, meaning that dimension is
-// unfiltered. maxResults must be positive.
+// unfiltered. sort and order must each be one of their own package-level
+// constants (e.g. SearchSortByCreated, SearchOrderDescending) — enforced
+// here as well as by SearchCriteria's own constructor, so this constructor
+// does not rely on every caller having already gone through
+// NewSearchCriteria. maxResults must be positive.
 func NewSearchQuery(owner, repo, author, assignee string, kinds []IssueKind, createdAfter, createdBefore *time.Time, sort SearchSortField, order SearchSortOrder, maxResults int) (SearchQuery, error) {
 	if owner == "" {
 		return SearchQuery{}, errors.New("search query owner must not be empty")
 	}
 	if repo == "" {
 		return SearchQuery{}, errors.New("search query repo must not be empty")
+	}
+	for _, kind := range kinds {
+		if !kind.valid() {
+			return SearchQuery{}, fmt.Errorf("search query kind %s is not a recognized value", kind)
+		}
+	}
+	if !sort.valid() {
+		return SearchQuery{}, fmt.Errorf("search query sort %s is not a recognized value", sort)
+	}
+	if !order.valid() {
+		return SearchQuery{}, fmt.Errorf("search query order %s is not a recognized value", order)
 	}
 	if maxResults <= 0 {
 		return SearchQuery{}, errors.New("search query max results must be positive")
