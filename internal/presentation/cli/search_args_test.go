@@ -25,6 +25,20 @@ func TestParseArgs_ExportSubcommand_RejectsAFilterFlag(t *testing.T) {
 	}
 }
 
+func TestParseArgs_ExportSearchSubcommand_AcceptsNoFlagsAtAll(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	if got.Criteria == nil {
+		t.Fatal("Criteria = nil, want a non-nil SearchCriteria matching everything up to the default limit")
+	}
+	if got.Criteria.Limit() != valueobjects.DefaultSearchLimit {
+		t.Errorf("Limit() = %d, want %d", got.Criteria.Limit(), valueobjects.DefaultSearchLimit)
+	}
+}
+
 func TestParseArgs_ExportSearchSubcommand_ReadsTheAuthorFlag(t *testing.T) {
 	got, err := ParseArgs([]string{"export-search", "--author", "octocat"})
 	if err != nil {
