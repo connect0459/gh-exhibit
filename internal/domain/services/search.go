@@ -64,11 +64,12 @@ func MergeSearchResults(results []valueobjects.SearchResult, criteria valueobjec
 	maxTotalCount := 0
 
 	for _, result := range results {
-		if result.TotalCount() > len(result.Matches()) {
+		resultMatches := result.Matches()
+		if result.TotalCount() > len(resultMatches) {
 			exceededLimit = true
 		}
 		maxTotalCount = max(maxTotalCount, result.TotalCount())
-		for _, match := range result.Matches() {
+		for _, match := range resultMatches {
 			if seen[match.Number()] {
 				continue
 			}
