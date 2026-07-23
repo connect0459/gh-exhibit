@@ -7,19 +7,19 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
-func TestParseArgs_NumberMode_LeavesCriteriaNil(t *testing.T) {
+func TestParseArgs_ExportSubcommand_LeavesCriteriaNil(t *testing.T) {
 	got, err := ParseArgs([]string{"export", "123"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
 
 	if got.Criteria != nil {
-		t.Errorf("Criteria = %v, want nil in number mode", got.Criteria)
+		t.Errorf("Criteria = %v, want nil for the export subcommand", got.Criteria)
 	}
 }
 
-func TestParseArgs_FilterMode_SelectedByAuthorFlag(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--author", "octocat"})
+func TestParseArgs_ExportSearchSubcommand_ReadsTheAuthorFlag(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--author", "octocat"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -31,12 +31,12 @@ func TestParseArgs_FilterMode_SelectedByAuthorFlag(t *testing.T) {
 		t.Errorf("Authors() = %v, want %v", got.Criteria.Authors(), want)
 	}
 	if len(got.Numbers) != 0 {
-		t.Errorf("Numbers = %v, want empty in filter mode", got.Numbers)
+		t.Errorf("Numbers = %v, want empty for export-search", got.Numbers)
 	}
 }
 
-func TestParseArgs_FilterMode_SelectedByDryRunAlone(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--dry-run"})
+func TestParseArgs_ExportSearchSubcommand_AcceptsDryRunAlone(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--dry-run"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -49,8 +49,8 @@ func TestParseArgs_FilterMode_SelectedByDryRunAlone(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_ParsesACommaSeparatedAssigneeList(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--assignee", "octocat, monalisa"})
+func TestParseArgs_ExportSearchSubcommand_ParsesACommaSeparatedAssigneeList(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--assignee", "octocat, monalisa"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -61,64 +61,64 @@ func TestParseArgs_FilterMode_ParsesACommaSeparatedAssigneeList(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnEmptyAuthorListEntry(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--author", "octocat,,monalisa"})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnEmptyAuthorListEntry(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--author", "octocat,,monalisa"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an empty --author list entry")
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnEmptyAssigneeListEntry(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--assignee", "octocat,,monalisa"})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnEmptyAssigneeListEntry(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--assignee", "octocat,,monalisa"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an empty --assignee list entry")
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnEmptyKindListEntry(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--kind", "issue,,pr"})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnEmptyKindListEntry(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--kind", "issue,,pr"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an empty --kind list entry")
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnExplicitEmptyAuthorValue(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--author="})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnExplicitEmptyAuthorValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--author="})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --author value, not a silent fall-back to unfiltered")
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnExplicitEmptyAssigneeValue(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--assignee="})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnExplicitEmptyAssigneeValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--assignee="})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --assignee value, not a silent fall-back to unfiltered")
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnExplicitEmptyKindValue(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--kind="})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnExplicitEmptyKindValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--kind="})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --kind value, not a silent fall-back to both kinds")
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnExplicitEmptyAfterValue(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--after="})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnExplicitEmptyAfterValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--after="})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --after value, not a silent fall-back to unbounded")
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnExplicitEmptyBeforeValue(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--before="})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnExplicitEmptyBeforeValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--before="})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --before value, not a silent fall-back to unbounded")
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAllExplicitEmptyValuesGivenTogether(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--after=", "--before="})
+func TestParseArgs_ExportSearchSubcommand_RejectsAllExplicitEmptyValuesGivenTogether(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--after=", "--before="})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for explicit empty --after and --before values")
 	}
@@ -127,8 +127,8 @@ func TestParseArgs_FilterMode_RejectsAllExplicitEmptyValuesGivenTogether(t *test
 	}
 }
 
-func TestParseArgs_FilterMode_DeduplicatesTheKindListInFirstSeenOrder(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--kind", "issue,issue,pr"})
+func TestParseArgs_ExportSearchSubcommand_DeduplicatesTheKindListInFirstSeenOrder(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--kind", "issue,issue,pr"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -139,15 +139,15 @@ func TestParseArgs_FilterMode_DeduplicatesTheKindListInFirstSeenOrder(t *testing
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAfterLaterThanBefore(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--after", "2024-06-01", "--before", "2024-01-01"})
+func TestParseArgs_ExportSearchSubcommand_RejectsAfterLaterThanBefore(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--after", "2024-06-01", "--before", "2024-01-01"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error when --after is later than --before")
 	}
 }
 
-func TestParseArgs_FilterMode_DeduplicatesTheAuthorListInFirstSeenOrder(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--author", "octocat,octocat,monalisa"})
+func TestParseArgs_ExportSearchSubcommand_DeduplicatesTheAuthorListInFirstSeenOrder(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--author", "octocat,octocat,monalisa"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -158,8 +158,8 @@ func TestParseArgs_FilterMode_DeduplicatesTheAuthorListInFirstSeenOrder(t *testi
 	}
 }
 
-func TestParseArgs_FilterMode_DefaultsKindToBothWhenOmitted(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--author", "octocat"})
+func TestParseArgs_ExportSearchSubcommand_DefaultsKindToBothWhenOmitted(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--author", "octocat"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -169,8 +169,8 @@ func TestParseArgs_FilterMode_DefaultsKindToBothWhenOmitted(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_ParsesTheKindList(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--kind", "pr"})
+func TestParseArgs_ExportSearchSubcommand_ParsesTheKindList(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--kind", "pr"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -181,15 +181,15 @@ func TestParseArgs_FilterMode_ParsesTheKindList(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnInvalidKind(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--kind", "draft"})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnInvalidKind(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--kind", "draft"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an invalid --kind value")
 	}
 }
 
-func TestParseArgs_FilterMode_ParsesAfterAndBefore(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--after", "2024-01-01", "--before", "2024-06-01"})
+func TestParseArgs_ExportSearchSubcommand_ParsesAfterAndBefore(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--after", "2024-01-01", "--before", "2024-06-01"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -202,15 +202,15 @@ func TestParseArgs_FilterMode_ParsesAfterAndBefore(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAMalformedDate(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--after", "01/01/2024"})
+func TestParseArgs_ExportSearchSubcommand_RejectsAMalformedDate(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--after", "01/01/2024"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for a malformed date")
 	}
 }
 
-func TestParseArgs_FilterMode_DefaultsLimitTo100(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--author", "octocat"})
+func TestParseArgs_ExportSearchSubcommand_DefaultsLimitTo100(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--author", "octocat"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -220,15 +220,15 @@ func TestParseArgs_FilterMode_DefaultsLimitTo100(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsALimitAboveTheMax(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--limit", "101"})
+func TestParseArgs_ExportSearchSubcommand_RejectsALimitAboveTheMax(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--limit", "101"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for a limit above the max")
 	}
 }
 
-func TestParseArgs_FilterMode_ReadsTheLimitFlag(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--limit", "10"})
+func TestParseArgs_ExportSearchSubcommand_ReadsTheLimitFlag(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--limit", "10"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -238,8 +238,8 @@ func TestParseArgs_FilterMode_ReadsTheLimitFlag(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_DefaultsSortAndOrder(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--author", "octocat"})
+func TestParseArgs_ExportSearchSubcommand_DefaultsSortAndOrder(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--author", "octocat"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -252,8 +252,8 @@ func TestParseArgs_FilterMode_DefaultsSortAndOrder(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_ReadsSortAndOrder(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--sort", "comments", "--order", "asc"})
+func TestParseArgs_ExportSearchSubcommand_ReadsSortAndOrder(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--sort", "comments", "--order", "asc"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -266,22 +266,22 @@ func TestParseArgs_FilterMode_ReadsSortAndOrder(t *testing.T) {
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnInvalidSort(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--sort", "reactions"})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnInvalidSort(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--sort", "reactions"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an invalid --sort value")
 	}
 }
 
-func TestParseArgs_FilterMode_RejectsAnInvalidOrder(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "--order", "sideways"})
+func TestParseArgs_ExportSearchSubcommand_RejectsAnInvalidOrder(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--order", "sideways"})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an invalid --order value")
 	}
 }
 
-func TestParseArgs_FilterMode_DefaultsDryRunToFalse(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--author", "octocat"})
+func TestParseArgs_ExportSearchSubcommand_DefaultsDryRunToFalse(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--author", "octocat"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
@@ -291,25 +291,15 @@ func TestParseArgs_FilterMode_DefaultsDryRunToFalse(t *testing.T) {
 	}
 }
 
-func TestParseArgs_RejectsCombiningAnExplicitNumberListWithAFilterFlag(t *testing.T) {
-	_, err := ParseArgs([]string{"export", "123", "--author", "octocat"})
+func TestParseArgs_ExportSearchSubcommand_RejectsAPositionalArgument(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "123", "--author", "octocat"})
 	if err == nil {
-		t.Fatal("ParseArgs() error = nil, want an error when combining a number list with a filter flag")
+		t.Fatal("ParseArgs() error = nil, want an error since export-search takes no positional argument")
 	}
 }
 
-func TestParseArgs_RejectsNeitherNumbersNorFilterFlags(t *testing.T) {
-	_, err := ParseArgs([]string{"export"})
-	if err == nil {
-		t.Fatal("ParseArgs() error = nil, want an error when neither a number list nor a filter flag is given")
-	}
-	if !strings.Contains(err.Error(), "--author") {
-		t.Errorf("ParseArgs() error = %v, want it to mention filter flags as an alternative", err)
-	}
-}
-
-func TestParseArgs_FilterMode_CarriesRepoOutputAndWithStdout(t *testing.T) {
-	got, err := ParseArgs([]string{"export", "--author", "octocat", "--repo", "octocat/hello-world", "--output", "/tmp/out", "--with-stdout"})
+func TestParseArgs_ExportSearchSubcommand_CarriesRepoOutputAndWithStdout(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--author", "octocat", "--repo", "octocat/hello-world", "--output", "/tmp/out", "--with-stdout"})
 	if err != nil {
 		t.Fatalf("ParseArgs() error = %v", err)
 	}
