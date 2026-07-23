@@ -102,6 +102,23 @@ func TestPullRequestDiff_Render_OmitsTruncatedFromTheMetaLineWhenNotTruncated(t 
 	}
 }
 
+func TestPullRequestDiff_Render_FencesADiffHeadingFilenameContainingABacktick(t *testing.T) {
+	files := []valueobjects.ChangedFile{
+		mustNewChangedFile(t, "weird`file.go", "", valueobjects.FileStatusModified, 1, 1, "@@ -1 +1 @@\n-old\n+new"),
+	}
+	diff := valueobjects.NewPullRequestDiff(newPullRequestDiffAttribution(t), files, 1, 1, false)
+
+	var buf strings.Builder
+	if err := diff.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering pull request diff: %v", err)
+	}
+
+	want := "**Diff: ``weird`file.go``**\n"
+	if !strings.Contains(buf.String(), want) {
+		t.Fatalf("Render() should keep the whole filename inside one unbroken code span in the diff heading, got:\n%s\nwant substring:\n%s", buf.String(), want)
+	}
+}
+
 func TestPullRequestDiff_Render_FencesAFilenameContainingABacktick(t *testing.T) {
 	files := []valueobjects.ChangedFile{
 		mustNewChangedFile(t, "weird`file.go", "", valueobjects.FileStatusModified, 1, 1, ""),

@@ -109,7 +109,7 @@ func (d PullRequestDiff) Render(w io.Writer) error {
 			continue
 		}
 		fence := diffFence(patch)
-		if _, err := fmt.Fprintf(w, "\n**Diff: `%s`**\n\n%sdiff\n%s\n%s\n", f.Filename(), fence, patch, fence); err != nil {
+		if _, err := fmt.Fprintf(w, "\n**Diff: %s**\n\n%sdiff\n%s\n%s\n", titleCodeSpan(f.Filename()), fence, patch, fence); err != nil {
 			return err
 		}
 	}
