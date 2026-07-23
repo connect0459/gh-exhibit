@@ -9,8 +9,10 @@ import (
 
 // newAttachmentGuardTransport builds the http.RoundTripper
 // NewAttachmentFetcher installs as its client's Transport when its caller
-// leaves api.ClientOptions.Transport nil (always true in real usage,
-// since neither cmd/gh-exhibit nor internal/registry ever sets it).
+// leaves api.ClientOptions.Transport nil — the default, production case:
+// internal/registry.Config.Transport is a pass-through field a caller
+// can still set (its own tests do, to point at a local fake server),
+// but cmd/gh-exhibit's own real, non-test construction never does.
 //
 // This guard splits across two layers deliberately, not out of
 // convenience: attachmentGuardRoundTripper tracks, once per logical HTTP
