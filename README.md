@@ -1,6 +1,8 @@
 # gh-exhibit
 
-[![CI](https://github.com/connect0459/gh-exhibit/actions/workflows/ci.yml/badge.svg)](https://github.com/connect0459/gh-exhibit/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/connect0459/gh-exhibit/blob/main/LICENSE) [![GitHub CLI](https://img.shields.io/badge/gh-cli-blue.svg)](https://cli.github.com)
+[![CI](https://github.com/connect0459/gh-exhibit/actions/workflows/ci.yml/badge.svg)](https://github.com/connect0459/gh-exhibit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/connect0459/gh-exhibit/blob/main/LICENSE)
+[![GitHub CLI](https://img.shields.io/badge/gh-cli-blue.svg)](https://cli.github.com)
 
 A `gh` CLI extension that exports a GitHub issue or pull request's full discussion (body, comments, reviews, inline review comments, attachments) as offline-verifiable Markdown alongside the raw JSON evidence it was rendered from.
 
@@ -13,6 +15,8 @@ A link back to a GitHub issue or pull request is not evidence — it can 404, ge
 - **One self-contained directory per issue/PR** — see [Output](#output) below.
 
 ## Installation
+
+To install:
 
 ```sh
 gh extension install connect0459/gh-exhibit
@@ -85,10 +89,10 @@ gh exhibit export 10
 gh exhibit export 10,11,12 --repo connect0459/gh-exhibit -o ./exhibits
 
 # Preview every issue/PR a given author opened this year, without exporting anything
-gh exhibit export-search --author octocat --after 2026-01-01 --dry-run
+gh exhibit export-search --author connect0459 --after 2026-01-01 --limit 10 --dry-run
 
 # Export every open pull request assigned to a given user
-gh exhibit export-search --assignee octocat --kind pr --repo connect0459/gh-exhibit -o ./exhibits
+gh exhibit export-search --repo connect0459/gh-exhibit -o ./exhibits --assignee connect0459 --kind pr --limit 10
 ```
 
 ## Output
@@ -98,12 +102,12 @@ The multi-issue example above produces one self-contained directory per number, 
 ```text
 ./exhibits/gh-exhibit/
 ├── 10/
-│   ├── index.md          rendered Markdown — the exhibit itself
-│   ├── assets/            downloaded attachments
-│   └── evidence/          raw JSON and export metadata
-│       ├── issue.json          verbatim GitHub REST response
-│       ├── timeline.json       verbatim GitHub REST response
-│       └── provenance.json     which gh-exhibit tool/version/commit produced this export
+│   ├── index.md            # rendered Markdown
+│   ├── assets/             # downloaded attachments
+│   └── evidence/           # raw JSON and export metadata
+│       ├── issue.json      # verbatim GitHub REST response
+│       ├── timeline.json   # verbatim GitHub REST response
+│       └── provenance.json # which gh-exhibit tool/version/commit produced this export
 ├── 11/
 └── 12/
 ```
