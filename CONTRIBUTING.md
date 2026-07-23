@@ -38,7 +38,7 @@ This mirrors the CI pipeline (`.github/workflows/ci.yml`), in order:
 | :--- | :--- |
 | `gofmt -l .` | Check formatting (empty output = clean) |
 | `go vet ./...` | Static analysis |
-| `golangci-lint run` | Lint (same config CI and pre-commit use) |
+| `pre-commit run golangci-lint --all-files` | Lint (same config CI uses; no separate golangci-lint install needed) |
 | `go build ./...` | Build |
 | `go test ./... -race -cover` | Run all tests with the race detector |
 
