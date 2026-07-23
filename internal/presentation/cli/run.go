@@ -52,9 +52,8 @@ func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir s
 			continue
 		}
 
-		documentPath := filepath.Join(outputDir, repo, strconv.Itoa(number), "index.md")
-
 		if dryRun {
+			documentPath := filepath.Join(outputDir, repo, strconv.Itoa(number), "index.md")
 			_, _ = fmt.Fprintf(stdout, "would export #%d -> %s\n", number, documentPath)
 			continue
 		}
@@ -66,6 +65,7 @@ func RunExports(ctx context.Context, exporter Exporter, owner, repo, outputDir s
 			continue
 		}
 
+		documentPath := filepath.Join(outputDir, repo, strconv.Itoa(number), "index.md")
 		message := fmt.Sprintf("exported #%d -> %s", number, documentPath)
 		if len(skips) > 0 {
 			message += fmt.Sprintf(" (skipped %d entries)", len(skips))
