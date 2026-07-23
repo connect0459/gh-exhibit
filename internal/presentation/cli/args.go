@@ -25,9 +25,12 @@ type Args struct {
 	// (see parseExportSearchArgs); nil when parsed from "export".
 	Criteria *valueobjects.SearchCriteria
 
-	// DryRun is true when --dry-run was given: the caller should report
-	// Criteria's resolved match count and numbers without exporting
-	// anything. Only meaningful when Criteria is non-nil.
+	// DryRun is true when --dry-run was given. Its meaning depends on which
+	// subcommand parsed it: for "export-search" (Criteria non-nil), the
+	// caller reports Criteria's resolved match count and numbers without
+	// exporting anything; for "export" (Numbers non-nil), the caller
+	// reports each ref's would-be destination path, offline, without
+	// exporting anything.
 	DryRun bool
 
 	// Repo is the explicit --repo owner/repo override; empty when omitted,
@@ -116,6 +119,7 @@ func parseExportArgs(args []string) (Args, error) {
 	output := fs.String("output", ".", "output directory the evidence is written under")
 	fs.StringVar(output, "o", ".", "shorthand for --output")
 	withStdout := fs.Bool("with-stdout", false, "also print each exported ref's rendered document to standard output")
+	dryRun := fs.Bool("dry-run", false, "report each ref's would-be destination path, offline, without exporting anything")
 
 	flagArgs, positional, err := splitFlagsAndPositional(args)
 	if err != nil {
@@ -135,7 +139,7 @@ func parseExportArgs(args []string) (Args, error) {
 		return Args{}, err
 	}
 
-	return Args{Numbers: numbers, Repo: *repo, OutputDir: *output, WithStdout: *withStdout}, nil
+	return Args{Numbers: numbers, DryRun: *dryRun, Repo: *repo, OutputDir: *output, WithStdout: *withStdout}, nil
 }
 
 // parseExportSearchArgs parses and validates the "export-search"
