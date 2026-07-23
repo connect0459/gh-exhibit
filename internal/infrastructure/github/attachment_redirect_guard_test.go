@@ -83,7 +83,7 @@ func ipAddrs(ips ...string) []net.IPAddr {
 
 func TestDialAttachmentRedirectHop_RejectsALiteralDisallowedAddress(t *testing.T) {
 	dial := &recordingDial{}
-	_, err := dialAttachmentRedirectHop(context.Background(), "127.0.0.1:443", "127.0.0.1:443", &fakeIPAddrResolver{}, dial.dial)
+	_, err := dialAttachmentRedirectHop(context.Background(), "tcp", "127.0.0.1:443", &fakeIPAddrResolver{}, dial.dial)
 	if err == nil {
 		t.Fatal("dialAttachmentRedirectHop() error = nil, want a rejection for a literal loopback address")
 	}
