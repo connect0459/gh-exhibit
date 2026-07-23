@@ -182,6 +182,36 @@ func TestSearchCriteria_Authors_ReturnsADefensiveCopy(t *testing.T) {
 	}
 }
 
+func TestSearchCriteria_CreatedAfter_ReturnsADefensiveCopy(t *testing.T) {
+	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, &after, nil, 100, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
+	if err != nil {
+		t.Fatalf("unexpected error building search criteria: %v", err)
+	}
+
+	got := criteria.CreatedAfter()
+	*got = got.Add(24 * time.Hour)
+
+	if want := criteria.CreatedAfter(); !want.Equal(after) {
+		t.Fatalf("mutating the returned pointer affected the criteria's own state: CreatedAfter() = %v, want %v", want, after)
+	}
+}
+
+func TestNewSearchCriteria_DoesNotAliasTheCallersCreatedBeforePointer(t *testing.T) {
+	original := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+	before := original
+	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, &before, 100, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
+	if err != nil {
+		t.Fatalf("unexpected error building search criteria: %v", err)
+	}
+
+	before = before.Add(24 * time.Hour)
+
+	if got := criteria.CreatedBefore(); got == nil || !got.Equal(original) {
+		t.Fatalf("mutating the caller's own pointer after construction affected the criteria's state: CreatedBefore() = %v, want %v", got, original)
+	}
+}
+
 func TestSearchCriteria_Kinds_DefaultsToEmptyMeaningBoth(t *testing.T) {
 	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, nil, 100, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
 	if err != nil {

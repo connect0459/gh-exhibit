@@ -91,8 +91,8 @@ func NewSearchCriteria(authors, assignees []string, kinds []IssueKind, createdAf
 		authors:       append([]string(nil), authors...),
 		assignees:     append([]string(nil), assignees...),
 		kinds:         append([]IssueKind(nil), kinds...),
-		createdAfter:  createdAfter,
-		createdBefore: createdBefore,
+		createdAfter:  copyPointer(createdAfter),
+		createdBefore: copyPointer(createdBefore),
 		limit:         limit,
 		sort:          sort,
 		order:         order,
@@ -117,16 +117,16 @@ func (c SearchCriteria) Kinds() []IssueKind {
 	return append([]IssueKind(nil), c.kinds...)
 }
 
-// CreatedAfter returns the inclusive lower bound on the created-date range,
-// or nil when unset.
+// CreatedAfter returns a defensive copy of the inclusive lower bound on the
+// created-date range, or nil when unset.
 func (c SearchCriteria) CreatedAfter() *time.Time {
-	return c.createdAfter
+	return copyPointer(c.createdAfter)
 }
 
-// CreatedBefore returns the inclusive upper bound on the created-date
-// range, or nil when unset.
+// CreatedBefore returns a defensive copy of the inclusive upper bound on
+// the created-date range, or nil when unset.
 func (c SearchCriteria) CreatedBefore() *time.Time {
-	return c.createdBefore
+	return copyPointer(c.createdBefore)
 }
 
 // Limit returns the maximum number of matches to resolve.

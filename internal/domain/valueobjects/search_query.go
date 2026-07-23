@@ -61,8 +61,8 @@ func NewSearchQuery(owner, repo, author, assignee string, kinds []IssueKind, cre
 		author:        author,
 		assignee:      assignee,
 		kinds:         append([]IssueKind(nil), kinds...),
-		createdAfter:  createdAfter,
-		createdBefore: createdBefore,
+		createdAfter:  copyPointer(createdAfter),
+		createdBefore: copyPointer(createdBefore),
 		sort:          sort,
 		order:         order,
 		maxResults:    maxResults,
@@ -97,16 +97,16 @@ func (q SearchQuery) Kinds() []IssueKind {
 	return append([]IssueKind(nil), q.kinds...)
 }
 
-// CreatedAfter returns the inclusive lower bound on the created-date range,
-// or nil when unset.
+// CreatedAfter returns a defensive copy of the inclusive lower bound on the
+// created-date range, or nil when unset.
 func (q SearchQuery) CreatedAfter() *time.Time {
-	return q.createdAfter
+	return copyPointer(q.createdAfter)
 }
 
-// CreatedBefore returns the inclusive upper bound on the created-date
-// range, or nil when unset.
+// CreatedBefore returns a defensive copy of the inclusive upper bound on
+// the created-date range, or nil when unset.
 func (q SearchQuery) CreatedBefore() *time.Time {
-	return q.createdBefore
+	return copyPointer(q.createdBefore)
 }
 
 // Sort returns which field matches are ordered by.

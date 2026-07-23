@@ -18,7 +18,7 @@ type Body struct {
 // NewBody constructs a Body from its attribution, content, and optional
 // closed/merged timestamps (nil when not applicable).
 func NewBody(attribution Attribution, content string, closedAt, mergedAt *time.Time) Body {
-	return Body{attribution: attribution, content: content, closedAt: closedAt, mergedAt: mergedAt}
+	return Body{attribution: attribution, content: content, closedAt: copyPointer(closedAt), mergedAt: copyPointer(mergedAt)}
 }
 
 // Attribution returns who authored the body and when, and its source URL.
@@ -31,15 +31,17 @@ func (b Body) Content() string {
 	return b.content
 }
 
-// ClosedAt returns when the issue/PR was closed, or nil if it is still open.
+// ClosedAt returns a defensive copy of when the issue/PR was closed, or nil
+// if it is still open.
 func (b Body) ClosedAt() *time.Time {
-	return b.closedAt
+	return copyPointer(b.closedAt)
 }
 
-// MergedAt returns when the pull request was merged, or nil if it was never
-// merged (including for a plain issue, which has no merge concept).
+// MergedAt returns a defensive copy of when the pull request was merged, or
+// nil if it was never merged (including for a plain issue, which has no
+// merge concept).
 func (b Body) MergedAt() *time.Time {
-	return b.mergedAt
+	return copyPointer(b.mergedAt)
 }
 
 // Equals reports whether b and other have the same attribution, content,

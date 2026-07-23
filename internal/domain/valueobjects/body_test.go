@@ -135,6 +135,30 @@ func TestBody_ClosedAtAndMergedAt_AreNilForAnOpenIssue(t *testing.T) {
 	}
 }
 
+func TestBody_ClosedAt_ReturnsADefensiveCopy(t *testing.T) {
+	closedAt := time.Date(2026, 3, 16, 4, 27, 50, 0, time.UTC)
+	body := valueobjects.NewBody(newBodyAttribution(t), "Issue description.", &closedAt, nil)
+
+	got := body.ClosedAt()
+	*got = got.Add(24 * time.Hour)
+
+	if want := body.ClosedAt(); !want.Equal(closedAt) {
+		t.Fatalf("mutating the returned pointer affected the body's own state: ClosedAt() = %v, want %v", want, closedAt)
+	}
+}
+
+func TestNewBody_DoesNotAliasTheCallersMergedAtPointer(t *testing.T) {
+	original := time.Date(2026, 3, 16, 4, 27, 50, 0, time.UTC)
+	mergedAt := original
+	body := valueobjects.NewBody(newBodyAttribution(t), "PR description.", nil, &mergedAt)
+
+	mergedAt = mergedAt.Add(24 * time.Hour)
+
+	if got := body.MergedAt(); got == nil || !got.Equal(original) {
+		t.Fatalf("mutating the caller's own pointer after construction affected the body's state: MergedAt() = %v, want %v", got, original)
+	}
+}
+
 func TestBody_Equals_TreatsMatchingValuesAsEqual(t *testing.T) {
 	closedAt := time.Date(2026, 3, 16, 4, 27, 50, 0, time.UTC)
 	a := valueobjects.NewBody(newBodyAttribution(t), "Issue description.", &closedAt, nil)

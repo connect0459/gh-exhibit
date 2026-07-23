@@ -64,6 +64,36 @@ func TestNewSearchQuery_RejectsAnOutOfRangeKind(t *testing.T) {
 	}
 }
 
+func TestSearchQuery_CreatedAfter_ReturnsADefensiveCopy(t *testing.T) {
+	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	query, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, &after, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	if err != nil {
+		t.Fatalf("unexpected error building search query: %v", err)
+	}
+
+	got := query.CreatedAfter()
+	*got = got.Add(24 * time.Hour)
+
+	if want := query.CreatedAfter(); !want.Equal(after) {
+		t.Fatalf("mutating the returned pointer affected the query's own state: CreatedAfter() = %v, want %v", want, after)
+	}
+}
+
+func TestNewSearchQuery_DoesNotAliasTheCallersCreatedBeforePointer(t *testing.T) {
+	original := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+	before := original
+	query, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, nil, &before, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	if err != nil {
+		t.Fatalf("unexpected error building search query: %v", err)
+	}
+
+	before = before.Add(24 * time.Hour)
+
+	if got := query.CreatedBefore(); got == nil || !got.Equal(original) {
+		t.Fatalf("mutating the caller's own pointer after construction affected the query's state: CreatedBefore() = %v, want %v", got, original)
+	}
+}
+
 func TestSearchQuery_Accessors_ReturnTheConstructedValues(t *testing.T) {
 	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	before := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
