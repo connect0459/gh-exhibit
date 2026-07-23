@@ -42,19 +42,30 @@ const maxAttachmentBytes = 100 * 1024 * 1024
 // local fake server instead.
 //
 // Unlike NewEvidenceFetcher, opts.Transport is not wrapped with the
-// redirect-origin guard from redirect_guard.go: a real attachment URL
-// (e.g. github.com/user-attachments/assets/...) legitimately redirects
-// cross-origin to serve the actual bytes (e.g. to a signed, time-limited
-// S3 URL), so pinning the origin here would reject every such fetch. This
-// stays safe without the guard because net/http itself strips the
-// Authorization/Cookie headers on a redirect whose host differs from the
-// original request's, so the credential this client attaches never
-// reaches the redirect target.
+// origin-pinning redirect guard from redirect_guard.go: a real attachment
+// URL (e.g. github.com/user-attachments/assets/...) legitimately
+// redirects cross-origin to serve the actual bytes (e.g. to a signed,
+// time-limited S3 URL), so pinning the origin here would reject every
+// such fetch. This stays safe from credential exposure without that
+// guard because net/http itself strips the Authorization/Cookie headers
+// on a redirect whose host differs from the original request's, so the
+// credential this client attaches never reaches the redirect target.
+//
+// The client's CheckRedirect is instead set to
+// rejectRedirectToADisallowedTarget (attachment_redirect_guard.go), a
+// narrower guard that refuses only a redirect into a loopback,
+// link-local, or private-network address (including a cloud-metadata
+// endpoint) — closing the SSRF-into-internal-network edge of this gap
+// while still allowing the legitimate cross-origin case above. A
+// redirect to an arbitrary external, attacker-controlled host remains
+// possible and is documented as an accepted, unmitigated risk in
+// SECURITY.md.
 func NewAttachmentFetcher(opts api.ClientOptions) (repositories.AttachmentFetcher, error) {
 	client, err := api.NewHTTPClient(opts)
 	if err != nil {
 		return nil, fmt.Errorf("create the GitHub-authenticated HTTP client: %w", err)
 	}
+	client.CheckRedirect = rejectRedirectToADisallowedTarget
 
 	return &attachmentFetcher{client: client, maxBytes: maxAttachmentBytes}, nil
 }

@@ -13,27 +13,28 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
-// hostScopedRewriteTransport rewrites a request whose Host is one of
-// placeholderHosts to target's real address, and passes every other
+// hostScopedRewriteTransport rewrites a request whose Host matches one of
+// hosts' keys to the corresponding real address, and passes every other
 // request through unrewritten. This is the seam that lets a test point
 // NewExportService's real, production-wired fetchers at fake servers: an
 // evidence request nominally addressed to "api.github.localhost" (go-gh's
 // own REST URL prefix for its special-cased "github.localhost" test host)
 // and an attachment request addressed to "github.localhost" itself both
-// land on the same fake GitHub server, while a redirect hop already
-// naming a second fake server's real address passes through untouched —
-// letting that second hop actually reach a distinct origin, the shape a
-// real GitHub attachment URL's redirect to its CDN takes.
+// land on the same fake GitHub server, while a redirect hop naming a
+// second placeholder hostname (not itself a loopback/private-network
+// literal address, so it doesn't trip attachmentFetcher's own
+// SSRF-target guard) is rewritten to a second fake server's real
+// address — letting that second hop actually reach a distinct origin,
+// the shape a real GitHub attachment URL's redirect to its CDN takes.
 type hostScopedRewriteTransport struct {
-	placeholderHosts map[string]bool
-	target           string
+	hosts map[string]string
 }
 
 func (t *hostScopedRewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = req.Clone(req.Context())
-	if t.placeholderHosts[req.URL.Host] {
-		req.URL.Host = t.target
-		req.Host = t.target
+	if target, ok := t.hosts[req.URL.Host]; ok {
+		req.URL.Host = target
+		req.Host = target
 	}
 	return http.DefaultTransport.RoundTrip(req)
 }
@@ -53,6 +54,14 @@ func (t *hostScopedRewriteTransport) RoundTrip(req *http.Request) (*http.Respons
 func TestNewExportService_DownloadsAnAttachmentServedViaACrossOriginRedirect(t *testing.T) {
 	const attachmentBody = "not-actually-a-png"
 	const attachmentPath = "/user-attachments/assets/abc-123"
+	// cdnPlaceholderHost stands in for the CDN's real address in the
+	// redirect Location: attachmentFetcher's SSRF-target guard
+	// (internal/infrastructure/github/attachment_redirect_guard.go)
+	// refuses a redirect naming a literal loopback address directly, so
+	// the fake httptest CDN server's own 127.0.0.1 address can't be used
+	// as-is here — a hostname is rewritten to the real address below
+	// instead.
+	const cdnPlaceholderHost = "cdn.example.test"
 
 	var cdnCalls int
 	cdn := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +95,7 @@ func TestNewExportService_DownloadsAnAttachmentServedViaACrossOriginRedirect(t *
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`[]`))
 		case attachmentPath:
-			http.Redirect(w, r, cdn.URL+attachmentPath, http.StatusFound)
+			http.Redirect(w, r, "http://"+cdnPlaceholderHost+attachmentPath, http.StatusFound)
 		default:
 			t.Errorf("githubAPI received unexpected path %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -98,6 +107,10 @@ func TestNewExportService_DownloadsAnAttachmentServedViaACrossOriginRedirect(t *
 	if err != nil {
 		t.Fatalf("url.Parse(%q) error = %v", githubAPI.URL, err)
 	}
+	cdnURL, err := url.Parse(cdn.URL)
+	if err != nil {
+		t.Fatalf("url.Parse(%q) error = %v", cdn.URL, err)
+	}
 
 	outputDir := t.TempDir()
 	exporter, err := NewExportService(Config{
@@ -107,11 +120,11 @@ func TestNewExportService_DownloadsAnAttachmentServedViaACrossOriginRedirect(t *
 		Commit:    "test-commit",
 		AuthToken: "test-token",
 		Transport: &hostScopedRewriteTransport{
-			placeholderHosts: map[string]bool{
-				"github.localhost":     true,
-				"api.github.localhost": true,
+			hosts: map[string]string{
+				"github.localhost":     githubAPIURL.Host,
+				"api.github.localhost": githubAPIURL.Host,
+				cdnPlaceholderHost:     cdnURL.Host,
 			},
-			target: githubAPIURL.Host,
 		},
 	})
 	if err != nil {

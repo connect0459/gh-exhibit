@@ -140,22 +140,24 @@ func TestFetch_AcceptsAResponseBodyExactlyAtTheSizeLimit(t *testing.T) {
 	}
 }
 
-// hostScopedRewriteTransport rewrites only a request whose Host matches
-// placeholderHost to target's real address. Unlike rewriteTransport (which
-// rewrites every request unconditionally), a later hop born from a redirect
-// Location that already names a second real test server's address passes
-// through unrewritten instead of being routed back to the first server —
-// letting a test genuinely reach two distinct origins.
+// hostScopedRewriteTransport rewrites a request whose Host matches one of
+// hosts' keys to the corresponding real test-server address, leaving any
+// other request unrewritten. Unlike rewriteTransport (which rewrites every
+// request unconditionally to one fixed target), this lets a test address
+// multiple distinct fake origins — each named by a placeholder hostname
+// that is not itself a loopback/private-network literal address, so a
+// redirect between them exercises the "different origin" case without
+// tripping rejectRedirectToADisallowedTarget's own address check — that
+// each resolve to a different real local server underneath.
 type hostScopedRewriteTransport struct {
-	placeholderHost string
-	target          string
+	hosts map[string]string
 }
 
 func (t *hostScopedRewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = req.Clone(req.Context())
-	if req.URL.Host == t.placeholderHost {
-		req.URL.Host = t.target
-		req.Host = t.target
+	if target, ok := t.hosts[req.URL.Host]; ok {
+		req.URL.Host = target
+		req.Host = target
 	}
 	return http.DefaultTransport.RoundTrip(req)
 }
@@ -171,8 +173,9 @@ func TestFetch_FollowsARedirectToADifferentOriginFromTheAttachmentHost(t *testin
 	}))
 	defer secondHop.Close()
 
+	const secondHopPlaceholderHost = "cdn.example.test"
 	firstHop := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, secondHop.URL+"/user-attachments/assets/redirected", http.StatusFound)
+		http.Redirect(w, r, "http://"+secondHopPlaceholderHost+"/user-attachments/assets/redirected", http.StatusFound)
 	}))
 	defer firstHop.Close()
 
@@ -180,11 +183,18 @@ func TestFetch_FollowsARedirectToADifferentOriginFromTheAttachmentHost(t *testin
 	if err != nil {
 		t.Fatalf("url.Parse(%q) error = %v", firstHop.URL, err)
 	}
+	secondHopURL, err := url.Parse(secondHop.URL)
+	if err != nil {
+		t.Fatalf("url.Parse(%q) error = %v", secondHop.URL, err)
+	}
 
 	fetcher, err := NewAttachmentFetcher(api.ClientOptions{
 		Host:      "github.localhost",
 		AuthToken: "test-token",
-		Transport: &hostScopedRewriteTransport{placeholderHost: "github.localhost", target: firstHopURL.Host},
+		Transport: &hostScopedRewriteTransport{hosts: map[string]string{
+			"github.localhost":       firstHopURL.Host,
+			secondHopPlaceholderHost: secondHopURL.Host,
+		}},
 	})
 	if err != nil {
 		t.Fatalf("NewAttachmentFetcher() error = %v", err)
