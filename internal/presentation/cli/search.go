@@ -18,12 +18,12 @@ type Searcher interface {
 	Search(ctx context.Context, owner, repo string, criteria valueobjects.SearchCriteria) (services.SearchOutcome, error)
 }
 
-// RunSearchExport resolves criteria via searcher — filter mode's
-// counterpart to RunExports' explicit-number mode — then either reports
-// the match (dry-run) or hands the resolved numbers straight into the
-// existing RunExports, unchanged. Returns the same exit-code convention
-// RunExports uses: 0 when the search (and, unless dryRun, every resolved
-// ref) succeeded, 1 otherwise.
+// RunSearchExport resolves criteria via searcher — the export-search
+// subcommand's counterpart to RunExports, which the export subcommand
+// uses — then either reports the match (dry-run) or hands the resolved
+// numbers straight into the existing RunExports, unchanged. Returns the
+// same exit-code convention RunExports uses: 0 when the search (and,
+// unless dryRun, every resolved ref) succeeded, 1 otherwise.
 func RunSearchExport(ctx context.Context, searcher Searcher, exporter Exporter, owner, repo, outputDir string, criteria valueobjects.SearchCriteria, dryRun, withStdout bool, stdout, stderr io.Writer) int {
 	outcome, err := searcher.Search(ctx, owner, repo, criteria)
 	if err != nil {
