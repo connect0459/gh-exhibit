@@ -82,6 +82,41 @@ func TestParseArgs_FilterMode_RejectsAnEmptyKindListEntry(t *testing.T) {
 	}
 }
 
+func TestParseArgs_FilterMode_RejectsAnExplicitEmptyAuthorValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "--author="})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --author value, not a silent fall-back to unfiltered")
+	}
+}
+
+func TestParseArgs_FilterMode_RejectsAnExplicitEmptyAssigneeValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "--assignee="})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --assignee value, not a silent fall-back to unfiltered")
+	}
+}
+
+func TestParseArgs_FilterMode_RejectsAnExplicitEmptyKindValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "--kind="})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --kind value, not a silent fall-back to both kinds")
+	}
+}
+
+func TestParseArgs_FilterMode_RejectsAnExplicitEmptyAfterValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "--after="})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --after value, not a silent fall-back to unbounded")
+	}
+}
+
+func TestParseArgs_FilterMode_RejectsAnExplicitEmptyBeforeValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export", "--before="})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --before value, not a silent fall-back to unbounded")
+	}
+}
+
 func TestParseArgs_FilterMode_DeduplicatesTheKindListInFirstSeenOrder(t *testing.T) {
 	got, err := ParseArgs([]string{"export", "--kind", "issue,issue,pr"})
 	if err != nil {

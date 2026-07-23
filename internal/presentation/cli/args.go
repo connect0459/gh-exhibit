@@ -99,6 +99,19 @@ var filterFlagNames = map[string]bool{
 	"limit": true, "sort": true, "order": true, "dry-run": true,
 }
 
+// stringFilterFlagNames are filterFlagNames' string-valued members — the
+// ones flag.FlagSet cannot itself distinguish "omitted" from "given as an
+// explicit empty string" for (an int-valued flag like --limit already
+// rejects an empty value as an invalid integer; --sort/--order already
+// reject "" as an unrecognized value). An explicit "--author=" would
+// otherwise parse as "", the same sentinel parseLogins/parseKinds/
+// parseSearchDate use for "omitted", and silently fall back to that
+// dimension being unfiltered instead of erroring.
+var stringFilterFlagNames = map[string]bool{
+	"author": true, "assignee": true, "kind": true,
+	"after": true, "before": true,
+}
+
 // parseExportArgs parses and validates the "export" subcommand's own
 // arguments (everything after the "export" token) into an Args value.
 // Supplying the positional issue/PR number (or comma-separated list)
@@ -133,11 +146,19 @@ func parseExportArgs(args []string) (Args, error) {
 	}
 
 	filterFlagGiven := false
+	var emptyValueFlag string
 	fs.Visit(func(f *flag.Flag) {
 		if filterFlagNames[f.Name] {
 			filterFlagGiven = true
 		}
+		if stringFilterFlagNames[f.Name] && f.Value.String() == "" {
+			emptyValueFlag = f.Name
+		}
 	})
+
+	if emptyValueFlag != "" {
+		return Args{}, fmt.Errorf("--%s: value must not be empty", emptyValueFlag)
+	}
 
 	if filterFlagGiven {
 		if len(positional) > 0 {
