@@ -1,6 +1,7 @@
 package valueobjects_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
@@ -81,5 +82,23 @@ func TestNewAssetFilename_RejectsASingleSlash(t *testing.T) {
 func TestNewAssetFilename_RejectsAFilenameContainingABackslash(t *testing.T) {
 	if _, err := valueobjects.NewAssetFilename(`sub\evil.png`); err == nil {
 		t.Fatal("NewAssetFilename() error = nil, want an error for a filename containing a backslash, regardless of the host OS's own path separator")
+	}
+}
+
+func TestNewAssetFilename_AcceptsAFilenameAtTheMaximumLength(t *testing.T) {
+	name := strings.Repeat("a", 255)
+
+	got := newTestAssetFilename(t, name)
+
+	if got.String() != name {
+		t.Fatalf("String() = %q, want %q", got.String(), name)
+	}
+}
+
+func TestNewAssetFilename_RejectsAFilenameExceedingTheMaximumLength(t *testing.T) {
+	name := strings.Repeat("a", 256)
+
+	if _, err := valueobjects.NewAssetFilename(name); err == nil {
+		t.Fatal("NewAssetFilename() error = nil, want an error for a filename exceeding the filesystem's single-path-component limit")
 	}
 }
