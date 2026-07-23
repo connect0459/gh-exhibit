@@ -23,8 +23,16 @@ func TestClosureEvent_Render_IncludesTheActionAndReasonInTheMetaLine(t *testing.
 		want   string
 	}{
 		{"closed with reason", valueobjects.ClosureActionClosed, "completed", `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"closed","reason":"completed","url":"https://github.com/example/repo/issues/1"}} -->
+
+Closed (completed)
+`},
+		{"closed with no reason", valueobjects.ClosureActionClosed, "", `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"closed","reason":"","url":"https://github.com/example/repo/issues/1"}} -->
+
+Closed
 `},
 		{"reopened with no reason", valueobjects.ClosureActionReopened, "", `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"reopened","reason":"","url":"https://github.com/example/repo/issues/1"}} -->
+
+Reopened
 `},
 	}
 

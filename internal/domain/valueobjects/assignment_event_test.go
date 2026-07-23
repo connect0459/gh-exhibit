@@ -37,9 +37,10 @@ func TestAssignmentEvent_Render_IncludesTheActionAndAssigneeInTheMetaLine(t *tes
 		name   string
 		action valueobjects.AssignmentAction
 		want   string
+		body   string
 	}{
-		{"assigned", valueobjects.AssignmentActionAssigned, "assigned"},
-		{"unassigned", valueobjects.AssignmentActionUnassigned, "unassigned"},
+		{"assigned", valueobjects.AssignmentActionAssigned, "assigned", "Assigned @hubot"},
+		{"unassigned", valueobjects.AssignmentActionUnassigned, "unassigned", "Unassigned @hubot"},
 	}
 
 	for _, c := range cases {
@@ -52,6 +53,8 @@ func TestAssignmentEvent_Render_IncludesTheActionAndAssigneeInTheMetaLine(t *tes
 			}
 
 			want := `<!-- {"meta":{"author":"octocat","created":"2026-07-02T14:19:40Z","action":"` + c.want + `","assignee":"hubot","url":"https://github.com/example/repo/issues/1"}} -->
+
+` + c.body + `
 `
 			if buf.String() != want {
 				t.Fatalf("Render() =\n%q\nwant\n%q", buf.String(), want)

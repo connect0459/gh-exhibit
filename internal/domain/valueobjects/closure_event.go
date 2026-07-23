@@ -1,6 +1,9 @@
 package valueobjects
 
-import "io"
+import (
+	"fmt"
+	"io"
+)
 
 // ClosureEvent is an issue or pull request being closed or reopened, sourced
 // from the timeline's "closed"/"reopened" events. Like LabelEvent, GitHub's
@@ -53,8 +56,9 @@ func (e ClosureEvent) Equals(other ClosureEvent) bool {
 		e.reason == other.reason
 }
 
-// Render writes e's <!-- {"meta":...} --> line. A ClosureEvent has no body
-// content, satisfying Entry.
+// Render writes e's <!-- {"meta":...} --> line, followed by a plain-text
+// description of the closure action so it's visible in a rendered Markdown
+// preview, not just in the hidden meta comment.
 func (e ClosureEvent) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta
@@ -68,7 +72,17 @@ func (e ClosureEvent) Render(w io.Writer) error {
 		URL:             e.attribution.URL(),
 	}
 
-	return writeMetaLine(w, meta, "")
+	var body string
+	switch {
+	case e.action == ClosureActionReopened:
+		body = "Reopened"
+	case e.reason != "":
+		body = fmt.Sprintf("Closed (%s)", e.reason)
+	default:
+		body = "Closed"
+	}
+
+	return writeMetaLine(w, meta, body)
 }
 
 func (ClosureEvent) entryNode() {}

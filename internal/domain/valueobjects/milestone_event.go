@@ -2,6 +2,7 @@ package valueobjects
 
 import (
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -50,8 +51,9 @@ func (e MilestoneEvent) Equals(other MilestoneEvent) bool {
 		e.title == other.title
 }
 
-// Render writes e's <!-- {"meta":...} --> line. A MilestoneEvent has no
-// body content, satisfying Entry.
+// Render writes e's <!-- {"meta":...} --> line, followed by a plain-text
+// description of the milestone action so it's visible in a rendered
+// Markdown preview, not just in the hidden meta comment.
 func (e MilestoneEvent) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta
@@ -65,7 +67,15 @@ func (e MilestoneEvent) Render(w io.Writer) error {
 		URL:             e.attribution.URL(),
 	}
 
-	return writeMetaLine(w, meta, "")
+	var verb string
+	switch e.action {
+	case MilestoneActionMilestoned:
+		verb = "Milestoned"
+	case MilestoneActionDemilestoned:
+		verb = "Demilestoned"
+	}
+
+	return writeMetaLine(w, meta, fmt.Sprintf("%s `%s`", verb, e.title))
 }
 
 func (MilestoneEvent) entryNode() {}

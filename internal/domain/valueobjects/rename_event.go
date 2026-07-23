@@ -2,6 +2,7 @@ package valueobjects
 
 import (
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -54,8 +55,9 @@ func (e RenameEvent) Equals(other RenameEvent) bool {
 		e.to == other.to
 }
 
-// Render writes e's <!-- {"meta":...} --> line. A RenameEvent has no body
-// content, satisfying Entry.
+// Render writes e's <!-- {"meta":...} --> line, followed by a plain-text
+// description of the rename so it's visible in a rendered Markdown preview,
+// not just in the hidden meta comment.
 func (e RenameEvent) Render(w io.Writer) error {
 	meta := struct {
 		attributionMeta
@@ -69,7 +71,7 @@ func (e RenameEvent) Render(w io.Writer) error {
 		URL:             e.attribution.URL(),
 	}
 
-	return writeMetaLine(w, meta, "")
+	return writeMetaLine(w, meta, fmt.Sprintf("Renamed from %q to %q", e.from, e.to))
 }
 
 func (RenameEvent) entryNode() {}
