@@ -102,9 +102,11 @@ func (c PullRequestChecks) Render(w io.Writer) error {
 // containing "]" or "(" could otherwise close the link early and splice
 // in an attacker-chosen URL. This matches changedFileLine/commitLine/
 // issueSummaryLine, none of which embed untrusted text as markdown link
-// syntax either.
+// syntax either. It fences r.Name() with titleCodeSpan rather than a fixed
+// backtick pair, keeping the whole name a single unbroken code span even
+// when it contains a backtick.
 func checkRunLine(r CheckRun) string {
-	return fmt.Sprintf("`%s`: %s", r.Name(), r.Outcome().String())
+	return fmt.Sprintf("%s: %s", titleCodeSpan(r.Name()), r.Outcome().String())
 }
 
 func (PullRequestChecks) entryNode() {}

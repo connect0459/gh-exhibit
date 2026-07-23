@@ -109,7 +109,7 @@ func (d PullRequestDiff) Render(w io.Writer) error {
 			continue
 		}
 		fence := diffFence(patch)
-		if _, err := fmt.Fprintf(w, "\n**Diff: `%s`**\n\n%sdiff\n%s\n%s\n", f.Filename(), fence, patch, fence); err != nil {
+		if _, err := fmt.Fprintf(w, "\n**Diff: %s**\n\n%sdiff\n%s\n%s\n", titleCodeSpan(f.Filename()), fence, patch, fence); err != nil {
 			return err
 		}
 	}
@@ -118,11 +118,15 @@ func (d PullRequestDiff) Render(w io.Writer) error {
 }
 
 // changedFileLine formats one ChangedFile as a single bullet-list line,
-// showing both names for a renamed file rather than only its new one.
+// showing both names for a renamed file rather than only its new one. A
+// filename is arbitrary, attacker-influenceable text (a contributor's own
+// choice), so each one is fenced with titleCodeSpan rather than a fixed
+// backtick pair, keeping it a single unbroken code span even when the
+// filename itself contains a backtick.
 func changedFileLine(f ChangedFile) string {
-	name := fmt.Sprintf("`%s`", f.Filename())
+	name := titleCodeSpan(f.Filename())
 	if f.Status() == FileStatusRenamed && f.PreviousFilename() != "" {
-		name = fmt.Sprintf("`%s` -> `%s`", f.PreviousFilename(), f.Filename())
+		name = fmt.Sprintf("%s -> %s", titleCodeSpan(f.PreviousFilename()), titleCodeSpan(f.Filename()))
 	}
 	return fmt.Sprintf("%s (%s, +%d/-%d)", name, f.Status().String(), f.Additions(), f.Deletions())
 }

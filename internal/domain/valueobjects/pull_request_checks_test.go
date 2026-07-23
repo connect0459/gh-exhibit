@@ -67,6 +67,24 @@ func TestPullRequestChecks_Render_DoesNotLetACheckRunNameInjectMarkdownLinkSynta
 	}
 }
 
+func TestPullRequestChecks_Render_FencesACheckRunNameContainingABacktick(t *testing.T) {
+	runs := []valueobjects.CheckRun{
+		mustNewCheckRun(t, "weird`build", valueobjects.CheckOutcomeSuccess, "https://github.com/example/repo/runs/1"),
+	}
+	capturedAt := time.Date(2026, 7, 22, 9, 30, 0, 0, time.UTC)
+	pc := valueobjects.NewPullRequestChecks(newPullRequestChecksAttribution(t), "abc1234567", capturedAt, runs)
+
+	var buf strings.Builder
+	if err := pc.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering pull request checks: %v", err)
+	}
+
+	want := "- ``weird`build``: success\n"
+	if !strings.Contains(buf.String(), want) {
+		t.Fatalf("Render() should keep the whole check run name inside one unbroken code span, got:\n%s\nwant substring:\n%s", buf.String(), want)
+	}
+}
+
 func TestPullRequestChecks_ExposesTheFieldsItWasConstructedWith(t *testing.T) {
 	attribution := newPullRequestChecksAttribution(t)
 	capturedAt := time.Date(2026, 7, 22, 9, 30, 0, 0, time.UTC)

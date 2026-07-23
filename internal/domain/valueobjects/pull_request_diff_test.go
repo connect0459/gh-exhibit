@@ -102,6 +102,57 @@ func TestPullRequestDiff_Render_OmitsTruncatedFromTheMetaLineWhenNotTruncated(t 
 	}
 }
 
+func TestPullRequestDiff_Render_FencesADiffHeadingFilenameContainingABacktick(t *testing.T) {
+	files := []valueobjects.ChangedFile{
+		mustNewChangedFile(t, "weird`file.go", "", valueobjects.FileStatusModified, 1, 1, "@@ -1 +1 @@\n-old\n+new"),
+	}
+	diff := valueobjects.NewPullRequestDiff(newPullRequestDiffAttribution(t), files, 1, 1, false)
+
+	var buf strings.Builder
+	if err := diff.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering pull request diff: %v", err)
+	}
+
+	want := "**Diff: ``weird`file.go``**\n"
+	if !strings.Contains(buf.String(), want) {
+		t.Fatalf("Render() should keep the whole filename inside one unbroken code span in the diff heading, got:\n%s\nwant substring:\n%s", buf.String(), want)
+	}
+}
+
+func TestPullRequestDiff_Render_FencesAFilenameContainingABacktick(t *testing.T) {
+	files := []valueobjects.ChangedFile{
+		mustNewChangedFile(t, "weird`file.go", "", valueobjects.FileStatusModified, 1, 1, ""),
+	}
+	diff := valueobjects.NewPullRequestDiff(newPullRequestDiffAttribution(t), files, 1, 1, false)
+
+	var buf strings.Builder
+	if err := diff.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering pull request diff: %v", err)
+	}
+
+	want := "- ``weird`file.go`` (modified, +1/-1)\n"
+	if !strings.Contains(buf.String(), want) {
+		t.Fatalf("Render() should keep the whole filename inside one unbroken code span, got:\n%s\nwant substring:\n%s", buf.String(), want)
+	}
+}
+
+func TestPullRequestDiff_Render_FencesARenamedFilesFromAndToEachContainingABacktick(t *testing.T) {
+	files := []valueobjects.ChangedFile{
+		mustNewChangedFile(t, "new`file.go", "old`file.go", valueobjects.FileStatusRenamed, 0, 0, ""),
+	}
+	diff := valueobjects.NewPullRequestDiff(newPullRequestDiffAttribution(t), files, 0, 0, false)
+
+	var buf strings.Builder
+	if err := diff.Render(&buf); err != nil {
+		t.Fatalf("unexpected error rendering pull request diff: %v", err)
+	}
+
+	want := "- ``old`file.go`` -> ``new`file.go`` (renamed, +0/-0)\n"
+	if !strings.Contains(buf.String(), want) {
+		t.Fatalf("Render() should keep each renamed filename inside its own unbroken code span, got:\n%s\nwant substring:\n%s", buf.String(), want)
+	}
+}
+
 func TestPullRequestDiff_Render_ShowsRenamedFilesFromAndTo(t *testing.T) {
 	files := []valueobjects.ChangedFile{
 		mustNewChangedFile(t, "internal/new.go", "internal/old.go", valueobjects.FileStatusRenamed, 0, 0, ""),
