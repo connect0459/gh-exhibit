@@ -34,6 +34,25 @@ func newTestAttachmentFetcher(t *testing.T, server *httptest.Server) repositorie
 	return fetcher
 }
 
+// TestNewAttachmentFetcher_SucceedsWhenNoTransportIsSupplied covers
+// NewAttachmentFetcher's opts.Transport == nil branch, which installs
+// newAttachmentGuardTransport() — always the case in real usage, since
+// neither cmd/gh-exhibit nor internal/registry ever sets
+// api.ClientOptions.Transport. api.NewHTTPClient wraps whatever
+// Transport it's given in its own unexported header/cache/logging
+// round-trippers, so this only confirms construction succeeds; the
+// guard transport's own dial behavior is covered directly by
+// TestNewAttachmentGuardTransport_DialsAnUnpinnedRequestNormally and
+// attachment_redirect_guard_test.go's other tests.
+func TestNewAttachmentFetcher_SucceedsWhenNoTransportIsSupplied(t *testing.T) {
+	if _, err := NewAttachmentFetcher(api.ClientOptions{
+		Host:      "github.localhost",
+		AuthToken: "test-token",
+	}); err != nil {
+		t.Fatalf("NewAttachmentFetcher() error = %v, want construction to succeed with no Transport override", err)
+	}
+}
+
 func newTestAttachment(t *testing.T, url string) services.Attachment {
 	t.Helper()
 
