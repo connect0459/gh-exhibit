@@ -1447,6 +1447,47 @@ func TestExportService_Export_ReplacesAFailedAttachmentFetchWithAPlaceholderAndP
 	}
 }
 
+func TestExportService_Export_ReplacesAnOversizedAttachmentIDWithAPlaceholderInsteadOfAbortingTheExport(t *testing.T) {
+	oversizedID := strings.Repeat("a", 300)
+	oversizedAttachmentURL := "https://github.example.com/user-attachments/assets/" + oversizedID
+	commentedEventWithOversizedAttachmentJSON := `{
+		"event": "commented",
+		"id": 100,
+		"user": {"login": "reviewer"},
+		"body": "See ![screenshot](` + oversizedAttachmentURL + `)",
+		"created_at": "2026-07-02T00:00:00Z",
+		"html_url": "https://github.example.com/example/repo/issues/1#issuecomment-100"
+	}`
+
+	repo := &fakeEvidenceFetcher{
+		issue:    json.RawMessage(plainIssueJSON),
+		timeline: []json.RawMessage{json.RawMessage(commentedEventWithOversizedAttachmentJSON)},
+	}
+	writer := &fakeEvidenceWriter{}
+	provenanceWriter := &fakeProvenanceWriter{}
+	docs := &fakeDocumentWriter{}
+	attachments := &fakeAttachmentFetcher{data: []byte("png-bytes"), contentType: "image/png"}
+	assets := &fakeAttachmentWriter{}
+	svc := NewExportService(repo, writer, provenanceWriter, docs, attachments, assets, "github.example.com", testProvenance(t), fakeClock{})
+
+	_, _, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v, want nil (an oversized attachment id should not fail the export)", err)
+	}
+
+	if len(assets.wroteAssets) != 0 {
+		t.Fatalf("WriteAsset was called despite the derived filename being invalid: %v", assets.wroteAssets)
+	}
+	if !strings.Contains(string(assets.wroteLog), oversizedAttachmentURL) {
+		t.Fatalf("WriteFetchErrorLog got %q, want it to mention the oversized attachment's URL", assets.wroteLog)
+	}
+
+	rendered := string(docs.written)
+	if !strings.Contains(rendered, oversizedAttachmentURL) {
+		t.Fatalf("rendered document = %q, want the original URL preserved in the placeholder", rendered)
+	}
+}
+
 func TestExportService_Export_PropagatesAnErrorWhenWriteAssetFails(t *testing.T) {
 	wantErr := errors.New("boom")
 	repo := &fakeEvidenceFetcher{

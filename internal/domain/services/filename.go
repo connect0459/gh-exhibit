@@ -24,16 +24,16 @@ var extensionsByContentType = map[string]string{
 	"application/zip": ".zip",
 }
 
-// Filename derives a's local asset filename: the UUID GitHub assigns in its
-// URL path (unique and stable) as the base name, plus an extension resolved
-// from the response's Content-Type header — the URL path itself does not
-// reliably encode one. An unrecognized content type yields no extension
-// rather than a guessed one. The error return is defensive: a's own URL is
-// already validated by NewAttachment to match a GitHub user-attachments
-// asset path, whose id segment can never fail valueobjects.NewAssetFilename,
-// but the constructor is still gone through rather than a bare struct
-// literal so this stays true regardless of how that upstream validation
-// evolves.
+// Filename derives a's local asset filename: the id GitHub assigns in its
+// URL path (unique and stable, a UUID on github.com itself) as the base
+// name, plus an extension resolved from the response's Content-Type header
+// — the URL path itself does not reliably encode one. An unrecognized
+// content type yields no extension rather than a guessed one. The error
+// return is real, not defensive: a's own URL is only validated by
+// NewAttachment to match a GitHub user-attachments asset path's shape, and
+// on an untrusted GitHub Enterprise Server host that id segment is fully
+// server-controlled and can fail valueobjects.NewAssetFilename, e.g. by
+// exceeding its maximum length.
 func (a Attachment) Filename(contentType string) (valueobjects.AssetFilename, error) {
 	id := path.Base(a.url.Path())
 

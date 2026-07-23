@@ -14,12 +14,21 @@ type AssetFilename struct {
 	value string
 }
 
+// maxFilenameLength is the longest value NewAssetFilename accepts, matching
+// the single-path-component limit (NAME_MAX) most filesystems this project
+// targets enforce in bytes. A GitHub Enterprise Server host is free to serve
+// an arbitrarily long id at an attachment path gh-exhibit otherwise trusts
+// the shape of, and without this bound that value would flow unchecked into
+// a filesystem path and fail the write with ENAMETOOLONG — aborting the
+// whole ref's export instead of being isolated as a per-attachment failure.
+const maxFilenameLength = 255
+
 // NewAssetFilename validates filename and returns an AssetFilename. It
 // rejects anything that isn't a single path-safe segment: empty, an
 // all-dots value (e.g. ".", "..", "...", optionally followed by trailing
-// spaces), or containing a path separator — any of which could otherwise
-// escape the intended assets directory once joined into a filesystem
-// path.
+// spaces), containing a path separator, or exceeding maxFilenameLength —
+// any of which could otherwise escape the intended assets directory or
+// fail the filesystem write once joined into a filesystem path.
 //
 // The separator check scans directly for '/' and '\', not a comparison
 // against filepath.Base(filename): Base has a fixed point at "/" itself
@@ -36,6 +45,9 @@ func NewAssetFilename(filename string) (AssetFilename, error) {
 	}
 	if strings.ContainsAny(filename, `/\`) {
 		return AssetFilename{}, fmt.Errorf("attachment filename %q must not contain a path separator", filename)
+	}
+	if len(filename) > maxFilenameLength {
+		return AssetFilename{}, fmt.Errorf("attachment filename %q must not exceed %d bytes", filename, maxFilenameLength)
 	}
 	return AssetFilename{value: filename}, nil
 }
