@@ -23,6 +23,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-24
+
+### Added
+
+- `export`: a new `--with-stdout` flag prints each exported ref's rendered document to standard output — the exact same bytes persisted to `index.md` — prefixed with a `=== owner/repo#N ===` header when exporting more than one ref, in addition to every file `export` already writes. A ref that fails to export prints nothing.
+- A new `export-search` subcommand resolves a set of filter criteria (`--author`, `--assignee`, `--kind`, `--after`/`--before`, `--limit`, `--sort`/`--order`) against GitHub's search API into a concrete, inspectable issue/PR number list, then feeds it into the same per-ref export pipeline `export`'s explicit number list already uses. `--dry-run` previews the resolved match count and full number list without exporting; `--limit` is capped (and defaults) at 100.
+- Issue/PR history: `LabelEvent`, `AssignmentEvent`, `ClosureEvent`, `RenameEvent`, and `MilestoneEvent` now render a short visible plain-text description (e.g. `` Labeled `bug` ``, `Assigned @octocat`, `Closed (completed)`, `` Renamed from "Old title" to "New title" ``, `` Milestoned `v1.0` ``), in addition to the existing hidden `<!-- {"meta":...} -->` line, so a rendered Markdown preview no longer shows nothing at all for these five event types.
+- `export`: a new `--dry-run` flag validates each ref and prints its would-be destination path (`{output}/{repo}/{number}/index.md`) without calling the GitHub API or writing to disk — an offline preview distinct from `export-search --dry-run`'s resolved-match preview, since `export`'s numbers are already known from its positional argument.
+
+### Fixed
+
+- CLI: a value-taking flag foreign to the invoked subcommand (e.g. `export-search`'s `--author` given to `export`) with its value omitted now reports the correct "flag provided but not defined" error, instead of misleadingly reporting "flag needs an argument" as if it were one of that subcommand's own recognized flags.
+- Valueobjects: a changed file's filename and a check run's name are now fenced with `titleCodeSpan` (the same longest-backtick-run-aware fence `LabelEvent`/`MilestoneEvent` already use), instead of a fixed single-backtick pair — a name containing its own backtick no longer closes the code span early and leaves a stray unfenced remainder.
+- Valueobjects: `AssetFilename` now rejects a filename exceeding 255 bytes (matching the `NAME_MAX` most target filesystems enforce), isolating an oversized attachment id from an untrusted GitHub Enterprise Server host as an ordinary per-attachment failure instead of aborting the whole ref's export with a filesystem `ENAMETOOLONG` error.
+
+### Security
+
+- GitHub client: an attachment fetch's redirect target is now validated at the moment of dialing — a redirect resolving to a loopback, link-local (including the cloud-metadata address `169.254.169.254`), or RFC 1918/IPv6-unique-local private address is refused, while a redirect to any other host or public IP (including the legitimate cross-origin case, e.g. a signed S3 URL) is still followed. Closes the SSRF-into-internal-network gap left after a prior fix removed origin-pinning for attachment fetches; redirect-based content substitution from an arbitrary external host remains a documented, intentionally unmitigated residual risk (see `SECURITY.md`).
+
 ## [0.5.0] - 2026-07-22
 
 ### Added
@@ -143,7 +162,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.5.0...HEAD>
+[Unreleased]: <https://github.com/connect0459/gh-exhibit/compare/v0.6.0...HEAD>
+[0.6.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.5.0...v0.6.0>
 [0.5.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.4.0...v0.5.0>
 [0.4.0]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.1...v0.4.0>
 [0.3.1]: <https://github.com/connect0459/gh-exhibit/compare/v0.3.0...v0.3.1>
