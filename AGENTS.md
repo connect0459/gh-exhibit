@@ -10,6 +10,12 @@ This project may be released publicly. All of the following must be written in *
 - Test names
 - Error messages
 
+## Before Starting Development
+
+Before making changes, read `CONTRIBUTING.md` and run `just --list` to learn
+the commands this project uses for setup, formatting, linting, building, and
+testing. Use those commands rather than reaching for ad-hoc equivalents.
+
 ## Development Philosophy
 
 ### Red/Green TDD (Detroit school)
