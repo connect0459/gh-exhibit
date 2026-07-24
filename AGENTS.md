@@ -25,6 +25,20 @@ testing. Use those commands rather than reaching for ad-hoc equivalents.
 - Write tests BEFORE implementation; run tests AFTER implementation
 - Discuss coverage targets with the user before starting implementation
 
+### Architecture
+
+- Onion architecture: `internal/domain` defines abstract types (entities,
+  value objects, repository interfaces); `internal/infrastructure` implements
+  them; `internal/application` orchestrates across layers; `internal/presentation`
+  is the CLI entrypoint. No layer depends directly on a concrete type from a
+  layer it doesn't own.
+- An `internal/infrastructure` implementation's struct type is never exported;
+  only the interface it satisfies and its `New...` constructor (returning that
+  interface) are exported.
+- See `docs/ARCHITECTURE.md` for the full guide, including the dependency
+  direction diagram and why aligning dependency direction alone doesn't
+  isolate change without a type conversion at the boundary.
+
 ### Domain Object Design
 
 - Rich domain objects: pair data and logic in the same type
