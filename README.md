@@ -120,6 +120,7 @@ See [Documentation](#documentation) for details.
 
 ## Documentation
 
+- [Architecture](docs/ARCHITECTURE.md) — onion architecture layers, the dependency rule between them, and why boundaries convert types rather than just aligning direction.
 - [Specification](docs/specs/README.md) — current behavior: CLI shape, domain model, on-disk layout, Markdown dialect, attachment and retry policy, coverage targets.
 
 ## Contributing
