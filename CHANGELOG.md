@@ -23,6 +23,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Attachments: `video/quicktime` (`.mov`) and `video/webm` (`.webm`) are now recognized content types for a downloaded attachment's file extension, alongside the existing `video/mp4`.
+
 ## [0.6.0] - 2026-07-24
 
 ### Added
