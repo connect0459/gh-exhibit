@@ -23,6 +23,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `export-search`: two new flags, `--review-requested` and `--reviewed-by`, filter by GitHub's own `review-requested:`/`reviewed-by:` search qualifiers. Both only ever match pull requests; combining either with `--kind issue` yields no matches rather than an error, the same way GitHub's own search API behaves for that combination.
+
 ## [0.6.0] - 2026-07-24
 
 ### Added

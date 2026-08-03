@@ -55,7 +55,7 @@ gh exhibit export <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <d
 Or export by filter criteria instead, via the separate `export-search` subcommand:
 
 ```sh
-gh exhibit export-search [--author <login>[,...]] [--assignee <login>[,...]] [--kind issue|pr[,...]] [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>] [--limit <n>] [--sort created|updated|comments] [--order asc|desc] [--dry-run] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
+gh exhibit export-search [--author <login>[,...]] [--assignee <login>[,...]] [--review-requested <login>[,...]] [--reviewed-by <login>[,...]] [--kind issue|pr[,...]] [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>] [--limit <n>] [--sort created|updated|comments] [--order asc|desc] [--dry-run] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
 ```
 
 ### Flags and Subcommands
@@ -68,6 +68,7 @@ gh exhibit export-search [--author <login>[,...]] [--assignee <login>[,...]] [--
   - `--dry-run`: report each ref's would-be destination path (e.g. `{output}/{repo}/{number}/index.md`) to stdout, without calling the GitHub API or writing anything to disk. `export` has no resolution step to preview — its numbers are already known — so this is a purely local, offline check, unlike `export-search --dry-run` below.
 - `export-search`: resolves a set of filter criteria into an issue/PR number list via GitHub's search API, then exports every match. Takes no positional argument.
   - `--author`, `--assignee`: comma-separated GitHub login(s) to filter by.
+  - `--review-requested`, `--reviewed-by`: comma-separated GitHub login(s) whose review is requested, or who have reviewed, respectively. Both match GitHub's own `review-requested:`/`reviewed-by:` search qualifiers and only ever match pull requests — combining either with `--kind issue` simply yields no matches, since GitHub's search API itself returns zero results for that combination rather than erroring.
   - `--kind`: comma-separated `issue`,`pr` to restrict which ref kind matches; omitted (or both) means both.
   - `--after`, `--before`: an inclusive `YYYY-MM-DD` bound on the ref's creation date.
   - `--limit`: maximum number of matches to resolve, `1`-`100` (default `100`) — gh-exhibit's own conservative cap, well below GitHub search's raw 1000-result ceiling, so a call with no other narrowing can't turn into a de facto whole-repository export.
