@@ -79,6 +79,29 @@ func TestParseArgs_ExportSearchSubcommand_ReadsTheAuthorFlag(t *testing.T) {
 	}
 }
 
+func TestParseArgs_ExportSearchSubcommand_ReadsTheReviewRequestedFlag(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--review-requested", "octocat"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	if want := []string{"octocat"}; !equalStrings(got.Criteria.ReviewRequested(), want) {
+		t.Errorf("ReviewRequested() = %v, want %v", got.Criteria.ReviewRequested(), want)
+	}
+}
+
+func TestParseArgs_ExportSearchSubcommand_ParsesACommaSeparatedReviewedByList(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--reviewed-by", "octocat, monalisa"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	want := []string{"octocat", "monalisa"}
+	if !equalStrings(got.Criteria.ReviewedBy(), want) {
+		t.Errorf("ReviewedBy() = %v, want %v", got.Criteria.ReviewedBy(), want)
+	}
+}
+
 func TestParseArgs_ExportSearchSubcommand_AcceptsDryRunAlone(t *testing.T) {
 	got, err := ParseArgs([]string{"export-search", "--dry-run"})
 	if err != nil {
@@ -119,6 +142,20 @@ func TestParseArgs_ExportSearchSubcommand_RejectsAnEmptyAssigneeListEntry(t *tes
 	}
 }
 
+func TestParseArgs_ExportSearchSubcommand_RejectsAnEmptyReviewRequestedListEntry(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--review-requested", "octocat,,monalisa"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an empty --review-requested list entry")
+	}
+}
+
+func TestParseArgs_ExportSearchSubcommand_RejectsAnEmptyReviewedByListEntry(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--reviewed-by", "octocat,,monalisa"})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an empty --reviewed-by list entry")
+	}
+}
+
 func TestParseArgs_ExportSearchSubcommand_RejectsAnEmptyKindListEntry(t *testing.T) {
 	_, err := ParseArgs([]string{"export-search", "--kind", "issue,,pr"})
 	if err == nil {
@@ -137,6 +174,20 @@ func TestParseArgs_ExportSearchSubcommand_RejectsAnExplicitEmptyAssigneeValue(t 
 	_, err := ParseArgs([]string{"export-search", "--assignee="})
 	if err == nil {
 		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --assignee value, not a silent fall-back to unfiltered")
+	}
+}
+
+func TestParseArgs_ExportSearchSubcommand_RejectsAnExplicitEmptyReviewRequestedValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--review-requested="})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --review-requested value, not a silent fall-back to unfiltered")
+	}
+}
+
+func TestParseArgs_ExportSearchSubcommand_RejectsAnExplicitEmptyReviewedByValue(t *testing.T) {
+	_, err := ParseArgs([]string{"export-search", "--reviewed-by="})
+	if err == nil {
+		t.Fatal("ParseArgs() error = nil, want an error for an explicit empty --reviewed-by value, not a silent fall-back to unfiltered")
 	}
 }
 
@@ -199,6 +250,30 @@ func TestParseArgs_ExportSearchSubcommand_DeduplicatesTheAuthorListInFirstSeenOr
 	want := []string{"octocat", "monalisa"}
 	if !equalStrings(got.Criteria.Authors(), want) {
 		t.Errorf("Authors() = %v, want %v", got.Criteria.Authors(), want)
+	}
+}
+
+func TestParseArgs_ExportSearchSubcommand_DeduplicatesTheReviewRequestedListInFirstSeenOrder(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--review-requested", "octocat,octocat,monalisa"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	want := []string{"octocat", "monalisa"}
+	if !equalStrings(got.Criteria.ReviewRequested(), want) {
+		t.Errorf("ReviewRequested() = %v, want %v", got.Criteria.ReviewRequested(), want)
+	}
+}
+
+func TestParseArgs_ExportSearchSubcommand_DeduplicatesTheReviewedByListInFirstSeenOrder(t *testing.T) {
+	got, err := ParseArgs([]string{"export-search", "--reviewed-by", "octocat,octocat,monalisa"})
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+
+	want := []string{"octocat", "monalisa"}
+	if !equalStrings(got.Criteria.ReviewedBy(), want) {
+		t.Errorf("ReviewedBy() = %v, want %v", got.Criteria.ReviewedBy(), want)
 	}
 }
 

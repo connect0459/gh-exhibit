@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewSearchQuery_RejectsEmptyOwner(t *testing.T) {
-	_, err := valueobjects.NewSearchQuery("", "gh-exhibit", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	_, err := valueobjects.NewSearchQuery("", "gh-exhibit", "", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	if err == nil {
 		t.Fatal("expected an error for an empty owner, got nil")
@@ -16,7 +16,7 @@ func TestNewSearchQuery_RejectsEmptyOwner(t *testing.T) {
 }
 
 func TestNewSearchQuery_RejectsEmptyRepo(t *testing.T) {
-	_, err := valueobjects.NewSearchQuery("connect0459", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	_, err := valueobjects.NewSearchQuery("connect0459", "", "", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	if err == nil {
 		t.Fatal("expected an error for an empty repo, got nil")
@@ -24,7 +24,7 @@ func TestNewSearchQuery_RejectsEmptyRepo(t *testing.T) {
 }
 
 func TestNewSearchQuery_RejectsANonPositiveMaxResults(t *testing.T) {
-	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 0)
+	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 0)
 
 	if err == nil {
 		t.Fatal("expected an error for a non-positive max results, got nil")
@@ -32,15 +32,23 @@ func TestNewSearchQuery_RejectsANonPositiveMaxResults(t *testing.T) {
 }
 
 func TestNewSearchQuery_AcceptsAnEmptyAuthorAndAssigneeMeaningUnfiltered(t *testing.T) {
-	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	if err != nil {
 		t.Fatalf("unexpected error for an unfiltered query: %v", err)
 	}
 }
 
+func TestNewSearchQuery_AcceptsAnEmptyReviewRequestedAndReviewedByMeaningUnfiltered(t *testing.T) {
+	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+
+	if err != nil {
+		t.Fatalf("unexpected error for a query unfiltered by review-requested/reviewed-by: %v", err)
+	}
+}
+
 func TestNewSearchQuery_RejectsAnOutOfRangeSortField(t *testing.T) {
-	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, nil, nil, valueobjects.SearchSortField(99), valueobjects.SearchOrderDescending, 100)
+	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", "", "", nil, nil, nil, valueobjects.SearchSortField(99), valueobjects.SearchOrderDescending, 100)
 
 	if err == nil {
 		t.Fatal("expected an error for a sort field built by bypassing ParseSearchSortField, got nil")
@@ -48,7 +56,7 @@ func TestNewSearchQuery_RejectsAnOutOfRangeSortField(t *testing.T) {
 }
 
 func TestNewSearchQuery_RejectsAnOutOfRangeOrder(t *testing.T) {
-	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchSortOrder(99), 100)
+	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchSortOrder(99), 100)
 
 	if err == nil {
 		t.Fatal("expected an error for an order built by bypassing ParseSearchSortOrder, got nil")
@@ -57,7 +65,7 @@ func TestNewSearchQuery_RejectsAnOutOfRangeOrder(t *testing.T) {
 
 func TestNewSearchQuery_RejectsAnOutOfRangeKind(t *testing.T) {
 	kinds := []valueobjects.IssueKind{valueobjects.IssueKind(99)}
-	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	_, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	if err == nil {
 		t.Fatal("expected an error for a kind built by bypassing ParseIssueKind, got nil")
@@ -66,7 +74,7 @@ func TestNewSearchQuery_RejectsAnOutOfRangeKind(t *testing.T) {
 
 func TestSearchQuery_CreatedAfter_ReturnsADefensiveCopy(t *testing.T) {
 	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	query, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, &after, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", "", "", nil, &after, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 	if err != nil {
 		t.Fatalf("unexpected error building search query: %v", err)
 	}
@@ -82,7 +90,7 @@ func TestSearchQuery_CreatedAfter_ReturnsADefensiveCopy(t *testing.T) {
 func TestNewSearchQuery_DoesNotAliasTheCallersCreatedBeforePointer(t *testing.T) {
 	original := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 	before := original
-	query, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", nil, nil, &before, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query, err := valueobjects.NewSearchQuery("connect0459", "gh-exhibit", "", "", "", "", nil, nil, &before, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 	if err != nil {
 		t.Fatalf("unexpected error building search query: %v", err)
 	}
@@ -100,7 +108,7 @@ func TestSearchQuery_Accessors_ReturnTheConstructedValues(t *testing.T) {
 	kinds := []valueobjects.IssueKind{valueobjects.IssueKindIssue}
 
 	query, err := valueobjects.NewSearchQuery(
-		"connect0459", "gh-exhibit", "octocat", "monalisa", kinds, &after, &before,
+		"connect0459", "gh-exhibit", "octocat", "monalisa", "hubot", "github-actions", kinds, &after, &before,
 		valueobjects.SearchSortByUpdated, valueobjects.SearchOrderAscending, 42,
 	)
 	if err != nil {
@@ -118,6 +126,12 @@ func TestSearchQuery_Accessors_ReturnTheConstructedValues(t *testing.T) {
 	}
 	if got := query.Assignee(); got != "monalisa" {
 		t.Fatalf("Assignee() = %q, want %q", got, "monalisa")
+	}
+	if got := query.ReviewRequested(); got != "hubot" {
+		t.Fatalf("ReviewRequested() = %q, want %q", got, "hubot")
+	}
+	if got := query.ReviewedBy(); got != "github-actions" {
+		t.Fatalf("ReviewedBy() = %q, want %q", got, "github-actions")
 	}
 	if got := query.Kinds(); len(got) != 1 || got[0] != valueobjects.IssueKindIssue {
 		t.Fatalf("Kinds() = %v, want [issue]", got)

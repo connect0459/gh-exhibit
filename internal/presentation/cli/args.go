@@ -107,6 +107,7 @@ func ParseArgs(args []string) (Args, error) {
 var stringFilterFlagNames = map[string]bool{
 	"author": true, "assignee": true, "kind": true,
 	"after": true, "before": true,
+	"review-requested": true, "reviewed-by": true,
 }
 
 // parseExportArgs parses and validates the "export" subcommand's own
@@ -157,6 +158,8 @@ func parseExportSearchArgs(args []string) (Args, error) {
 
 	author := fs.String("author", "", "comma-separated GitHub login(s) to match as author")
 	assignee := fs.String("assignee", "", "comma-separated GitHub login(s) to match as assignee")
+	reviewRequested := fs.String("review-requested", "", "comma-separated GitHub login(s) whose review is requested (pull requests only)")
+	reviewedBy := fs.String("reviewed-by", "", "comma-separated GitHub login(s) who have reviewed (pull requests only)")
 	kind := fs.String("kind", "", "comma-separated issue,pr to restrict the ref kind (default: both)")
 	createdAfter := fs.String("after", "", "only match refs created on or after this date (YYYY-MM-DD)")
 	createdBefore := fs.String("before", "", "only match refs created on or before this date (YYYY-MM-DD)")
@@ -193,7 +196,7 @@ func parseExportSearchArgs(args []string) (Args, error) {
 		return Args{}, fmt.Errorf("%s: value must not be empty", strings.Join(names, ", "))
 	}
 
-	criteria, err := parseSearchCriteria(*author, *assignee, *kind, *createdAfter, *createdBefore, *limit, *sortFlag, *order)
+	criteria, err := parseSearchCriteria(*author, *assignee, *reviewRequested, *reviewedBy, *kind, *createdAfter, *createdBefore, *limit, *sortFlag, *order)
 	if err != nil {
 		return Args{}, err
 	}
@@ -202,7 +205,7 @@ func parseExportSearchArgs(args []string) (Args, error) {
 
 // parseSearchCriteria builds a valueobjects.SearchCriteria from
 // parseExportArgs' own raw filter-flag values.
-func parseSearchCriteria(rawAuthor, rawAssignee, rawKind, rawCreatedAfter, rawCreatedBefore string, limit int, rawSort, rawOrder string) (valueobjects.SearchCriteria, error) {
+func parseSearchCriteria(rawAuthor, rawAssignee, rawReviewRequested, rawReviewedBy, rawKind, rawCreatedAfter, rawCreatedBefore string, limit int, rawSort, rawOrder string) (valueobjects.SearchCriteria, error) {
 	authors, err := parseLogins(rawAuthor)
 	if err != nil {
 		return valueobjects.SearchCriteria{}, fmt.Errorf("--author: %w", err)
@@ -210,6 +213,14 @@ func parseSearchCriteria(rawAuthor, rawAssignee, rawKind, rawCreatedAfter, rawCr
 	assignees, err := parseLogins(rawAssignee)
 	if err != nil {
 		return valueobjects.SearchCriteria{}, fmt.Errorf("--assignee: %w", err)
+	}
+	reviewRequested, err := parseLogins(rawReviewRequested)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--review-requested: %w", err)
+	}
+	reviewedBy, err := parseLogins(rawReviewedBy)
+	if err != nil {
+		return valueobjects.SearchCriteria{}, fmt.Errorf("--reviewed-by: %w", err)
 	}
 	kinds, err := parseKinds(rawKind)
 	if err != nil {
@@ -232,7 +243,7 @@ func parseSearchCriteria(rawAuthor, rawAssignee, rawKind, rawCreatedAfter, rawCr
 		return valueobjects.SearchCriteria{}, fmt.Errorf("--order: %w", err)
 	}
 
-	criteria, err := valueobjects.NewSearchCriteria(authors, assignees, kinds, createdAfter, createdBefore, limit, sortField, order)
+	criteria, err := valueobjects.NewSearchCriteria(authors, assignees, reviewRequested, reviewedBy, kinds, createdAfter, createdBefore, limit, sortField, order)
 	if err != nil {
 		return valueobjects.SearchCriteria{}, err
 	}
@@ -319,6 +330,7 @@ var exportValueFlags = map[string]bool{
 var exportSearchValueFlags = map[string]bool{
 	"repo": true, "output": true, "o": true,
 	"author": true, "assignee": true, "kind": true,
+	"review-requested": true, "reviewed-by": true,
 	"after": true, "before": true,
 	"limit": true, "sort": true, "order": true,
 }

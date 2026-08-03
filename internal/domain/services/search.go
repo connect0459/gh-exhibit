@@ -9,38 +9,65 @@ import (
 )
 
 // BuildSearchQueries expands criteria into one valueobjects.SearchQuery per
-// author/assignee combination. GitHub's search query language rejects OR
-// semantics between repeated qualifiers of the same kind ("author:a
-// author:b" is AND, not OR), so a criteria naming multiple authors/
-// assignees is resolved as separate underlying queries whose results
-// MergeSearchResults unions afterward, not as one combined query. An
-// unfiltered dimension (no authors, or no assignees) contributes a single
-// "" slot, matching SearchQuery's own "empty means unfiltered" convention.
+// author/assignee/review-requested/reviewed-by combination. GitHub's search
+// query language rejects OR semantics between repeated qualifiers of the
+// same kind ("author:a author:b" is AND, not OR), so a criteria naming
+// multiple values in any of these four dimensions is resolved as separate
+// underlying queries whose results MergeSearchResults unions afterward, not
+// as one combined query. sentinelDefault gives each unfiltered dimension a
+// single "" slot, matching SearchQuery's own "empty means unfiltered"
+// convention, and cartesianProduct expands all four dimensions' slots
+// together — a flat loop over the combinations rather than four levels of
+// nesting, so a future fifth "who" dimension is a one-line addition here.
 func BuildSearchQueries(owner, repo string, criteria valueobjects.SearchCriteria) ([]valueobjects.SearchQuery, error) {
-	authors := criteria.Authors()
-	if len(authors) == 0 {
-		authors = []string{""}
-	}
-	assignees := criteria.Assignees()
-	if len(assignees) == 0 {
-		assignees = []string{""}
-	}
+	combinations := cartesianProduct([][]string{
+		sentinelDefault(criteria.Authors()),
+		sentinelDefault(criteria.Assignees()),
+		sentinelDefault(criteria.ReviewRequested()),
+		sentinelDefault(criteria.ReviewedBy()),
+	})
 
-	queries := make([]valueobjects.SearchQuery, 0, len(authors)*len(assignees))
-	for _, author := range authors {
-		for _, assignee := range assignees {
-			query, err := valueobjects.NewSearchQuery(
-				owner, repo, author, assignee, criteria.Kinds(),
-				criteria.CreatedAfter(), criteria.CreatedBefore(),
-				criteria.Sort(), criteria.Order(), criteria.Limit(),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("build search query for author %q assignee %q: %w", author, assignee, err)
-			}
-			queries = append(queries, query)
+	queries := make([]valueobjects.SearchQuery, 0, len(combinations))
+	for _, who := range combinations {
+		author, assignee, reviewRequested, reviewedBy := who[0], who[1], who[2], who[3]
+		query, err := valueobjects.NewSearchQuery(
+			owner, repo, author, assignee, reviewRequested, reviewedBy, criteria.Kinds(),
+			criteria.CreatedAfter(), criteria.CreatedBefore(),
+			criteria.Sort(), criteria.Order(), criteria.Limit(),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("build search query for author %q assignee %q review-requested %q reviewed-by %q: %w", author, assignee, reviewRequested, reviewedBy, err)
 		}
+		queries = append(queries, query)
 	}
 	return queries, nil
+}
+
+// sentinelDefault returns values unchanged, or a single [""] slot when
+// values is empty — the "this dimension is unfiltered" sentinel
+// cartesianProduct's callers rely on (see BuildSearchQueries).
+func sentinelDefault(values []string) []string {
+	if len(values) == 0 {
+		return []string{""}
+	}
+	return values
+}
+
+// cartesianProduct returns every combination of one value from each slice
+// in dimensions, preserving dimensions' own order within each combination.
+// An empty dimensions returns a single empty combination.
+func cartesianProduct(dimensions [][]string) [][]string {
+	combinations := [][]string{{}}
+	for _, dimension := range dimensions {
+		next := make([][]string, 0, len(combinations)*len(dimension))
+		for _, combination := range combinations {
+			for _, value := range dimension {
+				next = append(next, append(append([]string(nil), combination...), value))
+			}
+		}
+		combinations = next
+	}
+	return combinations
 }
 
 // MergeSearchResults merges results (one per BuildSearchQueries query, run

@@ -50,7 +50,7 @@ func TestNewSearchService_ResolvesMatchesViaTheRealGitHubSearchAPI(t *testing.T)
 		t.Fatalf("NewSearchService() error = %v", err)
 	}
 
-	criteria, err := valueobjects.NewSearchCriteria([]string{"octocat"}, nil, nil, nil, nil, 100, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
+	criteria, err := valueobjects.NewSearchCriteria([]string{"octocat"}, nil, nil, nil, nil, nil, nil, 100, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
 	if err != nil {
 		t.Fatalf("unexpected error building search criteria: %v", err)
 	}

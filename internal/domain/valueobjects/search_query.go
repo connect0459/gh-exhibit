@@ -14,26 +14,28 @@ import (
 // domain/services.BuildSearchQueries before infrastructure ever sees one;
 // this type is not built directly from CLI input.
 type SearchQuery struct {
-	owner         string
-	repo          string
-	author        string // "" means unfiltered by author
-	assignee      string // "" means unfiltered by assignee
-	kinds         []IssueKind
-	createdAfter  *time.Time
-	createdBefore *time.Time
-	sort          SearchSortField
-	order         SearchSortOrder
-	maxResults    int
+	owner           string
+	repo            string
+	author          string // "" means unfiltered by author
+	assignee        string // "" means unfiltered by assignee
+	reviewRequested string // "" means unfiltered by review-requested
+	reviewedBy      string // "" means unfiltered by reviewed-by
+	kinds           []IssueKind
+	createdAfter    *time.Time
+	createdBefore   *time.Time
+	sort            SearchSortField
+	order           SearchSortOrder
+	maxResults      int
 }
 
 // NewSearchQuery constructs a SearchQuery. owner and repo must be
-// non-empty; author and assignee may be empty, meaning that dimension is
-// unfiltered. sort and order must each be one of their own package-level
-// constants (e.g. SearchSortByCreated, SearchOrderDescending) — enforced
-// here as well as by SearchCriteria's own constructor, so this constructor
-// does not rely on every caller having already gone through
-// NewSearchCriteria. maxResults must be positive.
-func NewSearchQuery(owner, repo, author, assignee string, kinds []IssueKind, createdAfter, createdBefore *time.Time, sort SearchSortField, order SearchSortOrder, maxResults int) (SearchQuery, error) {
+// non-empty; author, assignee, reviewRequested, and reviewedBy may each be
+// empty, meaning that dimension is unfiltered. sort and order must each be
+// one of their own package-level constants (e.g. SearchSortByCreated,
+// SearchOrderDescending) — enforced here as well as by SearchCriteria's own
+// constructor, so this constructor does not rely on every caller having
+// already gone through NewSearchCriteria. maxResults must be positive.
+func NewSearchQuery(owner, repo, author, assignee, reviewRequested, reviewedBy string, kinds []IssueKind, createdAfter, createdBefore *time.Time, sort SearchSortField, order SearchSortOrder, maxResults int) (SearchQuery, error) {
 	if owner == "" {
 		return SearchQuery{}, errors.New("search query owner must not be empty")
 	}
@@ -56,16 +58,18 @@ func NewSearchQuery(owner, repo, author, assignee string, kinds []IssueKind, cre
 	}
 
 	return SearchQuery{
-		owner:         owner,
-		repo:          repo,
-		author:        author,
-		assignee:      assignee,
-		kinds:         append([]IssueKind(nil), kinds...),
-		createdAfter:  copyPointer(createdAfter),
-		createdBefore: copyPointer(createdBefore),
-		sort:          sort,
-		order:         order,
-		maxResults:    maxResults,
+		owner:           owner,
+		repo:            repo,
+		author:          author,
+		assignee:        assignee,
+		reviewRequested: reviewRequested,
+		reviewedBy:      reviewedBy,
+		kinds:           append([]IssueKind(nil), kinds...),
+		createdAfter:    copyPointer(createdAfter),
+		createdBefore:   copyPointer(createdBefore),
+		sort:            sort,
+		order:           order,
+		maxResults:      maxResults,
 	}, nil
 }
 
@@ -89,6 +93,18 @@ func (q SearchQuery) Author() string {
 // unfiltered by assignee.
 func (q SearchQuery) Assignee() string {
 	return q.assignee
+}
+
+// ReviewRequested returns the single login to filter by GitHub's
+// review-requested qualifier, or "" when unfiltered by it.
+func (q SearchQuery) ReviewRequested() string {
+	return q.reviewRequested
+}
+
+// ReviewedBy returns the single login to filter by GitHub's reviewed-by
+// qualifier, or "" when unfiltered by it.
+func (q SearchQuery) ReviewedBy() string {
+	return q.reviewedBy
 }
 
 // Kinds returns a defensive copy of the issue/PR kinds to match (empty

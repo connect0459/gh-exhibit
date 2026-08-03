@@ -27,7 +27,7 @@ func (f *fakeIssueSearcher) Search(_ context.Context, query valueobjects.SearchQ
 
 func testSearchCriteria(t *testing.T, authors, assignees []string, limit int) valueobjects.SearchCriteria {
 	t.Helper()
-	criteria, err := valueobjects.NewSearchCriteria(authors, assignees, nil, nil, nil, limit, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
+	criteria, err := valueobjects.NewSearchCriteria(authors, assignees, nil, nil, nil, nil, nil, limit, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
 	if err != nil {
 		t.Fatalf("unexpected error building search criteria: %v", err)
 	}

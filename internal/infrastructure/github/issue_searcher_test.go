@@ -33,10 +33,10 @@ func newTestSearcher(t *testing.T, server *httptest.Server) repositories.IssueSe
 	return searcher
 }
 
-func testSearchQuery(t *testing.T, author, assignee string, kinds []valueobjects.IssueKind, createdAfter, createdBefore *time.Time, sort valueobjects.SearchSortField, order valueobjects.SearchSortOrder, maxResults int) valueobjects.SearchQuery {
+func testSearchQuery(t *testing.T, author, assignee, reviewRequested, reviewedBy string, kinds []valueobjects.IssueKind, createdAfter, createdBefore *time.Time, sort valueobjects.SearchSortField, order valueobjects.SearchSortOrder, maxResults int) valueobjects.SearchQuery {
 	t.Helper()
 
-	query, err := valueobjects.NewSearchQuery("octocat", "hello-world", author, assignee, kinds, createdAfter, createdBefore, sort, order, maxResults)
+	query, err := valueobjects.NewSearchQuery("octocat", "hello-world", author, assignee, reviewRequested, reviewedBy, kinds, createdAfter, createdBefore, sort, order, maxResults)
 	if err != nil {
 		t.Fatalf("NewSearchQuery() error = %v", err)
 	}
@@ -69,7 +69,7 @@ func searchQParam(t *testing.T, query valueobjects.SearchQuery) string {
 }
 
 func TestSearch_SendsARepoOnlyQualifierWhenUnfiltered(t *testing.T) {
-	query := testSearchQuery(t, "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	got := searchQParam(t, query)
 
@@ -79,7 +79,7 @@ func TestSearch_SendsARepoOnlyQualifierWhenUnfiltered(t *testing.T) {
 }
 
 func TestSearch_SendsAuthorAndAssigneeQualifiers(t *testing.T) {
-	query := testSearchQuery(t, "monalisa", "hubot", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "monalisa", "hubot", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	got := searchQParam(t, query)
 
@@ -89,9 +89,31 @@ func TestSearch_SendsAuthorAndAssigneeQualifiers(t *testing.T) {
 	}
 }
 
+func TestSearch_SendsReviewRequestedAndReviewedByQualifiers(t *testing.T) {
+	query := testSearchQuery(t, "", "", "monalisa", "hubot", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+
+	got := searchQParam(t, query)
+
+	want := "repo:octocat/hello-world review-requested:monalisa reviewed-by:hubot"
+	if got != want {
+		t.Fatalf("q = %q, want %q", got, want)
+	}
+}
+
+func TestSearch_SendsAllFourWhoQualifiersTogetherInOrder(t *testing.T) {
+	query := testSearchQuery(t, "octocat", "defunkt", "monalisa", "hubot", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+
+	got := searchQParam(t, query)
+
+	want := "repo:octocat/hello-world author:octocat assignee:defunkt review-requested:monalisa reviewed-by:hubot"
+	if got != want {
+		t.Fatalf("q = %q, want %q", got, want)
+	}
+}
+
 func TestSearch_OmitsTheIsQualifierWhenBothKindsAreRequested(t *testing.T) {
 	kinds := []valueobjects.IssueKind{valueobjects.IssueKindIssue, valueobjects.IssueKindPullRequest}
-	query := testSearchQuery(t, "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "", "", "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	got := searchQParam(t, query)
 
@@ -102,7 +124,7 @@ func TestSearch_OmitsTheIsQualifierWhenBothKindsAreRequested(t *testing.T) {
 
 func TestSearch_AddsIsIssueWhenOnlyIssueKindIsRequested(t *testing.T) {
 	kinds := []valueobjects.IssueKind{valueobjects.IssueKindIssue}
-	query := testSearchQuery(t, "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "", "", "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	got := searchQParam(t, query)
 
@@ -114,7 +136,7 @@ func TestSearch_AddsIsIssueWhenOnlyIssueKindIsRequested(t *testing.T) {
 
 func TestSearch_AddsIsPrWhenOnlyPullRequestKindIsRequested(t *testing.T) {
 	kinds := []valueobjects.IssueKind{valueobjects.IssueKindPullRequest}
-	query := testSearchQuery(t, "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "", "", "", "", kinds, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	got := searchQParam(t, query)
 
@@ -127,7 +149,7 @@ func TestSearch_AddsIsPrWhenOnlyPullRequestKindIsRequested(t *testing.T) {
 func TestSearch_CombinesBothDateBoundsIntoARange(t *testing.T) {
 	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	before := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
-	query := testSearchQuery(t, "", "", nil, &after, &before, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "", "", "", "", nil, &after, &before, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	got := searchQParam(t, query)
 
@@ -139,7 +161,7 @@ func TestSearch_CombinesBothDateBoundsIntoARange(t *testing.T) {
 
 func TestSearch_UsesAOneSidedLowerBoundWhenOnlyCreatedAfterIsSet(t *testing.T) {
 	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	query := testSearchQuery(t, "", "", nil, &after, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "", "", "", "", nil, &after, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	got := searchQParam(t, query)
 
@@ -151,7 +173,7 @@ func TestSearch_UsesAOneSidedLowerBoundWhenOnlyCreatedAfterIsSet(t *testing.T) {
 
 func TestSearch_UsesAOneSidedUpperBoundWhenOnlyCreatedBeforeIsSet(t *testing.T) {
 	before := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
-	query := testSearchQuery(t, "", "", nil, nil, &before, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "", "", "", "", nil, nil, &before, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	got := searchQParam(t, query)
 
@@ -184,7 +206,7 @@ func TestSearch_SendsQSortOrderAndPerPage(t *testing.T) {
 	defer server.Close()
 
 	searcher := newTestSearcher(t, server)
-	query := testSearchQuery(t, "monalisa", "", nil, nil, nil, valueobjects.SearchSortByComments, valueobjects.SearchOrderAscending, 17)
+	query := testSearchQuery(t, "monalisa", "", "", "", nil, nil, nil, valueobjects.SearchSortByComments, valueobjects.SearchOrderAscending, 17)
 
 	_, err := searcher.Search(context.Background(), query)
 	if err != nil {
@@ -205,7 +227,7 @@ func TestSearch_DecodesTotalCountAndItemsIntoASearchResult(t *testing.T) {
 	defer server.Close()
 
 	searcher := newTestSearcher(t, server)
-	query := testSearchQuery(t, "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	result, err := searcher.Search(context.Background(), query)
 	if err != nil {
@@ -238,7 +260,7 @@ func TestSearch_ReturnsAnErrorOnAServerFailure(t *testing.T) {
 	defer server.Close()
 
 	searcher := newTestSearcher(t, server)
-	query := testSearchQuery(t, "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
+	query := testSearchQuery(t, "", "", "", "", nil, nil, nil, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending, 100)
 
 	_, err := searcher.Search(context.Background(), query)
 	if err == nil {

@@ -31,7 +31,7 @@ func (f *fakeSearcher) Search(_ context.Context, owner, repo string, _ valueobje
 
 func testCriteriaWithLimit(t *testing.T, limit int) valueobjects.SearchCriteria {
 	t.Helper()
-	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, nil, limit, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
+	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, nil, nil, nil, limit, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
 	if err != nil {
 		t.Fatalf("unexpected error building search criteria: %v", err)
 	}
