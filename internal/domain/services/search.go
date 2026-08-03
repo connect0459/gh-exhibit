@@ -17,8 +17,8 @@ import (
 // as one combined query. sentinelDefault gives each unfiltered dimension a
 // single "" slot, matching SearchQuery's own "empty means unfiltered"
 // convention, and cartesianProduct expands all four dimensions' slots
-// together — a flat loop over the combinations rather than four levels of
-// nesting, so a future fifth "who" dimension is a one-line addition here.
+// together as a flat loop over the combinations, avoiding the four levels
+// of nesting a direct translation of this expansion would otherwise need.
 func BuildSearchQueries(owner, repo string, criteria valueobjects.SearchCriteria) ([]valueobjects.SearchQuery, error) {
 	combinations := cartesianProduct([][]string{
 		sentinelDefault(criteria.Authors()),
