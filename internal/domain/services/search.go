@@ -8,39 +8,85 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
+// MaxSearchQueryCombinations bounds how many underlying GitHub search
+// queries BuildSearchQueries will expand a single criteria into (the
+// product of its author/assignee/review-requested/reviewed-by dimension
+// sizes). Widening the cross product from 2 to 4 independent dimensions
+// made a runaway combination count (each one a real, rate-limited GitHub
+// API request) reachable from ordinary-looking multi-value flags in a way
+// the prior 2D expansion's own worst case did not; BuildSearchQueries
+// rejects a criteria whose combination count exceeds this bound outright,
+// before issuing a single query.
+const MaxSearchQueryCombinations = 50
+
 // BuildSearchQueries expands criteria into one valueobjects.SearchQuery per
-// author/assignee combination. GitHub's search query language rejects OR
-// semantics between repeated qualifiers of the same kind ("author:a
-// author:b" is AND, not OR), so a criteria naming multiple authors/
-// assignees is resolved as separate underlying queries whose results
-// MergeSearchResults unions afterward, not as one combined query. An
-// unfiltered dimension (no authors, or no assignees) contributes a single
-// "" slot, matching SearchQuery's own "empty means unfiltered" convention.
+// author/assignee/review-requested/reviewed-by combination. GitHub's search
+// query language rejects OR semantics between repeated qualifiers of the
+// same kind ("author:a author:b" is AND, not OR), so a criteria naming
+// multiple values in any of these four dimensions is resolved as separate
+// underlying queries whose results MergeSearchResults unions afterward, not
+// as one combined query. sentinelDefault gives each unfiltered dimension a
+// single "" slot, matching SearchQuery's own "empty means unfiltered"
+// convention, and cartesianProduct expands all four dimensions' slots
+// together as a flat loop over the combinations, avoiding the four levels
+// of nesting a direct translation of this expansion would otherwise need.
+// The resulting combination count is rejected above MaxSearchQueryCombinations
+// (see its own doc comment) before a single underlying query is built.
 func BuildSearchQueries(owner, repo string, criteria valueobjects.SearchCriteria) ([]valueobjects.SearchQuery, error) {
-	authors := criteria.Authors()
-	if len(authors) == 0 {
-		authors = []string{""}
-	}
-	assignees := criteria.Assignees()
-	if len(assignees) == 0 {
-		assignees = []string{""}
+	combinations := cartesianProduct([][]string{
+		sentinelDefault(criteria.Authors()),
+		sentinelDefault(criteria.Assignees()),
+		sentinelDefault(criteria.ReviewRequested()),
+		sentinelDefault(criteria.ReviewedBy()),
+	})
+	if len(combinations) > MaxSearchQueryCombinations {
+		return nil, fmt.Errorf(
+			"criteria would expand into %d underlying GitHub search queries (author x assignee x review-requested x reviewed-by combinations), exceeding the %d maximum; narrow one or more of --author/--assignee/--review-requested/--reviewed-by",
+			len(combinations), MaxSearchQueryCombinations,
+		)
 	}
 
-	queries := make([]valueobjects.SearchQuery, 0, len(authors)*len(assignees))
-	for _, author := range authors {
-		for _, assignee := range assignees {
-			query, err := valueobjects.NewSearchQuery(
-				owner, repo, author, assignee, criteria.Kinds(),
-				criteria.CreatedAfter(), criteria.CreatedBefore(),
-				criteria.Sort(), criteria.Order(), criteria.Limit(),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("build search query for author %q assignee %q: %w", author, assignee, err)
-			}
-			queries = append(queries, query)
+	queries := make([]valueobjects.SearchQuery, 0, len(combinations))
+	for _, who := range combinations {
+		author, assignee, reviewRequested, reviewedBy := who[0], who[1], who[2], who[3]
+		query, err := valueobjects.NewSearchQuery(
+			owner, repo, author, assignee, reviewRequested, reviewedBy, criteria.Kinds(),
+			criteria.CreatedAfter(), criteria.CreatedBefore(),
+			criteria.Sort(), criteria.Order(), criteria.Limit(),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("build search query for author %q assignee %q review-requested %q reviewed-by %q: %w", author, assignee, reviewRequested, reviewedBy, err)
 		}
+		queries = append(queries, query)
 	}
 	return queries, nil
+}
+
+// sentinelDefault returns values unchanged, or a single [""] slot when
+// values is empty — the "this dimension is unfiltered" sentinel
+// cartesianProduct's callers rely on (see BuildSearchQueries).
+func sentinelDefault(values []string) []string {
+	if len(values) == 0 {
+		return []string{""}
+	}
+	return values
+}
+
+// cartesianProduct returns every combination of one value from each slice
+// in dimensions, preserving dimensions' own order within each combination.
+// An empty dimensions returns a single empty combination.
+func cartesianProduct(dimensions [][]string) [][]string {
+	combinations := [][]string{{}}
+	for _, dimension := range dimensions {
+		next := make([][]string, 0, len(combinations)*len(dimension))
+		for _, combination := range combinations {
+			for _, value := range dimension {
+				next = append(next, append(append([]string(nil), combination...), value))
+			}
+		}
+		combinations = next
+	}
+	return combinations
 }
 
 // MergeSearchResults merges results (one per BuildSearchQueries query, run

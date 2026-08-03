@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,9 +9,9 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
-func testSearchCriteria(t *testing.T, authors, assignees []string) valueobjects.SearchCriteria {
+func testSearchCriteria(t *testing.T, authors, assignees, reviewRequested, reviewedBy []string) valueobjects.SearchCriteria {
 	t.Helper()
-	criteria, err := valueobjects.NewSearchCriteria(authors, assignees, nil, nil, nil, 100, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
+	criteria, err := valueobjects.NewSearchCriteria(authors, assignees, reviewRequested, reviewedBy, nil, nil, nil, 100, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
 	if err != nil {
 		t.Fatalf("unexpected error building search criteria: %v", err)
 	}
@@ -18,7 +19,7 @@ func testSearchCriteria(t *testing.T, authors, assignees []string) valueobjects.
 }
 
 func TestBuildSearchQueries_BuildsOneQueryPerAuthorAssigneeCombination(t *testing.T) {
-	criteria := testSearchCriteria(t, []string{"octocat", "monalisa"}, []string{"hubot", "defunkt"})
+	criteria := testSearchCriteria(t, []string{"octocat", "monalisa"}, []string{"hubot", "defunkt"}, nil, nil)
 
 	queries, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
 	if err != nil {
@@ -44,7 +45,7 @@ func TestBuildSearchQueries_BuildsOneQueryPerAuthorAssigneeCombination(t *testin
 }
 
 func TestBuildSearchQueries_BuildsASingleUnfilteredQueryWhenNoAuthorOrAssigneeGiven(t *testing.T) {
-	criteria := testSearchCriteria(t, nil, nil)
+	criteria := testSearchCriteria(t, nil, nil, nil, nil)
 
 	queries, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
 	if err != nil {
@@ -60,7 +61,7 @@ func TestBuildSearchQueries_BuildsASingleUnfilteredQueryWhenNoAuthorOrAssigneeGi
 }
 
 func TestBuildSearchQueries_BuildsOneQueryPerAuthorWhenNoAssigneeGiven(t *testing.T) {
-	criteria := testSearchCriteria(t, []string{"octocat", "monalisa"}, nil)
+	criteria := testSearchCriteria(t, []string{"octocat", "monalisa"}, nil, nil, nil)
 
 	queries, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
 	if err != nil {
@@ -77,11 +78,117 @@ func TestBuildSearchQueries_BuildsOneQueryPerAuthorWhenNoAssigneeGiven(t *testin
 	}
 }
 
+func TestBuildSearchQueries_BuildsOneQueryPerReviewRequestedReviewedByCombination(t *testing.T) {
+	criteria := testSearchCriteria(t, nil, nil, []string{"octocat", "monalisa"}, []string{"hubot", "defunkt"})
+
+	queries, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
+	if err != nil {
+		t.Fatalf("unexpected error building search queries: %v", err)
+	}
+
+	if len(queries) != 4 {
+		t.Fatalf("len(queries) = %d, want 4 (2 review-requested x 2 reviewed-by)", len(queries))
+	}
+
+	seen := make(map[string]bool, len(queries))
+	for _, q := range queries {
+		seen[q.ReviewRequested()+"|"+q.ReviewedBy()] = true
+	}
+	for _, want := range []string{"octocat|hubot", "octocat|defunkt", "monalisa|hubot", "monalisa|defunkt"} {
+		if !seen[want] {
+			t.Fatalf("expected a query for review-requested|reviewed-by combination %q, got %v", want, seen)
+		}
+	}
+}
+
+func TestBuildSearchQueries_BuildsOneQueryPerReviewRequestedWhenNoOthersGiven(t *testing.T) {
+	criteria := testSearchCriteria(t, nil, nil, []string{"octocat", "monalisa"}, nil)
+
+	queries, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
+	if err != nil {
+		t.Fatalf("unexpected error building search queries: %v", err)
+	}
+
+	if len(queries) != 2 {
+		t.Fatalf("len(queries) = %d, want 2", len(queries))
+	}
+	for _, q := range queries {
+		if q.ReviewedBy() != "" {
+			t.Fatalf("expected an unfiltered reviewed-by, got %q", q.ReviewedBy())
+		}
+	}
+}
+
+func TestBuildSearchQueries_BuildsFullCrossProductAcrossAllFourDimensions(t *testing.T) {
+	criteria := testSearchCriteria(t,
+		[]string{"a1", "a2"}, []string{"s1", "s2"}, []string{"r1", "r2"}, []string{"b1", "b2"},
+	)
+
+	queries, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
+	if err != nil {
+		t.Fatalf("unexpected error building search queries: %v", err)
+	}
+
+	if len(queries) != 16 {
+		t.Fatalf("len(queries) = %d, want 16 (2x2x2x2)", len(queries))
+	}
+
+	seen := make(map[string]bool, len(queries))
+	for _, q := range queries {
+		key := q.Author() + "|" + q.Assignee() + "|" + q.ReviewRequested() + "|" + q.ReviewedBy()
+		if seen[key] {
+			t.Fatalf("duplicate combination %q produced", key)
+		}
+		seen[key] = true
+	}
+	if len(seen) != 16 {
+		t.Fatalf("distinct combinations = %d, want 16", len(seen))
+	}
+}
+
+func loginList(prefix string, n int) []string {
+	logins := make([]string, n)
+	for i := range logins {
+		logins[i] = fmt.Sprintf("%s%d", prefix, i)
+	}
+	return logins
+}
+
+func TestBuildSearchQueries_AcceptsACombinationCountEqualToTheMax(t *testing.T) {
+	criteria := testSearchCriteria(t, loginList("a", services.MaxSearchQueryCombinations), nil, nil, nil)
+
+	queries, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
+	if err != nil {
+		t.Fatalf("unexpected error building search queries: %v", err)
+	}
+	if len(queries) != services.MaxSearchQueryCombinations {
+		t.Fatalf("len(queries) = %d, want %d", len(queries), services.MaxSearchQueryCombinations)
+	}
+}
+
+func TestBuildSearchQueries_RejectsACombinationCountAboveTheMax(t *testing.T) {
+	criteria := testSearchCriteria(t, loginList("a", services.MaxSearchQueryCombinations+1), nil, nil, nil)
+
+	_, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
+	if err == nil {
+		t.Fatal("expected an error when the author/assignee/review-requested/reviewed-by combination count exceeds MaxSearchQueryCombinations, got nil")
+	}
+}
+
+func TestBuildSearchQueries_RejectsACombinationCountAboveTheMaxAcrossMultipleDimensions(t *testing.T) {
+	criteria := testSearchCriteria(t, loginList("a", 8), loginList("s", 8), nil, nil)
+
+	_, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
+	if err == nil {
+		t.Fatal("expected an error when 8 authors x 8 assignees (64 combinations) exceeds MaxSearchQueryCombinations, got nil")
+	}
+}
+
 func TestBuildSearchQueries_PropagatesSharedFieldsToEveryQuery(t *testing.T) {
 	after := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	before := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 	kinds := []valueobjects.IssueKind{valueobjects.IssueKindPullRequest}
-	criteria, err := valueobjects.NewSearchCriteria(nil, nil, kinds, &after, &before, 7, valueobjects.SearchSortByComments, valueobjects.SearchOrderAscending)
+	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, kinds, &after, &before, 7, valueobjects.SearchSortByComments, valueobjects.SearchOrderAscending)
 	if err != nil {
 		t.Fatalf("unexpected error building search criteria: %v", err)
 	}
@@ -137,7 +244,7 @@ func TestMergeSearchResults_DeduplicatesMatchingNumbersAcrossMultipleResults(t *
 	now := time.Now()
 	a := testSearchMatch(t, 1, now, now, 0)
 	b := testSearchMatch(t, 2, now, now, 0)
-	criteria := testSearchCriteria(t, nil, nil)
+	criteria := testSearchCriteria(t, nil, nil, nil, nil)
 
 	numbers, matchedCount, exceededLimit := services.MergeSearchResults(
 		[]valueobjects.SearchResult{testSearchResult(t, 1, a), testSearchResult(t, 2, a, b)},
@@ -160,7 +267,7 @@ func TestMergeSearchResults_SortsByCreatedDescendingByDefault(t *testing.T) {
 	newer := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 	a := testSearchMatch(t, 1, older, older, 0)
 	b := testSearchMatch(t, 2, newer, newer, 0)
-	criteria := testSearchCriteria(t, nil, nil)
+	criteria := testSearchCriteria(t, nil, nil, nil, nil)
 
 	numbers, _, _ := services.MergeSearchResults([]valueobjects.SearchResult{testSearchResult(t, 2, a, b)}, criteria)
 
@@ -174,7 +281,7 @@ func TestMergeSearchResults_SortsAscendingWhenOrderIsAscending(t *testing.T) {
 	newer := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 	a := testSearchMatch(t, 1, older, older, 0)
 	b := testSearchMatch(t, 2, newer, newer, 0)
-	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, nil, 100, valueobjects.SearchSortByCreated, valueobjects.SearchOrderAscending)
+	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, nil, nil, nil, 100, valueobjects.SearchSortByCreated, valueobjects.SearchOrderAscending)
 	if err != nil {
 		t.Fatalf("unexpected error building search criteria: %v", err)
 	}
@@ -190,7 +297,7 @@ func TestMergeSearchResults_SortsByComments(t *testing.T) {
 	now := time.Now()
 	a := testSearchMatch(t, 1, now, now, 1)
 	b := testSearchMatch(t, 2, now, now, 5)
-	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, nil, 100, valueobjects.SearchSortByComments, valueobjects.SearchOrderDescending)
+	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, nil, nil, nil, 100, valueobjects.SearchSortByComments, valueobjects.SearchOrderDescending)
 	if err != nil {
 		t.Fatalf("unexpected error building search criteria: %v", err)
 	}
@@ -206,7 +313,7 @@ func TestMergeSearchResults_TruncatesToTheCriteriaLimitAndReportsExceededLimit(t
 	now := time.Now()
 	a := testSearchMatch(t, 1, now, now, 0)
 	b := testSearchMatch(t, 2, now, now, 0)
-	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, nil, 1, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
+	criteria, err := valueobjects.NewSearchCriteria(nil, nil, nil, nil, nil, nil, nil, 1, valueobjects.SearchSortByCreated, valueobjects.SearchOrderDescending)
 	if err != nil {
 		t.Fatalf("unexpected error building search criteria: %v", err)
 	}
@@ -227,7 +334,7 @@ func TestMergeSearchResults_TruncatesToTheCriteriaLimitAndReportsExceededLimit(t
 func TestMergeSearchResults_ReportsExceededLimitWhenAResultsTotalCountExceedsItsOwnMatches(t *testing.T) {
 	now := time.Now()
 	a := testSearchMatch(t, 1, now, now, 0)
-	criteria := testSearchCriteria(t, nil, nil)
+	criteria := testSearchCriteria(t, nil, nil, nil, nil)
 
 	_, _, exceededLimit := services.MergeSearchResults([]valueobjects.SearchResult{testSearchResult(t, 50, a)}, criteria)
 
@@ -239,7 +346,7 @@ func TestMergeSearchResults_ReportsExceededLimitWhenAResultsTotalCountExceedsIts
 func TestMergeSearchResults_ReportsTheResultsOwnTotalCountAsMatchedCountWhenItExceedsTheReturnedMatches(t *testing.T) {
 	now := time.Now()
 	a := testSearchMatch(t, 1, now, now, 0)
-	criteria := testSearchCriteria(t, nil, nil)
+	criteria := testSearchCriteria(t, nil, nil, nil, nil)
 
 	_, matchedCount, _ := services.MergeSearchResults([]valueobjects.SearchResult{testSearchResult(t, 250, a)}, criteria)
 
@@ -252,7 +359,7 @@ func TestMergeSearchResults_MatchedCountIsTheMaxTotalCountAcrossMultipleResults(
 	now := time.Now()
 	a := testSearchMatch(t, 1, now, now, 0)
 	b := testSearchMatch(t, 2, now, now, 0)
-	criteria := testSearchCriteria(t, nil, nil)
+	criteria := testSearchCriteria(t, nil, nil, nil, nil)
 
 	_, matchedCount, _ := services.MergeSearchResults(
 		[]valueobjects.SearchResult{testSearchResult(t, 30, a), testSearchResult(t, 250, b)},
@@ -265,7 +372,7 @@ func TestMergeSearchResults_MatchedCountIsTheMaxTotalCountAcrossMultipleResults(
 }
 
 func TestMergeSearchResults_ReturnsNoNumbersForNoResults(t *testing.T) {
-	criteria := testSearchCriteria(t, nil, nil)
+	criteria := testSearchCriteria(t, nil, nil, nil, nil)
 
 	numbers, matchedCount, exceededLimit := services.MergeSearchResults(nil, criteria)
 

@@ -36,29 +36,38 @@ const SearchDateLayout = "2006-01-02"
 // author/assignee combination) is domain/services.BuildSearchQueries' job,
 // not this type's.
 type SearchCriteria struct {
-	authors       []string
-	assignees     []string
-	kinds         []IssueKind
-	createdAfter  *time.Time
-	createdBefore *time.Time
-	limit         int
-	sort          SearchSortField
-	order         SearchSortOrder
+	authors         []string
+	assignees       []string
+	reviewRequested []string
+	reviewedBy      []string
+	kinds           []IssueKind
+	createdAfter    *time.Time
+	createdBefore   *time.Time
+	limit           int
+	sort            SearchSortField
+	order           SearchSortOrder
 }
 
 // NewSearchCriteria constructs a SearchCriteria from its filter values.
-// authors and assignees, when non-empty, must each be a valid GitHub login
-// (the same rule NewIssueRef applies to an owner). kinds, when non-empty,
-// restricts matches to the named issue/PR kinds; empty means both. sort and
-// order must each be one of their own package-level constants (e.g.
-// SearchSortByCreated, SearchOrderDescending) — this is enforced here, not
-// only by ParseSearchSortField/ParseSearchSortOrder, so an out-of-range
-// value can never reach domain/services.MergeSearchResults regardless of
-// how a SearchCriteria was built. createdAfter/createdBefore are inclusive
+// authors, assignees, reviewRequested, and reviewedBy, when non-empty, must
+// each be a valid GitHub login (the same rule NewIssueRef applies to an
+// owner). reviewRequested and reviewedBy filter by GitHub's own
+// review-requested/reviewed-by search qualifiers, which only ever match
+// pull requests (see domain/services.BuildSearchQueries and
+// infrastructure/github's buildSearchQueryString); combining either with a
+// kinds filter of issue-only is not validated here — it simply yields no
+// matches, the same way GitHub's own search API behaves for that
+// combination. kinds, when non-empty, restricts matches to the named
+// issue/PR kinds; empty means both. sort and order must each be one of
+// their own package-level constants (e.g. SearchSortByCreated,
+// SearchOrderDescending) — this is enforced here, not only by
+// ParseSearchSortField/ParseSearchSortOrder, so an out-of-range value can
+// never reach domain/services.MergeSearchResults regardless of how a
+// SearchCriteria was built. createdAfter/createdBefore are inclusive
 // bounds on the created-date range, either or both of which may be nil;
 // when both are given, createdAfter must not be later than createdBefore.
 // limit must be between 1 and MaxSearchLimit inclusive.
-func NewSearchCriteria(authors, assignees []string, kinds []IssueKind, createdAfter, createdBefore *time.Time, limit int, sort SearchSortField, order SearchSortOrder) (SearchCriteria, error) {
+func NewSearchCriteria(authors, assignees, reviewRequested, reviewedBy []string, kinds []IssueKind, createdAfter, createdBefore *time.Time, limit int, sort SearchSortField, order SearchSortOrder) (SearchCriteria, error) {
 	for _, author := range authors {
 		if err := validateOwner(author, "search criteria author"); err != nil {
 			return SearchCriteria{}, err
@@ -66,6 +75,16 @@ func NewSearchCriteria(authors, assignees []string, kinds []IssueKind, createdAf
 	}
 	for _, assignee := range assignees {
 		if err := validateOwner(assignee, "search criteria assignee"); err != nil {
+			return SearchCriteria{}, err
+		}
+	}
+	for _, login := range reviewRequested {
+		if err := validateOwner(login, "search criteria review-requested"); err != nil {
+			return SearchCriteria{}, err
+		}
+	}
+	for _, login := range reviewedBy {
+		if err := validateOwner(login, "search criteria reviewed-by"); err != nil {
 			return SearchCriteria{}, err
 		}
 	}
@@ -88,14 +107,16 @@ func NewSearchCriteria(authors, assignees []string, kinds []IssueKind, createdAf
 	}
 
 	return SearchCriteria{
-		authors:       append([]string(nil), authors...),
-		assignees:     append([]string(nil), assignees...),
-		kinds:         append([]IssueKind(nil), kinds...),
-		createdAfter:  copyPointer(createdAfter),
-		createdBefore: copyPointer(createdBefore),
-		limit:         limit,
-		sort:          sort,
-		order:         order,
+		authors:         append([]string(nil), authors...),
+		assignees:       append([]string(nil), assignees...),
+		reviewRequested: append([]string(nil), reviewRequested...),
+		reviewedBy:      append([]string(nil), reviewedBy...),
+		kinds:           append([]IssueKind(nil), kinds...),
+		createdAfter:    copyPointer(createdAfter),
+		createdBefore:   copyPointer(createdBefore),
+		limit:           limit,
+		sort:            sort,
+		order:           order,
 	}, nil
 }
 
@@ -109,6 +130,18 @@ func (c SearchCriteria) Authors() []string {
 // (empty means unfiltered by assignee).
 func (c SearchCriteria) Assignees() []string {
 	return append([]string(nil), c.assignees...)
+}
+
+// ReviewRequested returns a defensive copy of the logins to match against
+// GitHub's review-requested qualifier (empty means unfiltered).
+func (c SearchCriteria) ReviewRequested() []string {
+	return append([]string(nil), c.reviewRequested...)
+}
+
+// ReviewedBy returns a defensive copy of the logins to match against
+// GitHub's reviewed-by qualifier (empty means unfiltered).
+func (c SearchCriteria) ReviewedBy() []string {
+	return append([]string(nil), c.reviewedBy...)
 }
 
 // Kinds returns a defensive copy of the issue/PR kinds to match (empty

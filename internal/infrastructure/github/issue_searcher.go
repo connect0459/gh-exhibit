@@ -72,15 +72,23 @@ func searchRequestValues(query valueobjects.SearchQuery) url.Values {
 }
 
 // buildSearchQueryString builds GitHub search's own "q" qualifier string
-// for query: a "repo:" qualifier is always present; "author:"/"assignee:"
-// are added only when query names one (GitHub's search query language has
-// no OR semantics between repeated qualifiers of the same kind, so a
-// multi-valued filter is never represented here — see
-// domain/services.BuildSearchQueries); "is:issue"/"is:pr" is added only
-// when query restricts to exactly one kind (omitted entirely, meaning
-// both, when it names both or neither); the created-date range collapses
-// to a single two-sided "created:after..before" qualifier when both bounds
-// are set, or a one-sided ">="/"<=" qualifier when only one is.
+// for query: a "repo:" qualifier is always present; "author:"/"assignee:"/
+// "review-requested:"/"reviewed-by:" are added only when query names one
+// (GitHub's search query language has no OR semantics between repeated
+// qualifiers of the same kind, so a multi-valued filter is never
+// represented here — see domain/services.BuildSearchQueries); "is:issue"/
+// "is:pr" is added only when query restricts to exactly one kind (omitted
+// entirely, meaning both, when it names both or neither); the
+// created-date range collapses to a single two-sided
+// "created:after..before" qualifier when both bounds are set, or a
+// one-sided ">="/"<=" qualifier when only one is.
+//
+// review-requested:/reviewed-by: only ever match pull requests — GitHub's
+// search API returns zero results for an issue against either qualifier —
+// and this is not cross-validated against query.Kinds() here or anywhere
+// upstream (see valueobjects.NewSearchCriteria's own doc comment): a
+// caller combining, say, --kind issue with --review-requested simply gets
+// no matches, the same way GitHub's own API behaves for that combination.
 func buildSearchQueryString(query valueobjects.SearchQuery) string {
 	parts := []string{fmt.Sprintf("repo:%s/%s", query.Owner(), query.Repo())}
 
@@ -89,6 +97,12 @@ func buildSearchQueryString(query valueobjects.SearchQuery) string {
 	}
 	if assignee := query.Assignee(); assignee != "" {
 		parts = append(parts, "assignee:"+assignee)
+	}
+	if reviewRequested := query.ReviewRequested(); reviewRequested != "" {
+		parts = append(parts, "review-requested:"+reviewRequested)
+	}
+	if reviewedBy := query.ReviewedBy(); reviewedBy != "" {
+		parts = append(parts, "reviewed-by:"+reviewedBy)
 	}
 	if kinds := query.Kinds(); len(kinds) == 1 {
 		switch kinds[0] {
