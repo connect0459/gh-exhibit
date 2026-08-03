@@ -8,6 +8,17 @@ import (
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
+// MaxSearchQueryCombinations bounds how many underlying GitHub search
+// queries BuildSearchQueries will expand a single criteria into (the
+// product of its author/assignee/review-requested/reviewed-by dimension
+// sizes). Widening the cross product from 2 to 4 independent dimensions
+// made a runaway combination count (each one a real, rate-limited GitHub
+// API request) reachable from ordinary-looking multi-value flags in a way
+// the prior 2D expansion's own worst case did not; BuildSearchQueries
+// rejects a criteria whose combination count exceeds this bound outright,
+// before issuing a single query.
+const MaxSearchQueryCombinations = 50
+
 // BuildSearchQueries expands criteria into one valueobjects.SearchQuery per
 // author/assignee/review-requested/reviewed-by combination. GitHub's search
 // query language rejects OR semantics between repeated qualifiers of the
@@ -19,6 +30,8 @@ import (
 // convention, and cartesianProduct expands all four dimensions' slots
 // together as a flat loop over the combinations, avoiding the four levels
 // of nesting a direct translation of this expansion would otherwise need.
+// The resulting combination count is rejected above MaxSearchQueryCombinations
+// (see its own doc comment) before a single underlying query is built.
 func BuildSearchQueries(owner, repo string, criteria valueobjects.SearchCriteria) ([]valueobjects.SearchQuery, error) {
 	combinations := cartesianProduct([][]string{
 		sentinelDefault(criteria.Authors()),
@@ -26,6 +39,12 @@ func BuildSearchQueries(owner, repo string, criteria valueobjects.SearchCriteria
 		sentinelDefault(criteria.ReviewRequested()),
 		sentinelDefault(criteria.ReviewedBy()),
 	})
+	if len(combinations) > MaxSearchQueryCombinations {
+		return nil, fmt.Errorf(
+			"criteria would expand into %d underlying GitHub search queries (author x assignee x review-requested x reviewed-by combinations), exceeding the %d maximum; narrow one or more of --author/--assignee/--review-requested/--reviewed-by",
+			len(combinations), MaxSearchQueryCombinations,
+		)
+	}
 
 	queries := make([]valueobjects.SearchQuery, 0, len(combinations))
 	for _, who := range combinations {

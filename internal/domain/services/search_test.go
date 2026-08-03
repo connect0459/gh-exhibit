@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -142,6 +143,44 @@ func TestBuildSearchQueries_BuildsFullCrossProductAcrossAllFourDimensions(t *tes
 	}
 	if len(seen) != 16 {
 		t.Fatalf("distinct combinations = %d, want 16", len(seen))
+	}
+}
+
+func loginList(prefix string, n int) []string {
+	logins := make([]string, n)
+	for i := range logins {
+		logins[i] = fmt.Sprintf("%s%d", prefix, i)
+	}
+	return logins
+}
+
+func TestBuildSearchQueries_AcceptsACombinationCountEqualToTheMax(t *testing.T) {
+	criteria := testSearchCriteria(t, loginList("a", services.MaxSearchQueryCombinations), nil, nil, nil)
+
+	queries, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
+	if err != nil {
+		t.Fatalf("unexpected error building search queries: %v", err)
+	}
+	if len(queries) != services.MaxSearchQueryCombinations {
+		t.Fatalf("len(queries) = %d, want %d", len(queries), services.MaxSearchQueryCombinations)
+	}
+}
+
+func TestBuildSearchQueries_RejectsACombinationCountAboveTheMax(t *testing.T) {
+	criteria := testSearchCriteria(t, loginList("a", services.MaxSearchQueryCombinations+1), nil, nil, nil)
+
+	_, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
+	if err == nil {
+		t.Fatal("expected an error when the author/assignee/review-requested/reviewed-by combination count exceeds MaxSearchQueryCombinations, got nil")
+	}
+}
+
+func TestBuildSearchQueries_RejectsACombinationCountAboveTheMaxAcrossMultipleDimensions(t *testing.T) {
+	criteria := testSearchCriteria(t, loginList("a", 8), loginList("s", 8), nil, nil)
+
+	_, err := services.BuildSearchQueries("connect0459", "gh-exhibit", criteria)
+	if err == nil {
+		t.Fatal("expected an error when 8 authors x 8 assignees (64 combinations) exceeds MaxSearchQueryCombinations, got nil")
 	}
 }
 
