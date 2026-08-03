@@ -14,6 +14,9 @@ func TestFilename_DerivesTheExtensionFromContentType(t *testing.T) {
 		{"image/jpeg", "9492692e-41a2-484f-8d3b-e149d5f2c20f.jpg"},
 		{"image/gif", "9492692e-41a2-484f-8d3b-e149d5f2c20f.gif"},
 		{"application/pdf", "9492692e-41a2-484f-8d3b-e149d5f2c20f.pdf"},
+		{"video/mp4", "9492692e-41a2-484f-8d3b-e149d5f2c20f.mp4"},
+		{"video/quicktime", "9492692e-41a2-484f-8d3b-e149d5f2c20f.mov"},
+		{"video/webm", "9492692e-41a2-484f-8d3b-e149d5f2c20f.webm"},
 	}
 
 	attachment := newTestAttachment(t, url)
