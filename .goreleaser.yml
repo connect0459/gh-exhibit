@@ -44,10 +44,12 @@ checksum:
   name_template: "checksums.txt"
 
 # keep-existing (the default) leaves an already-existing release's title
-# and notes untouched and only attaches the built binaries as assets — the
-# expected flow is `gh release create vX.Y.Z --notes-file ... --target main`
-# run first (creating the tag and the curated release), which is what
-# triggers this workflow via the tag push.
+# and notes untouched and only attaches the built binaries as assets. The
+# tag push that triggers this workflow also runs the create-release job in
+# .github/workflows/release.yml first, which extracts this version's
+# CHANGELOG.md section and creates the GitHub Release from it — this job
+# only needs to append binaries to that already-created release, not
+# author its notes.
 release:
   mode: keep-existing
 

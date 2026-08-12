@@ -13,7 +13,40 @@ permissions:
   attestations: write
 
 jobs:
+  # Extracts this tag's section from CHANGELOG.md and creates the GitHub
+  # Release from it before goreleaser runs, so mode: keep-existing (see
+  # .goreleaser.yml) has an existing release whose title/notes it leaves
+  # untouched and only attaches binaries to.
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Extract changelog section for this version
+        shell: bash
+        run: |
+          RELEASE_VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$RELEASE_VERSION" '
+            /^## \[/ { if (capture) exit; if ($0 ~ "\\[" ver "\\]") { capture=1; next } }
+            capture { print }
+          ' CHANGELOG.md > release-notes.md
+
+          if [ ! -s release-notes.md ]; then
+            echo "::error::No CHANGELOG.md section found for [$RELEASE_VERSION]. Retitle [Unreleased] to [$RELEASE_VERSION] - YYYY-MM-DD before tagging."
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+
   release:
+    needs: create-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

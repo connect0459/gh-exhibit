@@ -13,22 +13,11 @@
 
 - Describe the problem being solved, its background, and what changes when this PR is merged.
 - Links to `docs/specs/README.md`, `docs/todo.md` entries, or other references are welcome.
+- The GitHub Release's notes are generated automatically from this version's `CHANGELOG.md` section when the tag is pushed; review this PR's `CHANGELOG.md` diff to see what will appear in the Release.
 
 ```txt
 It is difficult to review without knowing the specifications and background.
 ```
-
-## GitHub Release draft
-
-<details>
-
-<summary>Expand the GitHub Release draft</summary>
-
-<!-- # vX.Y.Z -->
-
-<!-- Paste the GitHub Release draft notes here. -->
-
-</details>
 
 ## Scope of Change
 
