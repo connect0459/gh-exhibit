@@ -1,8 +1,6 @@
 # Architecture
 
-`gh-exhibit` follows onion architecture. This document describes the layers, the
-dependency rule between them, and the boundary conventions that keep the rule
-meaningful rather than cosmetic.
+`gh-exhibit` follows onion architecture. This document describes the layers, the dependency rule between them, and the boundary conventions that keep the rule meaningful rather than cosmetic.
 
 ## Layers
 
@@ -27,19 +25,13 @@ presentation → application → domain ← infrastructure
   (dependency inversion) — it does not export its own concrete types.
 - `presentation` depends only on `application`.
 
-No layer imports a concrete type from a layer it doesn't own; cross-layer calls
-go through the abstract types defined in `domain`.
+No layer imports a concrete type from a layer it doesn't own; cross-layer calls go through the abstract types defined in `domain`.
 
 ## Infrastructure types stay unexported
 
-An `internal/infrastructure` implementation must not export its struct type.
-Only the interface it satisfies (defined in `internal/domain/repositories`) and
-a `New...` constructor returning that interface are exported. This keeps the
-concrete type substitutable and stops callers from depending on infrastructure
-details the interface doesn't promise.
+An `internal/infrastructure` implementation must not export its struct type. Only the interface it satisfies (defined in `internal/domain/repositories`) and a `New...` constructor returning that interface are exported. This keeps the concrete type substitutable and stops callers from depending on infrastructure details the interface doesn't promise.
 
-Wrong — the concrete type is exported, so callers can reference fields/methods
-the interface doesn't declare:
+Wrong — the concrete type is exported, so callers can reference fields/methods the interface doesn't declare:
 
 ```go
 type EvidenceRepository struct {
@@ -56,8 +48,7 @@ func NewEvidenceRepository(opts api.ClientOptions) (*EvidenceRepository, error) 
 }
 ```
 
-Right — the struct is unexported; the constructor returns the domain-layer
-abstract type:
+Right — the struct is unexported; the constructor returns the domain-layer abstract type:
 
 ```go
 type evidenceRepository struct {
@@ -76,19 +67,8 @@ func NewEvidenceRepository(opts api.ClientOptions) (repositories.EvidenceReposit
 }
 ```
 
-See `internal/infrastructure/github` and `internal/infrastructure/persistence`
-for existing implementations that follow this convention.
+See `internal/infrastructure/github` and `internal/infrastructure/persistence` for existing implementations that follow this convention.
 
 ## Boundaries convert types, not just direction
 
-Aligning dependency direction (inversion, coding to interfaces) is necessary
-but not sufficient for change isolation. An interface shaped by the
-infrastructure side's concerns (a GitHub API response shape, a filesystem
-layout) still couples callers to that shape, regardless of which way the
-arrow points. What actually stops a change from propagating past a layer is a
-type conversion at the boundary — untrusted input (HTTP responses, file
-contents) is decoded into a domain type before it travels further inward,
-rather than merely validated and passed through unchanged. Value object
-constructors (e.g. in `internal/domain/valueobjects`) are where this
-conversion happens: a raw string/int can't cross into domain/application code
-without going through one first.
+Aligning dependency direction (inversion, coding to interfaces) is necessary but not sufficient for change isolation. An interface shaped by the infrastructure side's concerns (a GitHub API response shape, a filesystem layout) still couples callers to that shape, regardless of which way the arrow points. What actually stops a change from propagating past a layer is a type conversion at the boundary — untrusted input (HTTP responses, file contents) is decoded into a domain type before it travels further inward, rather than merely validated and passed through unchanged. Value object constructors (e.g. in `internal/domain/valueobjects`) are where this conversion happens: a raw string/int can't cross into domain/application code without going through one first.
