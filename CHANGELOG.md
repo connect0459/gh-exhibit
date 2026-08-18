@@ -139,14 +139,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Security
 
-- Persistence: attachment filenames are now guaranteed path-safe via a dedicated `AssetFilename` value object, rejecting path-traversal- adjacent input at the boundary instead of trusting a derived filename.
+- Persistence: attachment filenames are now guaranteed path-safe via a dedicated `AssetFilename` value object, rejecting path-traversal-adjacent input at the boundary instead of trusting a derived filename.
 - GitHub client: a paginated response's next-page URL is now rejected when its origin (scheme + host) differs from the current one, instead of being followed unconditionally.
 
 ## [0.1.2] - 2026-07-20
 
 ### Changed
 
-- Internal: `internal/domain/services`'s attachment-download logic was refactored to remove Anemic Domain Model smells — decisions that belong on `Resolution`/`Attachment` (what Markdown text replaces an attachment reference, filename derivation) moved off `ExportService` and onto those types, and URL handling across `Attachment`/ `Resolution`/`Attribution` was unified behind a new `valueobjects.Url` type. No behavior change and no on-disk output layout change.
+- Internal: `internal/domain/services`'s attachment-download logic was refactored to remove Anemic Domain Model smells — decisions that belong on `Resolution`/`Attachment` (what Markdown text replaces an attachment reference, filename derivation) moved off `ExportService` and onto those types, and URL handling across `Attachment`/`Resolution`/`Attribution` was unified behind a new `valueobjects.Url` type. No behavior change and no on-disk output layout change.
 
 ## [0.1.1] - 2026-07-19
 
