@@ -21,7 +21,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -38,7 +38,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           # A "binary" format archive (see .goreleaser.yml) uploads its
           # release asset under archives.name_template, but leaves the
@@ -62,14 +62,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Extract changelog section for this version
-        id: changelog
-        uses: connect0459/extract-changelog-entry@d1a123486c1f4d24327a5d28c7ffa5c788b02a04 # v1.0.0
+      - id: changelog
+        uses: connect0459/extract-changelog-entry@ff85c8909583ffaa58df10a9f07f70752f860419 # v1.1.0
         with:
           ref-name: ${{ github.ref_name }}
 
-      - name: Update GitHub Release notes
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           name: ${{ github.ref_name }}
           body_path: ${{ steps.changelog.outputs.release-notes-path }}
