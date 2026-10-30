@@ -1,5 +1,6 @@
 // Package persistence implements gh-exhibit's domain-layer repository
-// ports (EvidenceWriter, DocumentWriter, AttachmentWriter, ProvenanceWriter)
+// ports (EvidenceWriter, EvidenceReader, DocumentWriter, AttachmentWriter,
+// ProvenanceWriter)
 // against the local filesystem. Every implementation type here is
 // unexported, so callers depend only on the repositories interfaces
 // (dependency inversion), never on these concrete types.
