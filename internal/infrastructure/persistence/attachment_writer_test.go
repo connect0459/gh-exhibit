@@ -144,3 +144,85 @@ func TestWriteFetchErrorLog_ReturnsContextErrorAndSkipsWriteWhenContextIsAlready
 		t.Fatalf("WriteFetchErrorLog() wrote a file despite the cancelled context, stat error = %v", statErr)
 	}
 }
+
+func testAttachmentLink(t *testing.T, rawURL, localPath string) valueobjects.AttachmentLink {
+	t.Helper()
+
+	u, err := valueobjects.NewUrl(rawURL)
+	if err != nil {
+		t.Fatalf("NewUrl(%q) error = %v", rawURL, err)
+	}
+	link, err := valueobjects.NewAttachmentLink(u, localPath)
+	if err != nil {
+		t.Fatalf("NewAttachmentLink() error = %v", err)
+	}
+	return link
+}
+
+func TestWriteAttachmentLinks_WritesEachURLAndLocalPathPairUnderRepoNumberEvidence(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+	links := []valueobjects.AttachmentLink{
+		testAttachmentLink(t, "https://github.com/user-attachments/assets/abc", "assets/abc-123.png"),
+		testAttachmentLink(t, "https://github.com/user-attachments/assets/def", "assets/def-456.png"),
+	}
+
+	err := writer.WriteAttachmentLinks(context.Background(), testIssueRef(t), links)
+	if err != nil {
+		t.Fatalf("WriteAttachmentLinks() error = %v", err)
+	}
+
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "attachments.json"))
+	const want = `[{"url":"https://github.com/user-attachments/assets/abc","path":"assets/abc-123.png"},{"url":"https://github.com/user-attachments/assets/def","path":"assets/def-456.png"}]`
+	if got != want {
+		t.Fatalf("WriteAttachmentLinks() wrote %q, want %q", got, want)
+	}
+}
+
+func TestWriteAttachmentLinks_WritesAnEmptyArrayWhenThereAreNoLinks(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+
+	err := writer.WriteAttachmentLinks(context.Background(), testIssueRef(t), nil)
+	if err != nil {
+		t.Fatalf("WriteAttachmentLinks() error = %v", err)
+	}
+
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "attachments.json"))
+	if got != "[]" {
+		t.Fatalf("WriteAttachmentLinks() wrote %q, want %q so an export without attachments is distinguishable from one that predates attachments.json", got, "[]")
+	}
+}
+
+func TestWriteAttachmentLinks_ReplacesLinksFromAPriorRun(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+	first := []valueobjects.AttachmentLink{testAttachmentLink(t, "https://github.com/user-attachments/assets/abc", "assets/abc-123.png")}
+	if err := writer.WriteAttachmentLinks(context.Background(), testIssueRef(t), first); err != nil {
+		t.Fatalf("first WriteAttachmentLinks() error = %v", err)
+	}
+
+	if err := writer.WriteAttachmentLinks(context.Background(), testIssueRef(t), nil); err != nil {
+		t.Fatalf("second WriteAttachmentLinks() error = %v", err)
+	}
+
+	got := readFile(t, filepath.Join(baseDir, "hello-world", "42", "evidence", "attachments.json"))
+	if got != "[]" {
+		t.Fatalf("WriteAttachmentLinks() left %q after a rerun without attachments, want %q", got, "[]")
+	}
+}
+
+func TestWriteAttachmentLinks_ReturnsContextErrorAndSkipsWriteWhenContextIsAlreadyCancelled(t *testing.T) {
+	baseDir := t.TempDir()
+	writer := NewAttachmentWriter(baseDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := writer.WriteAttachmentLinks(ctx, testIssueRef(t), nil)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("WriteAttachmentLinks() error = %v, want context.Canceled", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(baseDir, "hello-world", "42", "evidence", "attachments.json")); !os.IsNotExist(statErr) {
+		t.Fatalf("WriteAttachmentLinks() wrote a file despite the cancelled context, stat error = %v", statErr)
+	}
+}

@@ -200,6 +200,19 @@ func (s *ExportService) Export(ctx context.Context, ref valueobjects.IssueRef) (
 			return nil, nil, fmt.Errorf("could not persist the downloaded attachment %s: %w", d.filename, err)
 		}
 	}
+	links := make([]valueobjects.AttachmentLink, 0, len(downloads))
+	for _, d := range downloads {
+		link, err := valueobjects.NewAttachmentLink(d.url, ref.AssetPath(d.filename))
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not link the downloaded attachment %s to its original URL: %w", d.filename, err)
+		}
+		links = append(links, link)
+	}
+	// Always called, even when links is empty — see
+	// repositories.AttachmentWriter.WriteAttachmentLinks.
+	if err := s.assets.WriteAttachmentLinks(ctx, ref, links); err != nil {
+		return nil, nil, fmt.Errorf("could not persist the attachment links: %w", err)
+	}
 	// Always called, even when failureLog is empty — see
 	// repositories.AttachmentWriter.WriteFetchErrorLog.
 	if err := s.assets.WriteFetchErrorLog(ctx, ref, failureLog); err != nil {
@@ -441,6 +454,7 @@ func (s *ExportService) lookupIssueReference(ctx context.Context, target valueob
 // every fetch/build step, so a later failure never leaves a partial
 // evidence directory behind).
 type downloadedAsset struct {
+	url      valueobjects.Url
 	filename valueobjects.AssetFilename
 	data     []byte
 }
@@ -519,7 +533,7 @@ func (s *ExportService) resolveAttachments(ctx context.Context, ref valueobjects
 			fmt.Fprintf(&failureLog, "%s: %s\n", r.attachment.URL(), err)
 			continue
 		}
-		downloads = append(downloads, downloadedAsset{filename: filename, data: r.data})
+		downloads = append(downloads, downloadedAsset{url: r.attachment.URL(), filename: filename, data: r.data})
 		resolutions = append(resolutions, services.Downloaded(r.attachment.URL(), ref.AssetPath(filename)))
 	}
 

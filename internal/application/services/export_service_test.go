@@ -240,9 +240,13 @@ type fakeAttachmentWriter struct {
 	assetErr error
 	logErr   error
 
-	wroteAssets    map[string][]byte
-	wroteLog       []byte
-	logWriteCalled bool
+	linksErr error
+
+	wroteAssets      map[string][]byte
+	wroteLog         []byte
+	logWriteCalled   bool
+	wroteLinks       []valueobjects.AttachmentLink
+	linksWriteCalled bool
 }
 
 func (f *fakeAttachmentWriter) WriteAsset(_ context.Context, _ valueobjects.IssueRef, filename valueobjects.AssetFilename, data []byte) error {
@@ -260,6 +264,12 @@ func (f *fakeAttachmentWriter) WriteFetchErrorLog(_ context.Context, _ valueobje
 	f.logWriteCalled = true
 	f.wroteLog = log
 	return f.logErr
+}
+
+func (f *fakeAttachmentWriter) WriteAttachmentLinks(_ context.Context, _ valueobjects.IssueRef, links []valueobjects.AttachmentLink) error {
+	f.linksWriteCalled = true
+	f.wroteLinks = links
+	return f.linksErr
 }
 
 // fakeClock implements repositories.Clock, returning a fixed now (the zero
@@ -1529,6 +1539,77 @@ func TestExportService_Export_PropagatesAnErrorWhenWriteFetchErrorLogFails(t *te
 	}
 	if docs.written != nil {
 		t.Fatal("WriteDocument was called despite WriteFetchErrorLog failing")
+	}
+}
+
+func TestExportService_Export_PersistsTheDownloadedAttachmentsOriginalURLAndLocalPath(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:    json.RawMessage(plainIssueJSON),
+		timeline: []json.RawMessage{json.RawMessage(commentedEventWithAttachmentJSON)},
+	}
+	attachments := &fakeAttachmentFetcher{data: []byte("png-bytes"), contentType: "image/png"}
+	assets := &fakeAttachmentWriter{}
+	svc := NewExportService(repo, &fakeEvidenceWriter{}, &fakeProvenanceWriter{}, &fakeDocumentWriter{}, attachments, assets, "github.com", testProvenance(t), fakeClock{})
+
+	_, _, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if len(assets.wroteLinks) != 1 {
+		t.Fatalf("WriteAttachmentLinks got %d links, want 1", len(assets.wroteLinks))
+	}
+	if got := assets.wroteLinks[0].URL().String(); got != attachmentURL {
+		t.Fatalf("link URL = %q, want %q", got, attachmentURL)
+	}
+	if got := assets.wroteLinks[0].LocalPath(); got != "assets/abc-123.png" {
+		t.Fatalf("link local path = %q, want %q", got, "assets/abc-123.png")
+	}
+}
+
+func TestExportService_Export_DoesNotPersistALinkForAnAttachmentThatFailedToDownload(t *testing.T) {
+	repo := &fakeEvidenceFetcher{
+		issue:    json.RawMessage(plainIssueJSON),
+		timeline: []json.RawMessage{json.RawMessage(commentedEventWithAttachmentJSON)},
+	}
+	attachments := &fakeAttachmentFetcher{err: errors.New("404 not found")}
+	assets := &fakeAttachmentWriter{}
+	svc := NewExportService(repo, &fakeEvidenceWriter{}, &fakeProvenanceWriter{}, &fakeDocumentWriter{}, attachments, assets, "github.com", testProvenance(t), fakeClock{})
+
+	_, _, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if !assets.linksWriteCalled || len(assets.wroteLinks) != 0 {
+		t.Fatalf("WriteAttachmentLinks called=%v with %v, want it called with no links", assets.linksWriteCalled, assets.wroteLinks)
+	}
+}
+
+func TestExportService_Export_PersistsAnEmptyLinkListWhenTheRenderedDocumentReferencesNoAttachment(t *testing.T) {
+	repo := &fakeEvidenceFetcher{issue: json.RawMessage(plainIssueJSON)}
+	assets := &fakeAttachmentWriter{}
+	svc := NewExportService(repo, &fakeEvidenceWriter{}, &fakeProvenanceWriter{}, &fakeDocumentWriter{}, &fakeAttachmentFetcher{}, assets, "github.com", testProvenance(t), fakeClock{})
+
+	_, _, err := svc.Export(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("Export() error = %v", err)
+	}
+
+	if !assets.linksWriteCalled || len(assets.wroteLinks) != 0 {
+		t.Fatalf("WriteAttachmentLinks called=%v with %v, want it called with no links, so a stale attachments.json from a prior run is replaced", assets.linksWriteCalled, assets.wroteLinks)
+	}
+}
+
+func TestExportService_Export_AbortsWhenPersistingTheAttachmentLinksFails(t *testing.T) {
+	repo := &fakeEvidenceFetcher{issue: json.RawMessage(plainIssueJSON)}
+	assets := &fakeAttachmentWriter{linksErr: errors.New("disk full")}
+	svc := NewExportService(repo, &fakeEvidenceWriter{}, &fakeProvenanceWriter{}, &fakeDocumentWriter{}, &fakeAttachmentFetcher{}, assets, "github.com", testProvenance(t), fakeClock{})
+
+	_, _, err := svc.Export(context.Background(), testRef(t))
+
+	if err == nil || !strings.Contains(err.Error(), "disk full") {
+		t.Fatalf("Export() error = %v, want it to wrap the persistence failure", err)
 	}
 }
 
