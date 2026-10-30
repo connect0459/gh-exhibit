@@ -21,16 +21,19 @@ func (f *fakeEvidenceReader) ReadEvidence(_ context.Context, _ valueobjects.Issu
 }
 
 type fakeAttachmentLinkReader struct {
-	links []valueobjects.AttachmentLink
-	err   error
+	links      []valueobjects.AttachmentLink
+	unrecorded bool
+	err        error
 }
 
-func (f *fakeAttachmentLinkReader) ReadAttachmentLinks(_ context.Context, _ valueobjects.IssueRef) ([]valueobjects.AttachmentLink, error) {
-	return f.links, f.err
+func (f *fakeAttachmentLinkReader) ReadAttachmentLinks(_ context.Context, _ valueobjects.IssueRef) ([]valueobjects.AttachmentLink, bool, error) {
+	return f.links, !f.unrecorded, f.err
 }
 
 type fakeViewWriter struct {
 	err error
+
+	bodies []string
 
 	called  bool
 	doc     valueobjects.Document
@@ -41,6 +44,9 @@ func (f *fakeViewWriter) WriteView(_ context.Context, _ valueobjects.IssueRef, d
 	f.called = true
 	f.doc = doc
 	f.rewrite = rewrite
+	for _, body := range f.bodies {
+		rewrite(body)
+	}
 	return f.err
 }
 
@@ -110,13 +116,13 @@ func TestViewService_View_ReturnsTheSkipNotesRecordedWhileAssemblingTheDocument(
 	evidence.Timeline = []json.RawMessage{json.RawMessage(`{"event":"commented","id":"not-a-number"}`)}
 	svc := NewViewService(&fakeEvidenceReader{evidence: evidence}, &fakeAttachmentLinkReader{}, &fakeViewWriter{})
 
-	skipped, err := svc.View(context.Background(), testRef(t))
+	result, err := svc.View(context.Background(), testRef(t))
 	if err != nil {
 		t.Fatalf("View() error = %v", err)
 	}
 
-	if len(skipped) != 1 {
-		t.Fatalf("View() returned %d skip notes, want 1", len(skipped))
+	if len(result.Skipped()) != 1 {
+		t.Fatalf("View() returned %d skip notes, want 1", len(result.Skipped()))
 	}
 }
 
@@ -162,5 +168,47 @@ func TestViewService_View_FailsWhenTheViewCannotBeWritten(t *testing.T) {
 
 	if err == nil || !strings.Contains(err.Error(), "disk full") {
 		t.Fatalf("View() error = %v, want it to wrap the write failure", err)
+	}
+}
+
+func TestViewService_View_FlagsAnExportThatPredatesAttachmentLinksWhenItsBodiesHoldAnAttachment(t *testing.T) {
+	views := &fakeViewWriter{bodies: []string{"![x](" + attachmentURL + ")"}}
+	svc := NewViewService(&fakeEvidenceReader{evidence: plainEvidence()}, &fakeAttachmentLinkReader{unrecorded: true}, views)
+
+	result, err := svc.View(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("View() error = %v", err)
+	}
+
+	if !result.AttachmentsUnrecorded() {
+		t.Fatal("AttachmentsUnrecorded() = false, want true for an attachment in an export without attachments.json")
+	}
+}
+
+func TestViewService_View_DoesNotFlagAnExportThatPredatesAttachmentLinksWhenItHasNoAttachment(t *testing.T) {
+	views := &fakeViewWriter{bodies: []string{"plain text, no attachment"}}
+	svc := NewViewService(&fakeEvidenceReader{evidence: plainEvidence()}, &fakeAttachmentLinkReader{unrecorded: true}, views)
+
+	result, err := svc.View(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("View() error = %v", err)
+	}
+
+	if result.AttachmentsUnrecorded() {
+		t.Fatal("AttachmentsUnrecorded() = true, want false when no body holds an attachment")
+	}
+}
+
+func TestViewService_View_DoesNotFlagAnAttachmentTheExportRecordedNoLinkFor(t *testing.T) {
+	views := &fakeViewWriter{bodies: []string{"![x](" + attachmentURL + ")"}}
+	svc := NewViewService(&fakeEvidenceReader{evidence: plainEvidence()}, &fakeAttachmentLinkReader{}, views)
+
+	result, err := svc.View(context.Background(), testRef(t))
+	if err != nil {
+		t.Fatalf("View() error = %v", err)
+	}
+
+	if result.AttachmentsUnrecorded() {
+		t.Fatal("AttachmentsUnrecorded() = true, want false: attachments.json exists, so an unlinked attachment is a failed download, not a missing record")
 	}
 }

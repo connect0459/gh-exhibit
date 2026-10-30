@@ -23,17 +23,17 @@ func NewAttachmentLinkReader(baseDir string) repositories.AttachmentLinkReader {
 }
 
 // ReadAttachmentLinks implements repositories.AttachmentLinkReader.
-func (r *attachmentLinkReader) ReadAttachmentLinks(ctx context.Context, ref valueobjects.IssueRef) ([]valueobjects.AttachmentLink, error) {
+func (r *attachmentLinkReader) ReadAttachmentLinks(ctx context.Context, ref valueobjects.IssueRef) ([]valueobjects.AttachmentLink, bool, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	data, err := os.ReadFile(evidencePath(r.baseDir, ref, "attachments.json"))
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("could not read attachments.json: %w", err)
+		return nil, false, fmt.Errorf("could not read attachments.json: %w", err)
 	}
 
 	var wire []struct {
@@ -41,20 +41,20 @@ func (r *attachmentLinkReader) ReadAttachmentLinks(ctx context.Context, ref valu
 		Path string `json:"path"`
 	}
 	if err := json.Unmarshal(data, &wire); err != nil {
-		return nil, fmt.Errorf("attachments.json is not a list of url/path pairs: %w", err)
+		return nil, false, fmt.Errorf("attachments.json is not a list of url/path pairs: %w", err)
 	}
 
 	links := make([]valueobjects.AttachmentLink, 0, len(wire))
 	for i, w := range wire {
 		url, err := valueobjects.NewUrl(w.URL)
 		if err != nil {
-			return nil, fmt.Errorf("attachments.json entry %d is invalid: %w", i, err)
+			return nil, false, fmt.Errorf("attachments.json entry %d is invalid: %w", i, err)
 		}
 		link, err := valueobjects.NewAttachmentLink(url, w.Path)
 		if err != nil {
-			return nil, fmt.Errorf("attachments.json entry %d is invalid: %w", i, err)
+			return nil, false, fmt.Errorf("attachments.json entry %d is invalid: %w", i, err)
 		}
 		links = append(links, link)
 	}
-	return links, nil
+	return links, true, nil
 }

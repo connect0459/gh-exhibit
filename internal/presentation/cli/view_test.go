@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	appservices "github.com/connect0459/gh-exhibit/internal/application/services"
 	"github.com/connect0459/gh-exhibit/internal/domain/services"
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
@@ -19,18 +20,19 @@ type fakeViewer struct {
 }
 
 type fakeViewResult struct {
-	skips []services.SkipNote
-	err   error
+	skips      []services.SkipNote
+	unrecorded bool
+	err        error
 }
 
-func (f *fakeViewer) View(_ context.Context, ref valueobjects.IssueRef) ([]services.SkipNote, error) {
+func (f *fakeViewer) View(_ context.Context, ref valueobjects.IssueRef) (appservices.ViewResult, error) {
 	f.calledNumbers = append(f.calledNumbers, ref.Number())
 
 	result, ok := f.results[ref.Number()]
 	if !ok {
-		return nil, fmt.Errorf("no fake result configured for #%d", ref.Number())
+		return appservices.ViewResult{}, fmt.Errorf("no fake result configured for #%d", ref.Number())
 	}
-	return result.skips, result.err
+	return appservices.NewViewResult(result.skips, result.unrecorded), result.err
 }
 
 func TestParseArgs_AcceptsTheViewSubcommandWithNumbersRepoAndOutput(t *testing.T) {
@@ -122,5 +124,30 @@ func TestRunViews_ReportsARefThatFailsValidationWithoutCallingTheViewer(t *testi
 
 	if got != 1 || len(viewer.calledNumbers) != 0 {
 		t.Errorf("RunViews() = %d, viewer called for %v, want 1 and no calls", got, viewer.calledNumbers)
+	}
+}
+
+func TestRunViews_TellsTheUserToReExportWhenAnExportPredatesAttachmentLinks(t *testing.T) {
+	viewer := &fakeViewer{results: map[int]fakeViewResult{7: {unrecorded: true}}}
+	var stdout, stderr bytes.Buffer
+
+	got := RunViews(context.Background(), viewer, "octocat", "hello-world", ".", []int{7}, &stdout, &stderr)
+
+	if got != 0 {
+		t.Errorf("RunViews() = %d, want 0 (the view was still written)", got)
+	}
+	if !strings.Contains(stderr.String(), "note: #7") || !strings.Contains(stderr.String(), "re-run export") {
+		t.Errorf("stderr = %q, want a note that #7's attachments are unavailable until export is re-run", stderr.String())
+	}
+}
+
+func TestRunViews_SaysNothingAboutAttachmentLinksForAnExportThatRecordedThem(t *testing.T) {
+	viewer := &fakeViewer{results: map[int]fakeViewResult{7: {}}}
+	var stdout, stderr bytes.Buffer
+
+	RunViews(context.Background(), viewer, "octocat", "hello-world", ".", []int{7}, &stdout, &stderr)
+
+	if stderr.Len() != 0 {
+		t.Errorf("stderr = %q, want nothing", stderr.String())
 	}
 }

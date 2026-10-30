@@ -32,24 +32,52 @@ func TestAttachmentLinkReader_ReadAttachmentLinks_ReturnsTheLinksTheWriterPersis
 		t.Fatalf("WriteAttachmentLinks() error = %v", err)
 	}
 
-	got, err := NewAttachmentLinkReader(baseDir).ReadAttachmentLinks(context.Background(), testIssueRef(t))
+	got, recorded, err := NewAttachmentLinkReader(baseDir).ReadAttachmentLinks(context.Background(), testIssueRef(t))
 	if err != nil {
 		t.Fatalf("ReadAttachmentLinks() error = %v", err)
 	}
 
+	if !recorded {
+		t.Fatal("ReadAttachmentLinks() recorded = false, want true for an export that wrote attachments.json")
+	}
 	if len(got) != 2 || !got[0].URL().Equals(written[0].URL()) || got[0].LocalPath() != "assets/abc-123.png" || got[1].LocalPath() != "assets/def-456.png" {
 		t.Fatalf("ReadAttachmentLinks() = %v, want the two links written, in order", got)
 	}
 }
 
-func TestAttachmentLinkReader_ReadAttachmentLinks_ReadsAnExportThatPredatesAttachmentLinksAsEmpty(t *testing.T) {
-	got, err := NewAttachmentLinkReader(t.TempDir()).ReadAttachmentLinks(context.Background(), testIssueRef(t))
+func TestAttachmentLinkReader_ReadAttachmentLinks_ReportsAnExportThatPredatesAttachmentLinksAsNotRecorded(t *testing.T) {
+	got, recorded, err := NewAttachmentLinkReader(t.TempDir()).ReadAttachmentLinks(context.Background(), testIssueRef(t))
 	if err != nil {
 		t.Fatalf("ReadAttachmentLinks() error = %v, want nil when attachments.json does not exist", err)
 	}
 
-	if len(got) != 0 {
-		t.Fatalf("ReadAttachmentLinks() = %v, want none", got)
+	if recorded || len(got) != 0 {
+		t.Fatalf("ReadAttachmentLinks() = %v, recorded %v, want no links and recorded false", got, recorded)
+	}
+}
+
+func TestAttachmentLinkReader_ReadAttachmentLinks_ReportsAnExportThatRecordedNoAttachmentsAsRecordedAndEmpty(t *testing.T) {
+	baseDir := t.TempDir()
+	writeAttachmentsJSON(t, baseDir, `[]`)
+
+	got, recorded, err := NewAttachmentLinkReader(baseDir).ReadAttachmentLinks(context.Background(), testIssueRef(t))
+	if err != nil {
+		t.Fatalf("ReadAttachmentLinks() error = %v", err)
+	}
+
+	if !recorded || len(got) != 0 {
+		t.Fatalf("ReadAttachmentLinks() = %v, recorded %v, want no links and recorded true", got, recorded)
+	}
+}
+
+func TestAttachmentLinkReader_ReadAttachmentLinks_RejectsAPathThatEscapesTheAssetsDirectory(t *testing.T) {
+	baseDir := t.TempDir()
+	writeAttachmentsJSON(t, baseDir, `[{"url":"https://github.com/user-attachments/assets/abc","path":"assets/../../etc/passwd"}]`)
+
+	_, _, err := NewAttachmentLinkReader(baseDir).ReadAttachmentLinks(context.Background(), testIssueRef(t))
+
+	if err == nil {
+		t.Fatal("expected an error for an attachments.json path that escapes assets/, got nil")
 	}
 }
 
@@ -64,7 +92,7 @@ func TestAttachmentLinkReader_ReadAttachmentLinks_ReturnsAnErrorForMalformedCont
 			baseDir := t.TempDir()
 			writeAttachmentsJSON(t, baseDir, content)
 
-			_, err := NewAttachmentLinkReader(baseDir).ReadAttachmentLinks(context.Background(), testIssueRef(t))
+			_, _, err := NewAttachmentLinkReader(baseDir).ReadAttachmentLinks(context.Background(), testIssueRef(t))
 
 			if err == nil {
 				t.Fatalf("expected an error for attachments.json content %q, got nil", content)
@@ -77,7 +105,7 @@ func TestAttachmentLinkReader_ReadAttachmentLinks_ReturnsContextErrorWhenContext
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := NewAttachmentLinkReader(t.TempDir()).ReadAttachmentLinks(ctx, testIssueRef(t))
+	_, _, err := NewAttachmentLinkReader(t.TempDir()).ReadAttachmentLinks(ctx, testIssueRef(t))
 
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("ReadAttachmentLinks() error = %v, want context.Canceled", err)

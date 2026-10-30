@@ -10,8 +10,11 @@ import (
 // on to read back which downloaded file stands in for which original
 // attachment URL, symmetric to AttachmentWriter.WriteAttachmentLinks.
 type AttachmentLinkReader interface {
-	// ReadAttachmentLinks reads ref's recorded attachment links. An export
-	// that predates attachment links, or recorded none, reads as empty
-	// rather than as an error.
-	ReadAttachmentLinks(ctx context.Context, ref valueobjects.IssueRef) ([]valueobjects.AttachmentLink, error)
+	// ReadAttachmentLinks reads ref's recorded attachment links. recorded
+	// reports whether the export recorded any at all: an export that
+	// predates attachment links reads as no links and recorded false, which
+	// is not an error, but is distinguishable from an export that recorded
+	// an empty list (recorded true), where an unlinked attachment means the
+	// download failed.
+	ReadAttachmentLinks(ctx context.Context, ref valueobjects.IssueRef) (links []valueobjects.AttachmentLink, recorded bool, err error)
 }

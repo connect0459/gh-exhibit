@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/connect0459/gh-exhibit/internal/domain/services"
+	"github.com/connect0459/gh-exhibit/internal/application/services"
 	"github.com/connect0459/gh-exhibit/internal/domain/valueobjects"
 )
 
@@ -16,7 +16,7 @@ import (
 // path); defined here so tests can inject a fake instead of touching the
 // filesystem.
 type Viewer interface {
-	View(ctx context.Context, ref valueobjects.IssueRef) (skips []services.SkipNote, err error)
+	View(ctx context.Context, ref valueobjects.IssueRef) (services.ViewResult, error)
 }
 
 // RunViews writes the view of every ref in numbers (owner/repo/outputDir
@@ -37,7 +37,7 @@ func RunViews(ctx context.Context, viewer Viewer, owner, repo, outputDir string,
 			continue
 		}
 
-		skips, err := viewer.View(ctx, ref)
+		result, err := viewer.View(ctx, ref)
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "failed #%d: %v\n", number, err)
 			exitCode = 1
@@ -46,10 +46,13 @@ func RunViews(ctx context.Context, viewer Viewer, owner, repo, outputDir string,
 
 		viewPath := filepath.Join(outputDir, repo, strconv.Itoa(number), "index.html")
 		message := fmt.Sprintf("viewed #%d -> %s", number, viewPath)
-		if len(skips) > 0 {
+		if skips := result.Skipped(); len(skips) > 0 {
 			message += fmt.Sprintf(" (skipped %d entries)", len(skips))
 		}
 		_, _ = fmt.Fprintln(stdout, message)
+		if result.AttachmentsUnrecorded() {
+			_, _ = fmt.Fprintf(stderr, "note: #%d was exported before attachment links were recorded, so its attachments are shown as unavailable; re-run export to record them\n", number)
+		}
 	}
 
 	return exitCode
