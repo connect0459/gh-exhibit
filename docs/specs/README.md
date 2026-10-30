@@ -135,10 +135,13 @@ Every artifact for a given issue/PR number lives under one self-contained direct
     ├── parent-issue.json             parent issue resource, refetched via FetchIssue (plain issues with a parent only)
     ├── check-runs.json               check runs, from GET /commits/{sha}/check-runs (PRs only)
     ├── provenance.json               which gh-exhibit tool/version/commit produced this export
+    ├── attachments.json              which downloaded file in assets/ stands in for which original attachment URL
     └── fetch-errors.log              this run's attachment fetch failures, if any
 ```
 
 `{repo}` only — the owner is deliberately not part of the path. Raw JSON is split by source endpoint rather than consolidated into a self-authored wrapper, to keep each file's content a literal, verbatim REST response; the enclosing `evidence/` directory (rather than a `{number}` filename prefix) disambiguates it from the rendered document, since the number is already encoded by the parent directory. Multi-page timeline/review-comment responses are spliced into one JSON array by concatenating each page's raw bytes directly (not `json.Marshal`-ing a `[]json.RawMessage` slice, which would compact each element's whitespace and break the verbatim guarantee).
+
+`attachments.json` is a JSON array of `{"url":...,"path":...}` pairs, one per successfully downloaded attachment, where `path` is relative to `index.md` (`assets/{filename}`). The downloaded file's name depends on the response's `Content-Type` at download time, so it cannot be re-derived from the raw JSON alone; recording the pairing lets a later reader resolve an attachment URL found in the raw evidence to its local copy without re-fetching. Unlike `fetch-errors.log`, it is written on every export, as `[]` when nothing was downloaded, so an export without attachments is distinguishable from one that predates this file, and a stale file from a prior run is replaced.
 
 `fetch-errors.log` and `provenance.json` live under `evidence/` alongside the raw JSON rather than at the `{number}/` top level: the operative grouping is "final rendered exhibit" (`index.md` + `assets/`) vs. "everything else supporting it," so gh-exhibit-generated artifacts about the export itself — a failed fetch's log, or which tool/version/commit produced the export — belong with the other non-presentation artifacts. Unlike its eight siblings, `provenance.json`'s content is not a verbatim external REST response — it is gh-exhibit's own self-reported `{"tool":...,"version":...,"commit":...}`, written by a distinct `ProvenanceWriter` port rather than `EvidenceWriter`, which is scoped to raw GitHub-origin data only.
 

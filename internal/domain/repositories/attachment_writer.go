@@ -23,4 +23,13 @@ type AttachmentWriter interface {
 	// instead of writing one, so a stale log from a prior failing run
 	// does not survive a rerun where every attachment now succeeds.
 	WriteFetchErrorLog(ctx context.Context, ref valueobjects.IssueRef, log []byte) error
+
+	// WriteAttachmentLinks persists which downloaded file stands in for
+	// which original attachment URL to
+	// {repo}/{number}/evidence/attachments.json, so a later reader of the
+	// export can resolve an attachment URL in the raw evidence to its local
+	// copy. An empty links still writes an empty array, so an export without
+	// attachments stays distinguishable from one that predates this file,
+	// and a stale file from a prior run is replaced.
+	WriteAttachmentLinks(ctx context.Context, ref valueobjects.IssueRef, links []valueobjects.AttachmentLink) error
 }

@@ -1,5 +1,6 @@
 // Package persistence implements gh-exhibit's domain-layer repository
-// ports (EvidenceWriter, DocumentWriter, AttachmentWriter, ProvenanceWriter)
+// ports (EvidenceWriter, EvidenceReader, DocumentWriter, AttachmentWriter,
+// ProvenanceWriter)
 // against the local filesystem. Every implementation type here is
 // unexported, so callers depend only on the repositories interfaces
 // (dependency inversion), never on these concrete types.
@@ -7,6 +8,7 @@ package persistence
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,7 +27,9 @@ type attachmentWriter struct {
 // NewAttachmentWriter builds a repositories.AttachmentWriter that persists
 // fetched attachments and this run's failure log under baseDir, at
 // {repo}/{number}/assets/{filename} and
-// {repo}/{number}/evidence/fetch-errors.log respectively.
+// {repo}/{number}/evidence/fetch-errors.log respectively, and the mapping
+// from each attachment URL to its downloaded copy at
+// {repo}/{number}/evidence/attachments.json.
 func NewAttachmentWriter(baseDir string) repositories.AttachmentWriter {
 	return &attachmentWriter{baseDir: baseDir}
 }
@@ -52,6 +56,30 @@ func (w *attachmentWriter) WriteFetchErrorLog(ctx context.Context, ref valueobje
 		return nil
 	}
 	return writeFile(path, log)
+}
+
+// attachmentLinkWire is attachments.json's on-disk shape for a single
+// repositories.AttachmentWriter.WriteAttachmentLinks entry.
+type attachmentLinkWire struct {
+	URL  valueobjects.Url `json:"url"`
+	Path string           `json:"path"`
+}
+
+// WriteAttachmentLinks implements repositories.AttachmentWriter.
+func (w *attachmentWriter) WriteAttachmentLinks(ctx context.Context, ref valueobjects.IssueRef, links []valueobjects.AttachmentLink) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	wire := make([]attachmentLinkWire, len(links))
+	for i, l := range links {
+		wire[i] = attachmentLinkWire{URL: l.URL(), Path: l.LocalPath()}
+	}
+	data, err := json.Marshal(wire)
+	if err != nil {
+		return fmt.Errorf("encode attachment links: %w", err)
+	}
+	return writeFile(filepath.Join(issueDir(w.baseDir, ref), "evidence", "attachments.json"), data)
 }
 
 // issueDir builds the on-disk directory for ref's per-issue artifacts

@@ -97,7 +97,7 @@ func (r IssueRef) Number() int {
 // attachments from its rendered Markdown. Both the document and its assets
 // live under the same {number}/ directory, so no number prefix is needed.
 func (r IssueRef) AssetPath(filename AssetFilename) string {
-	return fmt.Sprintf("assets/%s", filename.String())
+	return assetsDirPrefix + filename.String()
 }
 
 // Equals reports whether r and other identify the same owner, repo, and
