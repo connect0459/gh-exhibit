@@ -94,3 +94,16 @@ func NewSearchService(cfg Config) (*services.SearchService, error) {
 
 	return services.NewSearchService(searcher), nil
 }
+
+// NewViewService builds a ViewService backed by local filesystem storage
+// rooted at cfg.OutputDir — the view subcommand's counterpart to
+// NewExportService. It needs no GitHub client: a view is rebuilt offline
+// from an earlier export's persisted evidence. Only cfg.OutputDir is
+// relevant here.
+func NewViewService(cfg Config) *services.ViewService {
+	return services.NewViewService(
+		persistence.NewEvidenceReader(cfg.OutputDir),
+		persistence.NewAttachmentLinkReader(cfg.OutputDir),
+		persistence.NewViewWriter(cfg.OutputDir),
+	)
+}

@@ -58,6 +58,12 @@ Or export by filter criteria instead, via the separate `export-search` subcomman
 gh exhibit export-search [--author <login>[,...]] [--assignee <login>[,...]] [--review-requested <login>[,...]] [--reviewed-by <login>[,...]] [--kind issue|pr[,...]] [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>] [--limit <n>] [--sort created|updated|comments] [--order asc|desc] [--dry-run] [--repo <owner>/<repo>] [-o|--output <dir>] [--with-stdout]
 ```
 
+Render a saved export as a browsable page, offline:
+
+```sh
+gh exhibit view <number>[,<number>...] [--repo <owner>/<repo>] [-o|--output <dir>]
+```
+
 ### Flags and Subcommands
 
 - `export`: exports the given issue/PR(s) by number.
@@ -75,6 +81,9 @@ gh exhibit export-search [--author <login>[,...]] [--assignee <login>[,...]] [--
   - `--sort`, `--order`: which field (`created`/`updated`/`comments`) and direction (`asc`/`desc`) matches are ordered by; default `created`/`desc`.
   - `--dry-run`: performs the real search, then reports the resolved match count and number list to stdout without exporting anything — a preview of the search *result*, unlike `export --dry-run` above, which has no search to preview.
   - `--repo`, `-o`/`--output`, `--with-stdout`: same as `export`'s flags above.
+- `view`: rebuilds a browsable `index.html` from the evidence a previous `export` saved, offline, without calling the GitHub API. The page shows the title, state, and the discussion as GitHub-style cards: the body, comments, reviews with their state, and inline review comments with their file, lines, and diff hunk. Authors are shown by initial, not by a downloaded avatar, and attachments point at their downloaded copies under `assets/`. Raw HTML in a body is sanitized: scripts, event handlers, forms, and any image that is not a downloaded asset are dropped, so opening the page never contacts another host.
+  - `<number>[,<number>...]`: a single issue/PR number, or a comma-separated list of them.
+  - `--repo`, `-o`, `--output`: same as `export`'s flags above; `--output` is where the earlier export wrote its evidence.
 - `-h`, `--help`: print usage and exit. Run at the root for the root-level flags, or `gh exhibit export -h`/`gh exhibit export-search -h` for a subcommand's own flags.
 - `--version`: print the version, commit, and build date, then exit.
 
@@ -108,6 +117,7 @@ The multi-issue example above produces one self-contained directory per number, 
 ./exhibits/gh-exhibit/
 ├── 10/
 │   ├── index.md            # rendered Markdown
+│   ├── index.html          # browsable view, written by `view` (not by `export`)
 │   ├── assets/             # downloaded attachments
 │   └── evidence/           # raw JSON and export metadata
 │       ├── issue.json      # verbatim GitHub REST response

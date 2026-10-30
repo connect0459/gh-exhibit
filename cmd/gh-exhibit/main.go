@@ -50,6 +50,10 @@ func run() int {
 		return 2
 	}
 
+	if args.View {
+		return cli.RunViews(context.Background(), registry.NewViewService(registry.Config{OutputDir: args.OutputDir}), repo.Owner, repo.Name, args.OutputDir, args.Numbers, os.Stdout, os.Stderr)
+	}
+
 	exporter, err := registry.NewExportService(registry.Config{Host: repo.Host, OutputDir: args.OutputDir, Version: version, Commit: commit})
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
