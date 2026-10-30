@@ -37,3 +37,28 @@ func TestAttachmentLink_ExposesTheFieldsItWasConstructedWith(t *testing.T) {
 		t.Fatalf("LocalPath() = %q, want %q", link.LocalPath(), "assets/abc-123.png")
 	}
 }
+
+func TestNewAttachmentLink_RejectsALocalPathThatIsNotASingleFileDirectlyUnderAssets(t *testing.T) {
+	tests := []struct {
+		name      string
+		localPath string
+	}{
+		{"parent traversal", "assets/../../etc/passwd"},
+		{"traversal from the document directory", "../secret.png"},
+		{"a nested path", "assets/a/b.png"},
+		{"another directory", "other/abc.png"},
+		{"the assets directory itself", "assets/"},
+		{"an absolute path", "/etc/passwd"},
+		{"a backslash separator", `assets\abc.png`},
+		{"a bare dot-dot file name", "assets/.."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := valueobjects.NewAttachmentLink(mustNewURL(t, "https://github.com/user-attachments/assets/abc"), tt.localPath)
+
+			if err == nil {
+				t.Fatalf("expected an error for local path %q, got nil", tt.localPath)
+			}
+		})
+	}
+}
