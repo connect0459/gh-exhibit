@@ -613,3 +613,49 @@ func TestViewWriter_WriteView_EscapesAnEventsLabelNameInsteadOfInterpretingItAsH
 		t.Fatalf("view interprets an event's label name as HTML")
 	}
 }
+
+func TestViewWriter_WriteView_DoesNotPassAnUnrecognizedReviewStateOffAsAComment(t *testing.T) {
+	attribution, err := valueobjects.NewAttribution("reviewer", time.Date(2026, 7, 2, 1, 0, 0, 0, time.UTC), "https://github.com/octocat/hello-world/pull/42#pullrequestreview-1")
+	if err != nil {
+		t.Fatalf("NewAttribution() error = %v", err)
+	}
+	doc, err := valueobjects.NewDocument("t", []valueobjects.Entry{valueobjects.NewPullRequestReview(attribution, valueobjects.ReviewState(99), "body")})
+	if err != nil {
+		t.Fatalf("NewDocument() error = %v", err)
+	}
+
+	got := writeAndReadView(t, doc, identity)
+
+	if strings.Contains(got, ">Commented<") || !strings.Contains(got, "ReviewState(99)") {
+		t.Fatalf("view labels a review with an unrecognized state as a comment instead of showing the state itself")
+	}
+}
+
+func TestViewWriter_WriteView_DrawsNoBlankLineAfterAPatchThatEndsWithANewline(t *testing.T) {
+	doc := pullRequestWithFiles(t, 1, 0, changedFileJSON(t, "a.go", "", "modified", 1, 0, "@@ -1 +1,2 @@\n keep\n+added\n"))
+
+	got := writeAndReadView(t, doc, identity)
+
+	if strings.Contains(got, `<div class="ctx"></div>`) {
+		t.Fatalf("view draws an empty context line after a patch that ends with a newline")
+	}
+}
+
+func TestViewWriter_WriteView_DrawsNoBlankLineAfterAnInlineCommentsHunkThatEndsWithANewline(t *testing.T) {
+	inline := strings.Replace(viewInlineCommentJSON, `"@@ -10,3 +10,3 @@\n context\n-old\n+new"`, `"@@ -10,3 +10,3 @@\n context\n-old\n+new\n"`, 1)
+	if inline == viewInlineCommentJSON {
+		t.Fatal("fixture was not changed: the hunk to end with a newline was not found")
+	}
+	doc := viewDocument(t, services.RawEvidence{
+		Issue:          json.RawMessage(viewIssueJSON),
+		PullRequest:    json.RawMessage(viewPullRequestJSON),
+		Timeline:       []json.RawMessage{json.RawMessage(viewReviewJSON)},
+		ReviewComments: []json.RawMessage{json.RawMessage(inline)},
+	})
+
+	got := writeAndReadView(t, doc, identity)
+
+	if !strings.Contains(got, `<div class="add">&#43;new</div>`) || strings.Contains(got, `<div class="ctx"></div>`) {
+		t.Fatalf("view does not end the inline comment's hunk at its last line")
+	}
+}

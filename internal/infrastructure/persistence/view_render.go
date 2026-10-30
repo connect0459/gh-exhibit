@@ -326,8 +326,9 @@ func reviewBadge(s valueobjects.ReviewState) (label, class string) {
 	case valueobjects.ReviewStateChangesRequested:
 		return "Changes requested", "changes"
 	case valueobjects.ReviewStateCommented:
+		return "Commented", "commented"
 	}
-	return "Commented", "commented"
+	return s.String(), "unknown"
 }
 
 func lineRange(c valueobjects.InlineContext) string {
@@ -347,7 +348,7 @@ func diffLines(hunk string) []diffLine {
 	}
 
 	var lines []diffLine
-	for _, text := range strings.Split(hunk, "\n") {
+	for _, text := range strings.Split(strings.TrimSuffix(hunk, "\n"), "\n") {
 		class := "ctx"
 		switch {
 		case strings.HasPrefix(text, "@@"):
