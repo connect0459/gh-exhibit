@@ -193,3 +193,46 @@ func TestAssembleDocument_RejectsAnUnparsableIssueResource(t *testing.T) {
 		t.Fatal("expected an error for an unparsable issue resource, got nil")
 	}
 }
+
+func TestAssembleDocument_IncludesTheParentIssueForAPlainIssueWithAParent(t *testing.T) {
+	raw := services.RawEvidence{
+		Issue:       json.RawMessage(assemblePlainIssueJSON),
+		ParentIssue: json.RawMessage(`{"number":7,"title":"Epic: reliability","state":"open","html_url":"https://github.com/example/repo/issues/7"}`),
+	}
+
+	doc, _, err := services.AssembleDocument(raw, time.Time{})
+	if err != nil {
+		t.Fatalf("AssembleDocument() error = %v", err)
+	}
+
+	rendered := renderToString(t, func(b *bytes.Buffer) error { return doc.Render(b) })
+	if !strings.Contains(rendered, "Epic: reliability") {
+		t.Fatalf("rendered = %q, want it to name the parent issue", rendered)
+	}
+}
+
+func TestAssembleDocument_RejectsAMalformedParentIssue(t *testing.T) {
+	raw := services.RawEvidence{
+		Issue:       json.RawMessage(assemblePlainIssueJSON),
+		ParentIssue: json.RawMessage(`{"number":"not-a-number"}`),
+	}
+
+	_, _, err := services.AssembleDocument(raw, time.Time{})
+
+	if err == nil {
+		t.Fatal("expected an error for a malformed parent issue, got nil")
+	}
+}
+
+func TestAssembleDocument_RejectsAPullRequestWhoseResourceHasNoHeadCommit(t *testing.T) {
+	raw := services.RawEvidence{
+		Issue:       json.RawMessage(assemblePullRequestIssueJSON),
+		PullRequest: json.RawMessage(`{"merged_at": null}`),
+	}
+
+	_, _, err := services.AssembleDocument(raw, time.Time{})
+
+	if err == nil {
+		t.Fatal("expected an error for a pull request resource without a head commit, got nil")
+	}
+}

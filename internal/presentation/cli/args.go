@@ -47,6 +47,11 @@ type Args struct {
 	// exported ref's rendered document to standard output.
 	WithStdout bool
 
+	// View is true when parsed from the "view" subcommand: the caller
+	// should write each Numbers entry's view from its persisted evidence,
+	// offline, instead of exporting anything.
+	View bool
+
 	// Version is true when --version was given; the caller should print
 	// the running binary's version and exit without requiring a
 	// positional issue/PR number.
@@ -60,6 +65,7 @@ type Args struct {
 const (
 	exportSubcommand       = "export"
 	exportSearchSubcommand = "export-search"
+	viewSubcommand         = "view"
 )
 
 // ParseArgs parses and validates args (typically os.Args[1:]) into an Args
@@ -82,7 +88,7 @@ func ParseArgs(args []string) (Args, error) {
 
 	remaining := rootFS.Args()
 	if len(remaining) == 0 {
-		return Args{}, fmt.Errorf("expected a subcommand (%q or %q)", exportSubcommand, exportSearchSubcommand)
+		return Args{}, fmt.Errorf("expected a subcommand (%q, %q, or %q)", exportSubcommand, exportSearchSubcommand, viewSubcommand)
 	}
 
 	subcommand, rest := remaining[0], remaining[1:]
@@ -91,8 +97,10 @@ func ParseArgs(args []string) (Args, error) {
 		return parseExportArgs(rest)
 	case exportSearchSubcommand:
 		return parseExportSearchArgs(rest)
+	case viewSubcommand:
+		return parseViewArgs(rest)
 	default:
-		return Args{}, fmt.Errorf("unknown subcommand %q (expected %q or %q)", subcommand, exportSubcommand, exportSearchSubcommand)
+		return Args{}, fmt.Errorf("unknown subcommand %q (expected %q, %q, or %q)", subcommand, exportSubcommand, exportSearchSubcommand, viewSubcommand)
 	}
 }
 
@@ -141,6 +149,37 @@ func parseExportArgs(args []string) (Args, error) {
 	}
 
 	return Args{Numbers: numbers, DryRun: *dryRun, Repo: *repo, OutputDir: *output, WithStdout: *withStdout}, nil
+}
+
+// parseViewArgs parses and validates the "view" subcommand's own arguments
+// (everything after the "view" token) into an Args value. Requires exactly
+// one positional issue/PR number (or comma-separated list), like
+// parseExportArgs; flags may appear before, after, or interleaved around it.
+func parseViewArgs(args []string) (Args, error) {
+	fs := flag.NewFlagSet("gh-exhibit view", flag.ContinueOnError)
+	repo := fs.String("repo", "", "target repository as owner/repo (defaults to the current repository)")
+	output := fs.String("output", ".", "output directory an earlier export wrote its evidence under")
+	fs.StringVar(output, "o", ".", "shorthand for --output")
+
+	flagArgs, positional, err := splitFlagsAndPositional(args, viewValueFlags)
+	if err != nil {
+		return Args{}, fmt.Errorf("parse flags: %w", err)
+	}
+
+	if err := fs.Parse(flagArgs); err != nil {
+		return Args{}, fmt.Errorf("parse flags: %w", err)
+	}
+
+	if len(positional) != 1 {
+		return Args{}, fmt.Errorf("expected exactly one issue/PR number argument (a single number or a comma-separated list); got %d", len(positional))
+	}
+
+	numbers, err := parseNumbers(positional[0])
+	if err != nil {
+		return Args{}, err
+	}
+
+	return Args{View: true, Numbers: numbers, Repo: *repo, OutputDir: *output}, nil
 }
 
 // parseExportSearchArgs parses and validates the "export-search"
@@ -321,6 +360,12 @@ func parseSearchDate(raw string) (*time.Time, error) {
 // exportValueFlags are "export"'s own flags that consume a following token
 // as their value when not given in the attached "--flag=value" form.
 var exportValueFlags = map[string]bool{
+	"repo": true, "output": true, "o": true,
+}
+
+// viewValueFlags are "view"'s own flags that consume a following token as
+// their value when not given in the attached "--flag=value" form.
+var viewValueFlags = map[string]bool{
 	"repo": true, "output": true, "o": true,
 }
 
