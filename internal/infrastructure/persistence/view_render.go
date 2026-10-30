@@ -37,7 +37,18 @@ type viewCard struct {
 	Lines      string
 	Outdated   bool
 	Diff       []diffLine
+	Title      string
+	Summary    string
+	Note       string
+	Files      []viewFile
 	HTML       template.HTML
+}
+
+type viewFile struct {
+	Name   string
+	Status string
+	Counts string
+	Diff   []diffLine
 }
 
 type diffLine struct {
@@ -118,6 +129,10 @@ func renderView(ref valueobjects.IssueRef, doc valueobjects.Document, rewrite fu
 			card.Outdated = ctx.Outdated()
 			card.Diff = diffLines(ctx.DiffHunk())
 			model.Cards = append(model.Cards, card)
+		case valueobjects.PullRequestDiff:
+			if card, ok := filesCard(e); ok {
+				model.Cards = append(model.Cards, card)
+			}
 		case valueobjects.PullRequestChecks:
 			continue
 		default:
@@ -149,6 +164,42 @@ func markdownHTML(markdown string, rewrite func(string) string) template.HTML {
 	}
 	sanitized := bytes.TrimSpace(viewPolicy.SanitizeBytes(rendered.Bytes()))
 	return template.HTML(sanitized)
+}
+
+func filesCard(d valueobjects.PullRequestDiff) (viewCard, bool) {
+	files := d.Files()
+	if len(files) == 0 {
+		return viewCard{}, false
+	}
+
+	card := viewCard{
+		Kind:    "files",
+		Title:   "Files changed",
+		Summary: fmt.Sprintf("%s · +%d −%d", pluralize(len(files), "file"), d.Additions(), d.Deletions()),
+	}
+	if d.Truncated() {
+		card.Note = "Diffs are omitted because this pull request is too large."
+	}
+	for _, f := range files {
+		name := f.Filename()
+		if f.Status() == valueobjects.FileStatusRenamed && f.PreviousFilename() != "" {
+			name = f.PreviousFilename() + " → " + f.Filename()
+		}
+		card.Files = append(card.Files, viewFile{
+			Name:   name,
+			Status: f.Status().String(),
+			Counts: fmt.Sprintf("+%d −%d", f.Additions(), f.Deletions()),
+			Diff:   diffLines(f.Patch()),
+		})
+	}
+	return card, true
+}
+
+func pluralize(n int, noun string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", noun)
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
 }
 
 func authoredCard(kind string, a valueobjects.Attribution, body template.HTML) viewCard {

@@ -50,6 +50,11 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 .diff { margin: 0; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; border-bottom: 1px solid var(--border); overflow: auto; }
 .diff div { padding: 0 16px; white-space: pre; }
 .diff .add { background: var(--add-bg); } .diff .del { background: var(--del-bg); } .diff .hunk { background: var(--hunk-bg); color: var(--muted); }
+.card .note { padding: 8px 16px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.file + .file { border-top: 1px solid var(--border); }
+.file-head { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--card-head); }
+.file-head .counts { margin-left: auto; color: var(--muted); font-size: 12px; }
+.file .diff { border-bottom: 0; }
 </style>
 </head>
 <body>
@@ -58,6 +63,8 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 <div class="meta"><span class="state merged">Merged</span><span>octocat/hello-world</span></div>
 <section class="card kind-body">
 <header><span class="avatar" aria-hidden="true">O</span><strong>octocat</strong><a href="https://github.com/octocat/hello-world/pull/42">2026-07-01 00:00 UTC</a></header>
+
+
 
 
 <div class="body"><p>This adds <strong>retry</strong>.</p>
@@ -81,7 +88,18 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 <pre><code class="language-go">fmt.Println(1)
 </code></pre></div>
 </section>
+<section class="card kind-files">
+
+
+<header><strong>Files changed</strong><span>1 file · &#43;1 −1</span></header>
+
+<div class="file"><div class="file-head"><span class="inline-path">internal/foo.go</span><span class="badge">modified</span><span class="counts">&#43;1 −1</span></div><div class="diff"><div class="hunk">@@ -10,3 &#43;10,3 @@</div><div class="ctx"> context</div><div class="del">-old</div><div class="add">&#43;new</div></div></div>
+
+
+</section>
 <section class="card kind-generic">
+
+
 
 
 
@@ -91,10 +109,14 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 <header><span class="avatar" aria-hidden="true">R</span><strong>reviewer</strong><a href="https://github.com/octocat/hello-world/pull/42#issuecomment-100">2026-07-02 00:00 UTC</a></header>
 
 
+
+
 <div class="body"><p>Looks fine to me.</p></div>
 </section>
 <section class="card kind-review">
 <header><span class="avatar" aria-hidden="true">R</span><strong>reviewer</strong><span class="badge changes">Changes requested</span><a href="https://github.com/octocat/hello-world/pull/42#pullrequestreview-1">2026-07-02 01:00 UTC</a></header>
+
+
 
 
 <div class="body"><p>Please address the inline note.</p></div>
@@ -102,6 +124,8 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 <section class="card kind-inline">
 <header><span class="avatar" aria-hidden="true">R</span><strong>reviewer</strong><a href="https://github.com/octocat/hello-world/pull/42#discussion_r11">2026-07-02 01:00 UTC</a></header>
 <header><span class="inline-path">internal/foo.go</span><span>L10-L12</span></header>
+
+
 <div class="diff"><div class="hunk">@@ -10,3 &#43;10,3 @@</div><div class="ctx"> context</div><div class="del">-old</div><div class="add">&#43;new</div></div>
 <div class="body"><p>Use a constant here.</p></div>
 </section>

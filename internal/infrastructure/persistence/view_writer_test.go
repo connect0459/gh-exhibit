@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,7 +28,7 @@ const viewIssueJSON = `{
 	"pull_request": {"url": "https://api.github.com/repos/octocat/hello-world/pulls/42"}
 }`
 
-const viewPullRequestJSON = `{"merged_at": "2026-07-03T00:00:00Z", "head": {"sha": "abc1234567"}}`
+const viewPullRequestJSON = `{"merged_at": "2026-07-03T00:00:00Z", "head": {"sha": "abc1234567"}, "additions": 1, "deletions": 1}`
 
 const viewCommentJSON = `{
 	"event": "commented", "id": 100, "user": {"login": "reviewer"},
@@ -104,6 +105,9 @@ func pullRequestDocument(t *testing.T) valueobjects.Document {
 		Timeline:       []json.RawMessage{json.RawMessage(viewLabeledEventJSON), json.RawMessage(viewCommentJSON), json.RawMessage(viewReviewJSON)},
 		ReviewComments: []json.RawMessage{json.RawMessage(viewInlineCommentJSON)},
 		CheckRuns:      []json.RawMessage{json.RawMessage(viewCheckRunJSON)},
+		PullRequestFiles: []json.RawMessage{
+			changedFileJSON(t, "internal/foo.go", "", "modified", 1, 1, "@@ -10,3 +10,3 @@\n context\n-old\n+new"),
+		},
 	})
 }
 
@@ -370,5 +374,103 @@ func TestViewWriter_WriteView_SkipsABodyThatIsOnlyWhitespace(t *testing.T) {
 
 	if strings.Contains(got, `<div class="body">`) {
 		t.Fatalf("view renders an empty body block for a whitespace-only body")
+	}
+}
+
+func changedFileJSON(t *testing.T, filename, previous, status string, additions, deletions int, patch string) json.RawMessage {
+	t.Helper()
+
+	raw, err := json.Marshal(map[string]any{
+		"filename": filename, "previous_filename": previous, "status": status,
+		"additions": additions, "deletions": deletions, "patch": patch,
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	return raw
+}
+
+func pullRequestWithFiles(t *testing.T, additions, deletions int, files ...json.RawMessage) valueobjects.Document {
+	t.Helper()
+
+	return viewDocument(t, services.RawEvidence{
+		Issue:            json.RawMessage(viewIssueJSON),
+		PullRequest:      json.RawMessage(fmt.Sprintf(`{"merged_at": null, "head": {"sha": "abc1234567"}, "additions": %d, "deletions": %d}`, additions, deletions)),
+		PullRequestFiles: files,
+	})
+}
+
+func TestViewWriter_WriteView_ShowsAFilesChangedCardWithTheTotalsAndEachFilesName(t *testing.T) {
+	doc := pullRequestWithFiles(t, 3, 1,
+		changedFileJSON(t, "internal/foo.go", "", "modified", 2, 1, "@@ -1,2 +1,3 @@\n keep\n-old\n+new\n+newer"),
+		changedFileJSON(t, "README.md", "", "modified", 1, 0, "@@ -1 +1,2 @@\n title\n+added"),
+	)
+
+	got := html.UnescapeString(writeAndReadView(t, doc, identity))
+
+	for _, want := range []string{`class="card kind-files"`, "Files changed", "2 files", "+3", "−1", "internal/foo.go", "README.md"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("view lacks %q in its files changed card", want)
+		}
+	}
+}
+
+func TestViewWriter_WriteView_ColoursEachFilesDiffByAddedRemovedAndHunkLines(t *testing.T) {
+	doc := pullRequestWithFiles(t, 1, 1, changedFileJSON(t, "a.go", "", "modified", 1, 1, "@@ -1 +1 @@\n-old\n+new"))
+
+	got := html.UnescapeString(writeAndReadView(t, doc, identity))
+
+	for _, want := range []string{`<div class="hunk">@@ -1 +1 @@</div>`, `<div class="del">-old</div>`, `<div class="add">+new</div>`} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("view lacks %q in the file's diff", want)
+		}
+	}
+}
+
+func TestViewWriter_WriteView_ShowsBothNamesForARenamedFile(t *testing.T) {
+	doc := pullRequestWithFiles(t, 0, 0, changedFileJSON(t, "new/name.go", "old/name.go", "renamed", 0, 0, ""))
+
+	got := writeAndReadView(t, doc, identity)
+
+	if !strings.Contains(got, "old/name.go → new/name.go") {
+		t.Fatalf("view does not show a renamed file as old → new")
+	}
+}
+
+func TestViewWriter_WriteView_ListsAFileWithoutADiffByNameOnly(t *testing.T) {
+	doc := pullRequestWithFiles(t, 5, 0, changedFileJSON(t, "big.bin", "", "added", 5, 0, ""))
+
+	got := writeAndReadView(t, doc, identity)
+
+	if !strings.Contains(got, "big.bin") || strings.Contains(got, `class="diff"`) {
+		t.Fatalf("view should list big.bin by name without a diff block")
+	}
+}
+
+func TestViewWriter_WriteView_NotesThatDiffsWereOmittedForALargePullRequest(t *testing.T) {
+	doc := pullRequestWithFiles(t, 1200, 0, changedFileJSON(t, "huge.go", "", "added", 1200, 0, "+x"))
+
+	got := writeAndReadView(t, doc, identity)
+
+	if !strings.Contains(got, "Diffs are omitted") {
+		t.Fatalf("view does not note that diffs were omitted for a large pull request")
+	}
+}
+
+func TestViewWriter_WriteView_OmitsTheFilesChangedCardWhenThereAreNoFiles(t *testing.T) {
+	got := writeAndReadView(t, pullRequestWithFiles(t, 0, 0), identity)
+
+	if strings.Contains(got, "kind-files") {
+		t.Fatalf("view has a files changed card for a pull request without changed files")
+	}
+}
+
+func TestViewWriter_WriteView_EscapesAChangedFilesNameAndPatchInsteadOfInterpretingThemAsHTML(t *testing.T) {
+	doc := pullRequestWithFiles(t, 1, 0, changedFileJSON(t, "<script>alert(1)</script>.go", "", "added", 1, 0, "+<img src=x onerror=alert(2)>"))
+
+	got := writeAndReadView(t, doc, identity)
+
+	if strings.Contains(got, "<script>alert(1)") || strings.Contains(got, "<img src=x") {
+		t.Fatalf("view interprets a changed file's name or patch as HTML")
 	}
 }

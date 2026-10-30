@@ -54,6 +54,11 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 .diff { margin: 0; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; border-bottom: 1px solid var(--border); overflow: auto; }
 .diff div { padding: 0 16px; white-space: pre; }
 .diff .add { background: var(--add-bg); } .diff .del { background: var(--del-bg); } .diff .hunk { background: var(--hunk-bg); color: var(--muted); }
+.card .note { padding: 8px 16px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.file + .file { border-top: 1px solid var(--border); }
+.file-head { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--card-head); }
+.file-head .counts { margin-left: auto; color: var(--muted); font-size: 12px; }
+.file .diff { border-bottom: 0; }
 </style>
 </head>
 <body>
@@ -63,7 +68,10 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 {{range .Cards}}<section class="card kind-{{.Kind}}">
 {{if .Author}}<header><span class="avatar" aria-hidden="true">{{.Initial}}</span><strong>{{.Author}}</strong>{{if .Badge}}<span class="badge {{.BadgeClass}}">{{.Badge}}</span>{{end}}<a href="{{.URL}}">{{.When}}</a></header>{{end}}
 {{if .Path}}<header><span class="inline-path">{{.Path}}</span>{{if .Lines}}<span>{{.Lines}}</span>{{end}}{{if .Outdated}}<span class="badge outdated">Outdated</span>{{end}}</header>{{end}}
-{{if .Diff}}<div class="diff">{{range .Diff}}<div class="{{.Class}}">{{.Text}}</div>{{end}}</div>{{end}}
+{{if .Title}}<header><strong>{{.Title}}</strong>{{if .Summary}}<span>{{.Summary}}</span>{{end}}</header>{{end}}
+{{if .Note}}<div class="note">{{.Note}}</div>{{end}}
+{{range .Files}}<div class="file"><div class="file-head"><span class="inline-path">{{.Name}}</span><span class="badge">{{.Status}}</span><span class="counts">{{.Counts}}</span></div>{{if .Diff}}<div class="diff">{{range .Diff}}<div class="{{.Class}}">{{.Text}}</div>{{end}}</div>{{end}}</div>
+{{end}}{{if .Diff}}<div class="diff">{{range .Diff}}<div class="{{.Class}}">{{.Text}}</div>{{end}}</div>{{end}}
 {{if .HTML}}<div class="body">{{.HTML}}</div>{{end}}
 </section>
 {{end}}</main>
