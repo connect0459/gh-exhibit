@@ -59,6 +59,13 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 .file-head { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--card-head); }
 .file-head .counts { margin-left: auto; color: var(--muted); font-size: 12px; }
 .file .diff { border-bottom: 0; }
+.commit { display: flex; align-items: baseline; gap: 12px; padding: 8px 16px; }
+.commit + .commit { border-top: 1px solid var(--border); }
+.commit .sha { color: var(--muted); }
+.commit details, .commit .subject { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.commit summary { cursor: pointer; }
+.commit pre { margin: 8px 0 0; white-space: pre-wrap; color: var(--muted); }
+.commit .who { color: var(--muted); font-size: 12px; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -71,6 +78,7 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 {{if .Title}}<header><strong>{{.Title}}</strong>{{if .Summary}}<span>{{.Summary}}</span>{{end}}</header>{{end}}
 {{if .Note}}<div class="note">{{.Note}}</div>{{end}}
 {{range .Files}}<div class="file"><div class="file-head"><span class="inline-path">{{.Name}}</span><span class="badge">{{.Status}}</span><span class="counts">{{.Counts}}</span></div>{{if .Diff}}<div class="diff">{{range .Diff}}<div class="{{.Class}}">{{.Text}}</div>{{end}}</div>{{end}}</div>
+{{end}}{{range .Commits}}<div class="commit"><code class="sha">{{.SHA}}</code>{{if .Body}}<details><summary>{{.Subject}}</summary><pre>{{.Body}}</pre></details>{{else}}<span class="subject">{{.Subject}}</span>{{end}}<span class="who">{{.Author}} · {{.When}}</span></div>
 {{end}}{{if .Diff}}<div class="diff">{{range .Diff}}<div class="{{.Class}}">{{.Text}}</div>{{end}}</div>{{end}}
 {{if .HTML}}<div class="body">{{.HTML}}</div>{{end}}
 </section>

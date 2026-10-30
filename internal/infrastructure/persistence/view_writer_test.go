@@ -108,6 +108,9 @@ func pullRequestDocument(t *testing.T) valueobjects.Document {
 		PullRequestFiles: []json.RawMessage{
 			changedFileJSON(t, "internal/foo.go", "", "modified", 1, 1, "@@ -10,3 +10,3 @@\n context\n-old\n+new"),
 		},
+		PullRequestCommits: []json.RawMessage{
+			commitJSON(t, "abc1234567890", "octocat", "feat: add retry backoff\n\nRetries now wait longer each time."),
+		},
 	})
 }
 
@@ -472,5 +475,80 @@ func TestViewWriter_WriteView_EscapesAChangedFilesNameAndPatchInsteadOfInterpret
 
 	if strings.Contains(got, "<script>alert(1)") || strings.Contains(got, "<img src=x") {
 		t.Fatalf("view interprets a changed file's name or patch as HTML")
+	}
+}
+
+func commitJSON(t *testing.T, sha, author, message string) json.RawMessage {
+	t.Helper()
+
+	identity := map[string]string{"name": author, "date": "2026-07-01T09:30:00Z"}
+	raw, err := json.Marshal(map[string]any{
+		"sha":    sha,
+		"commit": map[string]any{"author": identity, "committer": identity, "message": message},
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	return raw
+}
+
+func pullRequestWithCommits(t *testing.T, commits ...json.RawMessage) valueobjects.Document {
+	t.Helper()
+
+	return viewDocument(t, services.RawEvidence{
+		Issue:              json.RawMessage(viewIssueJSON),
+		PullRequest:        json.RawMessage(viewPullRequestJSON),
+		PullRequestCommits: commits,
+	})
+}
+
+func TestViewWriter_WriteView_ShowsACommitsCardWithEachCommitsShortSHASubjectAndAuthor(t *testing.T) {
+	doc := pullRequestWithCommits(t,
+		commitJSON(t, "9f35e9c1234567890abcdef", "octocat", "ci: pin workflow actions"),
+		commitJSON(t, "1111111222222233333334", "hubot", "fix: handle empty input"),
+	)
+
+	got := writeAndReadView(t, doc, identity)
+
+	for _, want := range []string{`class="card kind-commits"`, "Commits", "2 commits", ">9f35e9c<", "ci: pin workflow actions", "octocat", "2026-07-01 09:30 UTC", ">1111111<", "hubot"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("view lacks %q in its commits card", want)
+		}
+	}
+}
+
+func TestViewWriter_WriteView_FoldsACommitMessageBodyBehindItsSubject(t *testing.T) {
+	doc := pullRequestWithCommits(t,
+		commitJSON(t, "9f35e9c1234567890abcdef", "octocat", "ci: pin workflow actions\n\nAlso drops redundant step names."),
+		commitJSON(t, "1111111222222233333334", "hubot", "fix: handle empty input"),
+	)
+
+	got := writeAndReadView(t, doc, identity)
+
+	if !strings.Contains(got, "<details><summary>ci: pin workflow actions</summary>") || !strings.Contains(got, "Also drops redundant step names.") {
+		t.Fatalf("view does not fold the commit message body behind its subject")
+	}
+	if n := strings.Count(got, "<details>"); n != 1 {
+		t.Fatalf("view has %d folded commit messages, want 1 (a subject-only commit has nothing to fold)", n)
+	}
+}
+
+func TestViewWriter_WriteView_OmitsTheCommitsCardWhenThereAreNoCommits(t *testing.T) {
+	got := writeAndReadView(t, pullRequestWithCommits(t), identity)
+
+	if strings.Contains(got, "kind-commits") {
+		t.Fatalf("view has a commits card for a pull request without commits")
+	}
+}
+
+func TestViewWriter_WriteView_EscapesACommitsMessageAndAuthorInsteadOfInterpretingThemAsHTML(t *testing.T) {
+	doc := pullRequestWithCommits(t, commitJSON(t, "9f35e9c1234567890abcdef", "<b>mallory</b>", "<script>alert(1)</script>\n\n<img src=x onerror=alert(2)>"))
+
+	got := writeAndReadView(t, doc, identity)
+
+	for _, bad := range []string{"<script>alert(1)", "<img src=x", "<b>mallory"} {
+		if strings.Contains(got, bad) {
+			t.Fatalf("view interprets a commit's message or author as HTML: found %q", bad)
+		}
 	}
 }

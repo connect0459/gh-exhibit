@@ -41,7 +41,16 @@ type viewCard struct {
 	Summary    string
 	Note       string
 	Files      []viewFile
+	Commits    []viewCommit
 	HTML       template.HTML
+}
+
+type viewCommit struct {
+	SHA     string
+	Subject string
+	Body    string
+	Author  string
+	When    string
 }
 
 type viewFile struct {
@@ -133,6 +142,10 @@ func renderView(ref valueobjects.IssueRef, doc valueobjects.Document, rewrite fu
 			if card, ok := filesCard(e); ok {
 				model.Cards = append(model.Cards, card)
 			}
+		case valueobjects.PullRequestCommits:
+			if card, ok := commitsCard(e); ok {
+				model.Cards = append(model.Cards, card)
+			}
 		case valueobjects.PullRequestChecks:
 			continue
 		default:
@@ -193,6 +206,34 @@ func filesCard(d valueobjects.PullRequestDiff) (viewCard, bool) {
 		})
 	}
 	return card, true
+}
+
+func commitsCard(c valueobjects.PullRequestCommits) (viewCard, bool) {
+	commits := c.Commits()
+	if len(commits) == 0 {
+		return viewCard{}, false
+	}
+
+	card := viewCard{Kind: "commits", Title: "Commits", Summary: pluralize(len(commits), "commit")}
+	for _, commit := range commits {
+		subject, body, _ := strings.Cut(commit.Message(), "\n")
+		card.Commits = append(card.Commits, viewCommit{
+			SHA:     shortSHA(commit.SHA()),
+			Subject: strings.TrimSpace(subject),
+			Body:    strings.TrimSpace(body),
+			Author:  commit.AuthorName(),
+			When:    commit.AuthoredAt().UTC().Format("2006-01-02 15:04 UTC"),
+		})
+	}
+	return card, true
+}
+
+func shortSHA(sha string) string {
+	const length = 7
+	if len(sha) <= length {
+		return sha
+	}
+	return sha[:length]
 }
 
 func pluralize(n int, noun string) string {
