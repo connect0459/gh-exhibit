@@ -62,6 +62,8 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 .commit summary { cursor: pointer; }
 .commit pre { margin: 8px 0 0; white-space: pre-wrap; color: var(--muted); }
 .commit .who { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.event { margin: 0 0 16px 16px; padding-left: 12px; border-left: 2px solid var(--border); color: var(--muted); }
+.event strong { color: var(--fg); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -69,6 +71,7 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 <h1 class="title">Add retry backoff <span class="number">#42</span></h1>
 <div class="meta"><span class="state merged">Merged</span><span>octocat/hello-world</span></div>
 <section class="card kind-body">
+
 <header><span class="avatar" aria-hidden="true">O</span><strong>octocat</strong><a href="https://github.com/octocat/hello-world/pull/42">2026-07-01 00:00 UTC</a></header>
 
 
@@ -98,6 +101,7 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 <section class="card kind-files">
 
 
+
 <header><strong>Files changed</strong><span>1 file · &#43;1 −1</span></header>
 
 <div class="file"><div class="file-head"><span class="inline-path">internal/foo.go</span><span class="badge">modified</span><span class="counts">&#43;1 −1</span></div><div class="diff"><div class="hunk">@@ -10,3 &#43;10,3 @@</div><div class="ctx"> context</div><div class="del">-old</div><div class="add">&#43;new</div></div></div>
@@ -107,21 +111,24 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 <section class="card kind-commits">
 
 
+
 <header><strong>Commits</strong><span>1 commit</span></header>
 
 <div class="commit"><code class="sha">abc1234</code><details><summary>feat: add retry backoff</summary><pre>Retries now wait longer each time.</pre></details><span class="who">octocat · 2026-07-01 09:30 UTC</span></div>
 
 
 </section>
-<section class="card kind-generic">
+<section class="event">
+<strong>octocat</strong> added the label enhancement · 2026-07-01 01:00 UTC
 
 
 
 
 
-<div class="body"><p>Labeled <code>enhancement</code></p></div>
+
 </section>
 <section class="card kind-comment">
+
 <header><span class="avatar" aria-hidden="true">R</span><strong>reviewer</strong><a href="https://github.com/octocat/hello-world/pull/42#issuecomment-100">2026-07-02 00:00 UTC</a></header>
 
 
@@ -130,6 +137,7 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 <div class="body"><p>Looks fine to me.</p></div>
 </section>
 <section class="card kind-review">
+
 <header><span class="avatar" aria-hidden="true">R</span><strong>reviewer</strong><span class="badge changes">Changes requested</span><a href="https://github.com/octocat/hello-world/pull/42#pullrequestreview-1">2026-07-02 01:00 UTC</a></header>
 
 
@@ -138,6 +146,7 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 <div class="body"><p>Please address the inline note.</p></div>
 </section>
 <section class="card kind-inline">
+
 <header><span class="avatar" aria-hidden="true">R</span><strong>reviewer</strong><a href="https://github.com/octocat/hello-world/pull/42#discussion_r11">2026-07-02 01:00 UTC</a></header>
 <header><span class="inline-path">internal/foo.go</span><span>L10-L12</span></header>
 

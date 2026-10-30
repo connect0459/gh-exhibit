@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/microcosm-cc/bluemonday"
@@ -37,6 +38,8 @@ type viewCard struct {
 	Lines      string
 	Outdated   bool
 	Diff       []diffLine
+	Event      string
+	Actor      string
 	Title      string
 	Summary    string
 	Note       string
@@ -146,6 +149,16 @@ func renderView(ref valueobjects.IssueRef, doc valueobjects.Document, rewrite fu
 			if card, ok := commitsCard(e); ok {
 				model.Cards = append(model.Cards, card)
 			}
+		case valueobjects.AssignmentEvent:
+			model.Cards = append(model.Cards, eventRow(e.Attribution(), assignmentText(e)))
+		case valueobjects.ClosureEvent:
+			model.Cards = append(model.Cards, eventRow(e.Attribution(), closureText(e)))
+		case valueobjects.LabelEvent:
+			model.Cards = append(model.Cards, eventRow(e.Attribution(), labelText(e)))
+		case valueobjects.MilestoneEvent:
+			model.Cards = append(model.Cards, eventRow(e.Attribution(), milestoneText(e)))
+		case valueobjects.RenameEvent:
+			model.Cards = append(model.Cards, eventRow(e.Attribution(), "renamed this from "+e.From()+" to "+e.To()))
 		case valueobjects.PullRequestChecks:
 			continue
 		default:
@@ -222,7 +235,7 @@ func commitsCard(c valueobjects.PullRequestCommits) (viewCard, bool) {
 			Subject: strings.TrimSpace(subject),
 			Body:    strings.TrimSpace(body),
 			Author:  commit.AuthorName(),
-			When:    commit.AuthoredAt().UTC().Format("2006-01-02 15:04 UTC"),
+			When:    formatWhen(commit.AuthoredAt()),
 		})
 	}
 	return card, true
@@ -234,6 +247,46 @@ func shortSHA(sha string) string {
 		return sha
 	}
 	return sha[:length]
+}
+
+func eventRow(a valueobjects.Attribution, text string) viewCard {
+	return viewCard{Kind: "event", Actor: a.Author(), Event: text, When: formatWhen(a.CreatedAt())}
+}
+
+func assignmentText(e valueobjects.AssignmentEvent) string {
+	if e.Action() == valueobjects.AssignmentActionUnassigned {
+		return "unassigned @" + e.Assignee()
+	}
+	return "assigned @" + e.Assignee()
+}
+
+func closureText(e valueobjects.ClosureEvent) string {
+	switch {
+	case e.Action() == valueobjects.ClosureActionReopened:
+		return "reopened this"
+	case e.Reason() != "":
+		return "closed this (" + e.Reason() + ")"
+	default:
+		return "closed this"
+	}
+}
+
+func labelText(e valueobjects.LabelEvent) string {
+	if e.Action() == valueobjects.LabelActionUnlabeled {
+		return "removed the label " + e.Name()
+	}
+	return "added the label " + e.Name()
+}
+
+func milestoneText(e valueobjects.MilestoneEvent) string {
+	if e.Action() == valueobjects.MilestoneActionDemilestoned {
+		return "removed this from the milestone " + e.Title()
+	}
+	return "added this to the milestone " + e.Title()
+}
+
+func formatWhen(t time.Time) string {
+	return t.UTC().Format("2006-01-02 15:04 UTC")
 }
 
 func pluralize(n int, noun string) string {
@@ -249,7 +302,7 @@ func authoredCard(kind string, a valueobjects.Attribution, body template.HTML) v
 		Kind:    kind,
 		Initial: string(initial),
 		Author:  a.Author(),
-		When:    a.CreatedAt().UTC().Format("2006-01-02 15:04 UTC"),
+		When:    formatWhen(a.CreatedAt()),
 		URL:     a.URL().String(),
 		HTML:    body,
 	}

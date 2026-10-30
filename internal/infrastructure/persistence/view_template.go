@@ -66,13 +66,16 @@ h1.title .number { color: var(--muted); font-weight: 300; }
 .commit summary { cursor: pointer; }
 .commit pre { margin: 8px 0 0; white-space: pre-wrap; color: var(--muted); }
 .commit .who { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.event { margin: 0 0 16px 16px; padding-left: 12px; border-left: 2px solid var(--border); color: var(--muted); }
+.event strong { color: var(--fg); font-weight: 500; }
 </style>
 </head>
 <body>
 <main>
 <h1 class="title">{{.Title}} <span class="number">#{{.Number}}</span></h1>
 <div class="meta"><span class="state {{.State}}">{{.StateLabel}}</span><span>{{.Repo}}</span></div>
-{{range .Cards}}<section class="card kind-{{.Kind}}">
+{{range .Cards}}<section class="{{if .Event}}event{{else}}card kind-{{.Kind}}{{end}}">
+{{if .Event}}<strong>{{.Actor}}</strong> {{.Event}} · {{.When}}{{end}}
 {{if .Author}}<header><span class="avatar" aria-hidden="true">{{.Initial}}</span><strong>{{.Author}}</strong>{{if .Badge}}<span class="badge {{.BadgeClass}}">{{.Badge}}</span>{{end}}<a href="{{.URL}}">{{.When}}</a></header>{{end}}
 {{if .Path}}<header><span class="inline-path">{{.Path}}</span>{{if .Lines}}<span>{{.Lines}}</span>{{end}}{{if .Outdated}}<span class="badge outdated">Outdated</span>{{end}}</header>{{end}}
 {{if .Title}}<header><strong>{{.Title}}</strong>{{if .Summary}}<span>{{.Summary}}</span>{{end}}</header>{{end}}

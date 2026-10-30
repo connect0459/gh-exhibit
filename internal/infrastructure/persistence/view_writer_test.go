@@ -183,19 +183,24 @@ func TestViewWriter_WriteView_ShowsAnAuthorsInitialAsTheAvatarInsteadOfLoadingOn
 	}
 }
 
-func TestViewWriter_WriteView_RendersEntriesWithoutADedicatedCardAsGenericMarkdown(t *testing.T) {
-	got := writeAndReadView(t, pullRequestDocument(t), identity)
+func TestViewWriter_WriteView_RendersEntriesWithoutADedicatedViewAsGenericMarkdown(t *testing.T) {
+	doc := viewDocument(t, services.RawEvidence{
+		Issue:     json.RawMessage(`{"title":"Epic","body":"b","user":{"login":"octocat"},"created_at":"2026-07-01T00:00:00Z","html_url":"https://github.com/octocat/hello-world/issues/42"}`),
+		SubIssues: []json.RawMessage{json.RawMessage(`{"number":65,"title":"Include issue/PR labels","state":"closed","html_url":"https://github.com/octocat/hello-world/issues/65"}`)},
+	})
 
-	if !strings.Contains(got, `class="card kind-generic"`) || !strings.Contains(got, "enhancement") {
-		t.Fatalf("view does not render the labeled event as a generic card naming the label")
+	got := writeAndReadView(t, doc, identity)
+
+	if !strings.Contains(got, `class="card kind-generic"`) || !strings.Contains(got, "Include issue/PR labels") {
+		t.Fatalf("view does not render the sub-issues as a generic card naming the sub-issue")
 	}
 }
 
-func TestViewWriter_WriteView_OmitsEntriesThatRenderToNothingVisible(t *testing.T) {
+func TestViewWriter_WriteView_UsesNoGenericCardForEntriesThatHaveADedicatedView(t *testing.T) {
 	got := writeAndReadView(t, pullRequestDocument(t), identity)
 
-	if n := strings.Count(got, `class="card kind-generic"`); n != 1 {
-		t.Fatalf("view has %d generic cards, want 1 (only the labeled event; the diff and commits entries have no content in this fixture)", n)
+	if n := strings.Count(got, `class="card kind-generic"`); n != 0 {
+		t.Fatalf("view has %d generic cards, want 0 (the diff, commits, and events each have a dedicated view)", n)
 	}
 }
 
@@ -550,5 +555,61 @@ func TestViewWriter_WriteView_EscapesACommitsMessageAndAuthorInsteadOfInterpreti
 		if strings.Contains(got, bad) {
 			t.Fatalf("view interprets a commit's message or author as HTML: found %q", bad)
 		}
+	}
+}
+
+func eventJSON(event, extra string) string {
+	return fmt.Sprintf(`{"id": 9, "event": %q, "actor": {"login": "octocat"}, "created_at": "2026-07-01T02:00:00Z"%s}`, event, extra)
+}
+
+func TestViewWriter_WriteView_ShowsATimelineEventAsOneLineNamingTheActorAndWhen(t *testing.T) {
+	doc := plainIssueWithBody(t, "t", "b", eventJSON("assigned", `, "assignee": {"login": "hubot"}`))
+
+	got := writeAndReadView(t, doc, identity)
+
+	for _, want := range []string{`<section class="event">`, "<strong>octocat</strong>", "assigned @hubot", "2026-07-01 02:00 UTC"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("view lacks %q in the assignment event row", want)
+		}
+	}
+	if strings.Contains(got, "kind-generic") {
+		t.Fatalf("view draws the event as a card, want a bare timeline row")
+	}
+}
+
+func TestViewWriter_WriteView_DescribesEachKindOfTimelineEventInWords(t *testing.T) {
+	tests := []struct {
+		name  string
+		event string
+		want  string
+	}{
+		{"unassigned", eventJSON("unassigned", `, "assignee": {"login": "hubot"}`), "unassigned @hubot"},
+		{"closed", eventJSON("closed", ""), "closed this"},
+		{"closed with a reason", eventJSON("closed", `, "state_reason": "not_planned"`), "closed this (not_planned)"},
+		{"reopened", eventJSON("reopened", ""), "reopened this"},
+		{"labeled", eventJSON("labeled", `, "label": {"name": "bug", "color": "d73a4a"}`), "added the label bug"},
+		{"unlabeled", eventJSON("unlabeled", `, "label": {"name": "bug", "color": "d73a4a"}`), "removed the label bug"},
+		{"milestoned", eventJSON("milestoned", `, "milestone": {"title": "v1"}`), "added this to the milestone v1"},
+		{"demilestoned", eventJSON("demilestoned", `, "milestone": {"title": "v1"}`), "removed this from the milestone v1"},
+		{"renamed", eventJSON("renamed", `, "rename": {"from": "Old", "to": "New"}`), "renamed this from Old to New"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := writeAndReadView(t, plainIssueWithBody(t, "t", "b", tt.event), identity)
+
+			if !strings.Contains(got, tt.want) {
+				t.Fatalf("view lacks %q for a %s event", tt.want, tt.name)
+			}
+		})
+	}
+}
+
+func TestViewWriter_WriteView_EscapesAnEventsLabelNameInsteadOfInterpretingItAsHTML(t *testing.T) {
+	doc := plainIssueWithBody(t, "t", "b", eventJSON("labeled", `, "label": {"name": "<script>alert(1)</script>", "color": "d73a4a"}`))
+
+	got := writeAndReadView(t, doc, identity)
+
+	if strings.Contains(got, "<script>alert(1)") {
+		t.Fatalf("view interprets an event's label name as HTML")
 	}
 }
