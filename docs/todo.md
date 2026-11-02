@@ -762,3 +762,15 @@ A second local review of the dial-time guard above, before its branch was pushed
 - Added `TestAttachmentGuardTransport_RejectsARedirectOnASecondFetchReusingAPooledConnection`, reproducing the exact scenario above end-to-end against real `httptest.Server`s and the real production types, with an instrumented dial confirming exactly one real dial occurred across both requests (proving connection reuse genuinely happened, not merely assumed) while the second request's redirect is still refused. Also added direct unit tests of `attachmentGuardRoundTripper`'s marking behavior and `newAttachmentDialContext`'s revised, marker-based contract, replacing the pin-based tests the prior entry's version had (those tested the mechanism this entry replaced, not a smaller version of it).
 
 C0 after this revision: `internal/infrastructure/github` 94.9% (up from 94.8%). `go build ./...`, `go vet ./...`, `go test ./... -race -cover`, and `gofmt -l .` all pass.
+
+### CI split into changes, run, and gate jobs (2026-11-02)
+
+`.github/workflows/ci.yml` was one job named `gate` that ran the path filter and every check as conditional steps. It is now three jobs, on `ci/split-jobs-changes-run-gate` (a tooling-only change):
+
+- `changes` runs `dorny/paths-filter` and exposes the result as a job output. `run` is skipped, as a whole job, when neither a Go-relevant path nor `workflow_dispatch` applies, so the per-step `if:` guards and the "Skip CI checks" no-op step are gone.
+- `run` keeps the existing sequential checks (`gofmt -l .` → `go vet ./...` → `golangci-lint` → `go build ./...` → `go test ./... -race -cover`) in a single job.
+- `gate` depends on both and runs with `if: always()`, failing only when a dependency failed or was cancelled. A skipped `run` therefore still lets `gate` succeed, so the `Main Branch Protection` ruleset's required `gate` check is reported on every PR, including docs-only ones. The required check name did not change, so the ruleset needs no edit.
+- **Not a reversal of the "single job" decision above**: that entry rejected splitting lint and test into parallel jobs because it duplicated checkout and setup-go for no real parallelism gain. `run` is still one job that sets up Go once, and `changes` only filters paths, so nothing is duplicated. This matches `edit-pr-duration`'s existing job structure.
+- `changes` keeps `fetch-depth: 0`, since diffing a `push` event against its previous ref needs history. `run` uses a default shallow clone, since it only builds and tests the checked-out tree. Both set `persist-credentials: false`.
+
+No test file for a workflow YAML change, same precedent as the entries above; verified with `actionlint` and `pre-commit run --files .github/workflows/ci.yml`.
