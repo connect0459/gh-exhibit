@@ -18,8 +18,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gate:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,13 +39,20 @@ jobs:
               - 'go.mod'
               - 'go.sum'
 
+  run:
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         with:
           go-version-file: go.mod
 
       - name: Check formatting
-        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           unformatted=$(gofmt -l .)
@@ -54,26 +63,31 @@ jobs:
           fi
 
       - name: Run go vet
-        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: go vet ./...
 
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         with:
           version: v2.15.0
 
       - name: Build
-        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: go build ./...
 
       - name: Test
-        if: steps.filter.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: go test ./... -race -cover
 
-      - name: Skip CI checks (no relevant changes)
-        if: steps.filter.outputs.code != 'true' && github.event_name != 'workflow_dispatch'
+  gate:
+    needs:
+      - changes
+      - run
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all required jobs succeeded
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         shell: bash
-        run: echo "No changes detected in code-related files."
+        run: |
+          echo "One or more required jobs did not succeed."
+          exit 1
