@@ -82,6 +82,8 @@ Coverage targets (see `docs/specs/README.md`): domain layer (`internal/domain/..
 3. Run `go test ./... -race -cover` and `pre-commit run --all-files`, and ensure both pass.
 4. Open a pull request using the repository's PR template — CI (`gofmt`, `go vet`, `golangci-lint`, `go build`, `go test -race -cover`) runs automatically.
 
+Do not edit `CHANGELOG.md` in regular pull requests. Changelog entries are written all at once in the Release PR.
+
 ## Code style
 
 - Onion architecture: `internal/domain` defines abstract types (ports, value objects); `internal/infrastructure` implements them; `internal/application` orchestrates across layers; `internal/presentation` is the CLI entrypoint. No layer depends directly on a concrete type from a layer it doesn't own.
